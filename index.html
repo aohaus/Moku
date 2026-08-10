@@ -10,18 +10,70 @@
 <meta name="apple-mobile-web-app-title" content="Moku Series">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --sky-top: #05060f;
+  --sky-mid: #0d1024;
+  --sky-bottom: #141a33;
+  --place-glow: rgba(147,160,255,0.25);
+  --place-accent: #93A0FF;
+  --skyline-shape: polygon(0% 100%,0% 100%,100% 100%,100% 100%);
+}
 html, body {
   min-height: 100%;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(42,122,48,0.10), transparent 40%),
-    radial-gradient(circle at 82% 20%, rgba(217,111,176,0.09), transparent 42%),
-    radial-gradient(circle at 55% 85%, rgba(255,201,74,0.08), transparent 45%),
-    linear-gradient(180deg, #0A0B12 0%, #121320 55%, #0A0B12 100%);
+  background: #0A0B12;
   color: #EDEEF6;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+/* Negative z-index on a fixed child of <body> would be painted behind
+   the html/body "canvas background" in most browsers, so these layers
+   use z-index:0 and rely on DOM order + .wrap's own stacking context
+   (position:relative + z-index:1) to sit above them instead. */
+#skyLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 24% 18%, var(--place-glow), transparent 46%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bottom) 100%);
+  transition: background 1.4s ease;
+}
+#starsLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.4s ease;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 18%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 28% 8%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 44% 22%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 61% 12%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 77% 20%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 88% 9%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 6% 34%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 95% 33%, #fff, transparent);
+  background-repeat: no-repeat;
+}
+body[data-band="night"] #starsLayer,
+body[data-band="evening"] #starsLayer {
+  opacity: 0.7;
+}
+#skylineLayer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 15vh;
+  min-height: 100px;
+  z-index: 0;
+  background: var(--place-accent);
+  filter: brightness(0.14) saturate(1.2);
+  clip-path: var(--skyline-shape);
+  transition: clip-path 1.4s ease, background 1.4s ease;
+}
 .wrap {
+  position: relative;
+  z-index: 1;
   max-width: 1040px;
   margin: 0 auto;
   padding: clamp(28px, 6vw, 64px) 20px 40px;
@@ -53,6 +105,30 @@ header p {
   font-size: clamp(13px, 2.4vw, 15px);
   font-weight: 600;
   letter-spacing: 0.04em;
+}
+#skyMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+#clock {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(13px, 2.6vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+#placeLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--place-accent);
+  transition: color 1.4s ease;
 }
 .cards {
   width: 100%;
@@ -173,11 +249,18 @@ footer {
 </style>
 </head>
 <body>
+<div id="skyLayer"></div>
+<div id="starsLayer"></div>
+<div id="skylineLayer"></div>
 <div class="wrap">
   <header>
     <img class="owl" src="icons/icon-512.png" alt="モクモク">
     <h1>Moku Series</h1>
     <p>Pick a game to play · 9 titles planned (4 live now)</p>
+    <div id="skyMeta">
+      <div id="clock">----年--月--日(-) --:--</div>
+      <div id="placeLabel">・・・</div>
+    </div>
   </header>
 
   <div class="cards">
@@ -221,5 +304,70 @@ footer {
     <div class="repo-note">aohaus/Moku</div>
   </footer>
 </div>
+<script>
+(function () {
+  // Background = time-of-day band (4) × place (7: 6 SE Asian cities + one
+  // "otherworld" slot), fixed by the visitor's local day-of-week and hour
+  // rather than randomized, so the hub reliably cycles through all 7
+  // places across a week and all 4 lighting moods across a day.
+  var PLACES = [
+    { name: 'バンコク',           emoji: '🛕', accent: '#FFC94A', skyline: 'city'   }, // Sun
+    { name: 'シンガポール',       emoji: '🌆', accent: '#45E0D9', skyline: 'modern' }, // Mon
+    { name: 'クアラルンプール',   emoji: '🏙️', accent: '#8C7BFF', skyline: 'modern' }, // Tue
+    { name: 'マニラ',             emoji: '🌇', accent: '#FF6F91', skyline: 'city'   }, // Wed
+    { name: 'ホーチミン',         emoji: '🏮', accent: '#4FCB6B', skyline: 'city'   }, // Thu
+    { name: 'ジャカルタ',         emoji: '🕌', accent: '#FF9F45', skyline: 'modern' }, // Fri
+    { name: '異世界',             emoji: '✨', accent: '#C77DFF', skyline: 'other'  }  // Sat
+  ];
+  // Kept deliberately dark and low-saturation across all four bands, in
+  // line with the series design system (SPEC.md §03): this is a mood
+  // shift, not a bright-daytime website.
+  var BANDS = {
+    morning: { label: '朝', sky: ['#181026', '#2c2032', '#3f2a26'] },
+    day:     { label: '昼', sky: ['#0d1420', '#152134', '#1f3040'] },
+    evening: { label: '夕', sky: ['#150e1e', '#291828', '#392016'] },
+    night:   { label: '夜', sky: ['#05060f', '#0d1024', '#141a33'] }
+  };
+  var SKYLINE_SHAPES = {
+    city:   'polygon(0% 100%,0% 55%,4% 55%,4% 35%,9% 35%,9% 60%,15% 60%,15% 20%,19% 20%,19% 60%,26% 60%,26% 45%,32% 45%,32% 70%,38% 70%,38% 30%,44% 30%,44% 65%,50% 65%,50% 10%,54% 10%,54% 65%,60% 65%,60% 40%,66% 40%,66% 60%,72% 60%,72% 25%,78% 25%,78% 60%,85% 60%,85% 45%,90% 45%,90% 65%,96% 65%,96% 50%,100% 50%,100% 100%)',
+    modern: 'polygon(0% 100%,0% 60%,5% 60%,5% 25%,10% 25%,10% 60%,16% 60%,16% 15%,21% 15%,21% 60%,28% 60%,28% 40%,34% 40%,34% 5%,38% 5%,38% 40%,44% 40%,44% 55%,50% 55%,50% 20%,56% 20%,56% 55%,63% 55%,63% 35%,69% 35%,69% 5%,73% 5%,73% 35%,80% 35%,80% 50%,86% 50%,86% 20%,92% 20%,92% 50%,100% 50%,100% 100%)',
+    other:  'polygon(0% 100%,0% 70%,8% 60%,14% 72%,20% 55%,28% 68%,35% 50%,44% 66%,52% 48%,60% 64%,68% 52%,76% 66%,84% 56%,92% 68%,100% 58%,100% 100%)'
+  };
+
+  function bandKeyFor(hour) {
+    if (hour >= 5 && hour < 10) return 'morning';
+    if (hour >= 10 && hour < 17) return 'day';
+    if (hour >= 17 && hour < 20) return 'evening';
+    return 'night';
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function updateSky() {
+    var now = new Date();
+    var place = PLACES[now.getDay()];
+    var bandKey = bandKeyFor(now.getHours());
+    var band = BANDS[bandKey];
+    var root = document.documentElement.style;
+
+    root.setProperty('--sky-top', band.sky[0]);
+    root.setProperty('--sky-mid', band.sky[1]);
+    root.setProperty('--sky-bottom', band.sky[2]);
+    root.setProperty('--place-glow', place.accent + '1f');
+    root.setProperty('--place-accent', place.accent);
+    root.setProperty('--skyline-shape', SKYLINE_SHAPES[place.skyline]);
+    document.body.dataset.band = bandKey;
+
+    var weekday = ['日', '月', '火', '水', '木', '金', '土'][now.getDay()];
+    document.getElementById('clock').textContent =
+      now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日(' + weekday + ') ' +
+      pad(now.getHours()) + ':' + pad(now.getMinutes());
+    document.getElementById('placeLabel').textContent = place.emoji + ' ' + place.name + ' ・ ' + band.label;
+  }
+
+  updateSky();
+  setInterval(updateSky, 30000);
+})();
+</script>
 </body>
 </html>
