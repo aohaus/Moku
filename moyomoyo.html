@@ -53,7 +53,11 @@ body {
      bottom button an easy mis-tap right after the top one. */
   gap: clamp(20px, 5vw, 44px);
   position: absolute;
-  top: 140px;
+  /* Percentage of #wrapper's own height (not a fixed px offset) so this
+     still lands comfortably below center regardless of which canvas
+     shape is active — marathon/title's tall portrait one or VS mode's
+     wider one. */
+  top: 55%;
   visibility: hidden;
 }
 #left-col { left: clamp(14px, 3vw, 32px); }
@@ -289,7 +293,7 @@ canvas {
 </head>
 <body>
 <div id="title-frame"></div>
-<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<a id="hub-link" href="index.html">🦉 Moku Series ▶</a>
 <div id="game-layout">
   <div id="wrapper">
     <canvas id="c"></canvas>
@@ -356,9 +360,17 @@ const GRID_Y0    = 130; // tall enough to clear the 3-line HTML HUD overlay
 const SPAWN_COL  = 5;   // re-centered for the wider 10-column board
 const W = GRID_W + GRID_MARGIN_X * 2, H = GRID_Y0 + GRID_H + 20;
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
-canvas.width  = W * DPR;
-canvas.height = H * DPR;
-ctx.scale(DPR, DPR);
+// Canvas is resized per mode rather than sized once — marathon/title use
+// the tall W x H portrait shape the single board needs, while VS mode
+// swaps in its own wider VS_CANVAS_W x VS_CANVAS_H (defined below) so two
+// side-by-side boards aren't squeezed into a shape sized for one board.
+function resizeCanvasTo(w, h) {
+  canvas.width = w * DPR;
+  canvas.height = h * DPR;
+  canvas.style.aspectRatio = `${w} / ${h}`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resizeCanvasTo(W, H);
 const MATCH_MIN  = 4;
 // Retuned from 200 for a finite Lv1-10 run with a real ending (MAX_LEVEL
 // below) instead of endless play — the old value's quadratic cumulative
@@ -374,30 +386,27 @@ const LEADERBOARD_KEY = 'moyomoyo-leaderboard';
 const LEADERBOARD_MAX = 10;
 
 // ─── CPU対戦 (VS MODE) config ────────────────────────────────
-// Same 10x9 grid shape as marathon mode, just rendered smaller so two
-// boards fit side by side in the existing canvas footprint instead of
-// needing a wider canvas/layout.
+// Same 10x9 grid shape as marathon mode. Two boards side by side don't
+// fit marathon's tall portrait canvas without leaving huge dead margins
+// top/bottom/left/right, so VS mode swaps the canvas to its own wider
+// VS_CANVAS_W x VS_CANVAS_H (via resizeCanvasTo, see startVsGame /
+// startGame / quitToTitle) instead of reusing marathon's W x H.
 const GARBAGE = -2; // sentinel grid value — colorless, inert: never joins a match, never clears, just falls
-const VS_CELL = 38;
+const VS_CELL = 53;
 const VS_GRID_W = VS_CELL * GRID_COLS;
 const VS_GRID_H = VS_CELL * GRID_ROWS;
-const VS_MARGIN_X = 16;
-const VS_GAP = 20;
-// Vertically centered-ish within the tall portrait canvas (rather than
-// pinned under a marathon-style top HUD) — two side-by-side boards are
-// much wider than tall relative to the 828x852 canvas, so anchoring them
-// higher up left a big dead void at the bottom.
-const VS_GRID_Y0 = 220;
+const VS_MARGIN_X = 24;
+const VS_GAP = 32;
+const VS_GRID_Y0 = 130;
 const VS_P_X0 = VS_MARGIN_X;
 const VS_C_X0 = VS_MARGIN_X + VS_GRID_W + VS_GAP;
+const VS_CANVAS_W = VS_C_X0 + VS_GRID_W + VS_MARGIN_X;
+const VS_CANVAS_H = 760;
 const VS_SPAWN_COL = 5;
 // Big attacks rain down over a couple of spawn cycles instead of landing
 // all at once — closer to how a real ojama tray drops in bursts, and it
 // keeps one huge chain from being an instant, unavoidable kill.
 const VS_GARBAGE_PER_DROP = GRID_COLS;
-
-const PAUSE_RESUME_Y = H * 0.48;
-const PAUSE_QUIT_Y   = PAUSE_RESUME_Y + 79;
 
 // Colors are spread across distinct hues (not a same-family gradient) so
 // each stage reads at a glance during fast match play — size/name still
@@ -1036,10 +1045,20 @@ function drawComboAnnouncement() {
   }
 }
 
-// Tightened from a 2-item (636 / gap 63) layout to fit the new CPU対戦
-// entry without the bottom item crowding the franchise footer tag below.
-const TITLE_MENU_Y = 578, TITLE_MENU_GAP = 44;
-const TITLE_MENU_ITEMS = ['スタート', '⚔️ CPU対戦', '🏆 ランキング'];
+// item1→item2 gap is the "normal" spacing; item0→item1 gets extra
+// clearance on top of that because the best-score line hangs under item0
+// (スタート) alone, and a plain uniform gap let it collide with item1.
+const TITLE_MENU_Y = 566, TITLE_MENU_GAP = 56, TITLE_MENU_GAP_EXTRA_AFTER_FIRST = 26;
+// English exception: per SPEC.md §3 ("Language"), individual game bodies
+// stay Japanese and only the hub (index.html) is English-first — moyomoyo's
+// title screen is a deliberate, explicitly-approved carve-out on top of
+// that rule. Everything past the title screen (gameplay, HUD, VS battle
+// screen, overlays) is intentionally still Japanese.
+const TITLE_MENU_ITEMS = ['Start', '⚔️ VS CPU', '🏆 Ranking'];
+
+function titleMenuItemY(i) {
+  return TITLE_MENU_Y + i * TITLE_MENU_GAP + (i >= 1 ? TITLE_MENU_GAP_EXTRA_AFTER_FIRST : 0);
+}
 
 function activateTitleMenu(i) {
   if (i === 0) startGame();
@@ -1120,9 +1139,9 @@ function drawTitleScreen() {
     ctx.restore();
   });
 
-  drawGummyShape(W/2, mascotY, 97, lastStage.color, lastStage.face, tilt, 1, true);
+  drawGummyShape(W/2, mascotY, 92, lastStage.color, lastStage.face, tilt, 1, true);
 
-  const chainY = 462;
+  const chainY = 445;
   const startX = W/2 - 123;
   STAGES.forEach((st, i) => {
     const x = startX + i * 82;
@@ -1138,8 +1157,8 @@ function drawTitleScreen() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '20px Arial';
-  ctx.fillText('同じ段階を4つ以上つなげて進化させよう', W/2, 505);
-  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W/2, 528);
+  ctx.fillText('Connect 4+ of the same stage to evolve', W/2, 498);
+  ctx.fillText('◀▶ Move · 🔄 Rotate · ▼ Drop', W/2, 520);
   ctx.restore();
 
   // Menu — a selectable list like Angry Mokumoku's own title menu
@@ -1154,7 +1173,7 @@ function drawTitleScreen() {
   ctx.font = 'bold 34px Arial';
   TITLE_MENU_ITEMS.forEach((label, i) => {
     const sel = titleMenuSel === i;
-    const y = TITLE_MENU_Y + i * TITLE_MENU_GAP;
+    const y = titleMenuItemY(i);
     ctx.textAlign = 'center';
     if (sel) {
       ctx.fillStyle = '#FFE9F5';
@@ -1169,7 +1188,7 @@ function drawTitleScreen() {
       ctx.shadowBlur = 0;
       ctx.fillStyle = sel ? 'rgba(255,233,245,0.75)' : 'rgba(255,255,255,0.45)';
       ctx.font = '19px Arial';
-      ctx.fillText(`ベスト ${bestScore}pt`, W/2, y + 24);
+      ctx.fillText(`Best ${bestScore}pt`, W/2, y + 24);
       ctx.restore();
     }
   });
@@ -1191,40 +1210,43 @@ function drawTitleScreen() {
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '18px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('タップ / クリックで選択　・　↑↓キーで移動', W/2, H - 24);
+  ctx.fillText('Tap / Click to select  ·  ↑↓ to navigate', W/2, H - 24);
 }
 
-function drawPausedOverlay() {
+function drawPausedOverlay(w, h) {
+  const resumeY = h * 0.48;
+  const quitY = resumeY + 79;
+
   ctx.save();
   ctx.fillStyle = 'rgba(20,5,30,0.72)';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, w, h);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#FFE9F5';
   ctx.font = 'bold 36px Arial';
   ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
-  ctx.fillText('⏸ 一時停止中', W/2, H * 0.36);
+  ctx.fillText('⏸ 一時停止中', w/2, h * 0.36);
   ctx.shadowBlur = 0;
   ctx.restore();
 
   ctx.save();
   ctx.fillStyle = '#FF6FA8';
-  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_RESUME_Y - 29, 216, 58, 29); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(w/2 - 108, resumeY - 29, 216, 58, 29); ctx.fill();
   ctx.fillStyle = 'white';
   ctx.font = 'bold 23px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.fillText('▶ 再開', w/2, resumeY);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_QUIT_Y - 26, 216, 53, 26); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(w/2 - 108, quitY - 26, 216, 53, 26); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_QUIT_Y - 26, 216, 53, 26); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(w/2 - 108, quitY - 26, 216, 53, 26); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = '19px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.fillText('🏠 タイトルへ', w/2, quitY);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
@@ -1261,7 +1283,7 @@ function draw() {
     flashAlpha = 0;
   }
 
-  if (state === 'PAUSED') drawPausedOverlay();
+  if (state === 'PAUSED') drawPausedOverlay(W, H);
 }
 
 // ─── GAME LOGIC ───────────────────────────────────────────────
@@ -1422,6 +1444,7 @@ function winClear() {
 function startGame() {
   mode = 'MARATHON';
   state = 'PLAYING';
+  resizeCanvasTo(W, H);
   phase = 'FALL';
   score = 0;
   level = 1;
@@ -1920,20 +1943,20 @@ function vbDrawHud(b, label) {
 }
 
 function drawVs() {
-  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  const bg = ctx.createLinearGradient(0, 0, 0, VS_CANVAS_H);
   bg.addColorStop(0, '#2A1840'); bg.addColorStop(0.55, '#4A2560'); bg.addColorStop(1, '#331A48');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, VS_CANVAS_W, VS_CANVAS_H);
 
   ctx.save();
   ctx.textAlign = 'center';
   ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
   ctx.fillStyle = '#FFE9F5';
   ctx.font = 'bold 40px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
-  ctx.fillText('⚔️ CPU対戦', W / 2, 88);
+  ctx.fillText('⚔️ CPU対戦', VS_CANVAS_W / 2, 56);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '16px Arial';
-  ctx.fillText('最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！', W / 2, 118);
+  ctx.fillText('最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！', VS_CANVAS_W / 2, 86);
   ctx.restore();
 
   ctx.save();
@@ -1953,7 +1976,7 @@ function drawVs() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = 'bold 20px Arial';
-  ctx.fillText('VS', W / 2, VS_GRID_Y0 + VS_GRID_H / 2);
+  ctx.fillText('VS', VS_CANVAS_W / 2, VS_GRID_Y0 + VS_GRID_H / 2);
 
   ctx.restore();
 
@@ -1961,19 +1984,19 @@ function drawVs() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '18px Arial';
-  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W / 2, H - 24);
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', VS_CANVAS_W / 2, VS_CANVAS_H - 24);
   ctx.restore();
 
   if (flashAlpha > 0.01) {
     ctx.save();
     ctx.globalAlpha = flashAlpha;
     ctx.fillStyle = '#FFE9A0';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, VS_CANVAS_W, VS_CANVAS_H);
     ctx.restore();
     flashAlpha *= 0.82;
   } else flashAlpha = 0;
 
-  if (state === 'PAUSED') drawPausedOverlay();
+  if (state === 'PAUSED') drawPausedOverlay(VS_CANVAS_W, VS_CANVAS_H);
 }
 
 function updateVs() {
@@ -1990,6 +2013,7 @@ function updateVs() {
 function startVsGame() {
   mode = 'VS';
   state = 'PLAYING';
+  resizeCanvasTo(VS_CANVAS_W, VS_CANVAS_H);
   particles = [];
   flashAlpha = 0; shakeX = 0; shakeY = 0;
   vsP = newVsBoard(VS_P_X0, false);
@@ -2068,10 +2092,18 @@ function playSfx(kind, arg) {
 
 // ─── INPUT ────────────────────────────────────────────────────
 
+// The canvas's internal drawing size varies by mode (see resizeCanvasTo),
+// so touch/click coordinates are mapped using its current logical size —
+// not the fixed marathon W x H — to stay correct in both modes.
+function currentCanvasSize() {
+  return mode === 'VS' ? [VS_CANVAS_W, VS_CANVAS_H] : [W, H];
+}
+
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = W / rect.width;
-  const scaleY = H / rect.height;
+  const [cw, ch] = currentCanvasSize();
+  const scaleX = cw / rect.width;
+  const scaleY = ch / rect.height;
   const src = e.touches ? e.touches[0] : e;
   return {
     x: (src.clientX - rect.left) * scaleX,
@@ -2092,6 +2124,7 @@ function resumeGame() {
 function quitToTitle() {
   state = 'TITLE';
   mode = 'MARATHON';
+  resizeCanvasTo(W, H);
   titleFrame = 0;
   titleMenuSel = 0;
   document.getElementById('pause-btn').textContent = '⏸';
@@ -2107,7 +2140,7 @@ function onDown(e) {
   const p = getPos(e);
   if (state === 'TITLE') {
     for (let i = 0; i < TITLE_MENU_ITEMS.length; i++) {
-      const y = TITLE_MENU_Y + i * TITLE_MENU_GAP;
+      const y = titleMenuItemY(i);
       if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= y - 22 && p.y <= y + 22) {
         titleMenuSel = i; activateTitleMenu(i); return;
       }
@@ -2117,8 +2150,10 @@ function onDown(e) {
     return;
   }
   if (state === 'PAUSED') {
-    if (p.x >= W/2-108 && p.x <= W/2+108 && p.y >= PAUSE_RESUME_Y-29 && p.y <= PAUSE_RESUME_Y+29) { resumeGame(); return; }
-    if (p.x >= W/2-108 && p.x <= W/2+108 && p.y >= PAUSE_QUIT_Y-26 && p.y <= PAUSE_QUIT_Y+26) { quitToTitle(); return; }
+    const [cw, ch] = currentCanvasSize();
+    const resumeY = ch * 0.48, quitY = resumeY + 79;
+    if (p.x >= cw/2-108 && p.x <= cw/2+108 && p.y >= resumeY-29 && p.y <= resumeY+29) { resumeGame(); return; }
+    if (p.x >= cw/2-108 && p.x <= cw/2+108 && p.y >= quitY-26 && p.y <= quitY+26) { quitToTitle(); return; }
     return;
   }
 }
