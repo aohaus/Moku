@@ -365,14 +365,14 @@ footer {
 <div id="skylineLayer"></div>
 <div class="wrap">
   <header>
-    <img class="owl" src="icons/icon-512.png" alt="モクモク">
+    <img class="owl" src="icons/icon-512.png" alt="Mokumoku">
     <h1>Moku Series</h1>
     <p>Pick a game to play · 9 titles planned (4 live now)</p>
     <div id="skyMeta">
-      <div id="clock">----年--月--日(-) --:--</div>
-      <div id="placeLabel">・・・</div>
+      <div id="clock">---, --- --, ---- --:--</div>
+      <div id="placeLabel">···</div>
     </div>
-    <button id="a2hsBtn" type="button">📲 ホーム画面に追加</button>
+    <button id="a2hsBtn" type="button">📲 Add to Home Screen</button>
   </header>
 
   <div class="cards">
@@ -419,29 +419,29 @@ footer {
 
 <div id="a2hsOverlay">
   <div id="a2hsModal" role="dialog" aria-modal="true" aria-labelledby="a2hsTitle">
-    <button id="a2hsClose" type="button" aria-label="閉じる">✕</button>
+    <button id="a2hsClose" type="button" aria-label="Close">✕</button>
 
     <div class="a2hs-panel" id="a2hsIOS">
-      <h2 id="a2hsTitle">📲 ホーム画面に追加(iPhone / iPad)</h2>
-      <p class="a2hs-sub">Safariで開いている場合、下の手順でアプリのように起動できます。</p>
+      <h2 id="a2hsTitle">📲 Add to Home Screen (iPhone / iPad)</h2>
+      <p class="a2hs-sub">If you're using Safari, follow these steps to launch it like an app.</p>
       <ol class="a2hs-steps">
-        <li><span class="a2hs-icon">📤</span><span class="a2hs-step-text">画面下(iPadは上)の<strong>共有ボタン</strong>をタップ</span></li>
-        <li><span class="a2hs-icon">➕</span><span class="a2hs-step-text">メニューから<strong>「ホーム画面に追加」</strong>を選択</span></li>
-        <li><span class="a2hs-icon">✅</span><span class="a2hs-step-text">右上の<strong>「追加」</strong>をタップして完了</span></li>
+        <li><span class="a2hs-icon">📤</span><span class="a2hs-step-text">Tap the <strong>Share button</strong> (bottom on iPhone, top on iPad)</span></li>
+        <li><span class="a2hs-icon">➕</span><span class="a2hs-step-text">Choose <strong>"Add to Home Screen"</strong> from the menu</span></li>
+        <li><span class="a2hs-icon">✅</span><span class="a2hs-step-text">Tap <strong>"Add"</strong> in the top-right corner to finish</span></li>
       </ol>
-      <p class="a2hs-note">Chrome等の他ブラウザで開いている場合は、一度Safariで開き直してください。</p>
+      <p class="a2hs-note">If you're using Chrome or another browser, please reopen this page in Safari first.</p>
     </div>
 
     <div class="a2hs-panel" id="a2hsAndroid" hidden>
-      <h2>📲 ホーム画面に追加(Android)</h2>
-      <p class="a2hs-sub">この端末なら、下のボタンからそのまま追加できます。</p>
-      <button id="a2hsInstallBtn" type="button">ホーム画面に追加する</button>
-      <p class="a2hs-note">ボタンが反応しない場合はブラウザメニュー(⋮)から「ホーム画面に追加」を選んでください。</p>
+      <h2>📲 Add to Home Screen (Android)</h2>
+      <p class="a2hs-sub">On this device, you can add it directly with the button below.</p>
+      <button id="a2hsInstallBtn" type="button">Add to Home Screen</button>
+      <p class="a2hs-note">If the button doesn't respond, choose "Add to Home Screen" from the browser menu (⋮) instead.</p>
     </div>
 
     <div class="a2hs-panel" id="a2hsDesktop" hidden>
-      <h2>📲 ホーム画面に追加</h2>
-      <p class="a2hs-sub">この機能はiPhone・iPad・Androidのブラウザで利用できます。お使いの端末でこのページを開き、案内に従ってください。</p>
+      <h2>📲 Add to Home Screen</h2>
+      <p class="a2hs-sub">This feature is available in iPhone, iPad, and Android browsers. Please open this page on one of those devices and follow the instructions.</p>
     </div>
   </div>
 </div>
@@ -453,22 +453,22 @@ footer {
   // rather than randomized, so the hub reliably cycles through all 7
   // places across a week and all 4 lighting moods across a day.
   var PLACES = [
-    { name: 'バンコク',           emoji: '🛕', accent: '#FFC94A', skyline: 'city'   }, // Sun
-    { name: 'シンガポール',       emoji: '🌆', accent: '#45E0D9', skyline: 'modern' }, // Mon
-    { name: 'クアラルンプール',   emoji: '🏙️', accent: '#8C7BFF', skyline: 'modern' }, // Tue
-    { name: 'マニラ',             emoji: '🌇', accent: '#FF6F91', skyline: 'city'   }, // Wed
-    { name: 'ホーチミン',         emoji: '🏮', accent: '#4FCB6B', skyline: 'city'   }, // Thu
-    { name: 'ジャカルタ',         emoji: '🕌', accent: '#FF9F45', skyline: 'modern' }, // Fri
-    { name: '異世界',             emoji: '✨', accent: '#C77DFF', skyline: 'other'  }  // Sat
+    { name: 'Bangkok',       emoji: '🛕', accent: '#FFC94A', skyline: 'city'   }, // Sun
+    { name: 'Singapore',     emoji: '🌆', accent: '#45E0D9', skyline: 'modern' }, // Mon
+    { name: 'Kuala Lumpur',  emoji: '🏙️', accent: '#8C7BFF', skyline: 'modern' }, // Tue
+    { name: 'Manila',        emoji: '🌇', accent: '#FF6F91', skyline: 'city'   }, // Wed
+    { name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B', skyline: 'city'   }, // Thu
+    { name: 'Jakarta',       emoji: '🕌', accent: '#FF9F45', skyline: 'modern' }, // Fri
+    { name: 'Otherworld',    emoji: '✨', accent: '#C77DFF', skyline: 'other'  }  // Sat
   ];
   // Kept deliberately dark and low-saturation across all four bands, in
   // line with the series design system (SPEC.md §03): this is a mood
   // shift, not a bright-daytime website.
   var BANDS = {
-    morning: { label: '朝', sky: ['#181026', '#2c2032', '#3f2a26'] },
-    day:     { label: '昼', sky: ['#0d1420', '#152134', '#1f3040'] },
-    evening: { label: '夕', sky: ['#150e1e', '#291828', '#392016'] },
-    night:   { label: '夜', sky: ['#05060f', '#0d1024', '#141a33'] }
+    morning: { label: 'Morning', sky: ['#181026', '#2c2032', '#3f2a26'] },
+    day:     { label: 'Day',     sky: ['#0d1420', '#152134', '#1f3040'] },
+    evening: { label: 'Evening', sky: ['#150e1e', '#291828', '#392016'] },
+    night:   { label: 'Night',   sky: ['#05060f', '#0d1024', '#141a33'] }
   };
   var SKYLINE_SHAPES = {
     city:   'polygon(0% 100%,0% 55%,4% 55%,4% 35%,9% 35%,9% 60%,15% 60%,15% 20%,19% 20%,19% 60%,26% 60%,26% 45%,32% 45%,32% 70%,38% 70%,38% 30%,44% 30%,44% 65%,50% 65%,50% 10%,54% 10%,54% 65%,60% 65%,60% 40%,66% 40%,66% 60%,72% 60%,72% 25%,78% 25%,78% 60%,85% 60%,85% 45%,90% 45%,90% 65%,96% 65%,96% 50%,100% 50%,100% 100%)',
@@ -500,11 +500,12 @@ footer {
     root.setProperty('--skyline-shape', SKYLINE_SHAPES[place.skyline]);
     document.body.dataset.band = bandKey;
 
-    var weekday = ['日', '月', '火', '水', '木', '金', '土'][now.getDay()];
+    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     document.getElementById('clock').textContent =
-      now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日(' + weekday + ') ' +
+      WEEKDAYS[now.getDay()] + ', ' + MONTHS[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' ' +
       pad(now.getHours()) + ':' + pad(now.getMinutes());
-    document.getElementById('placeLabel').textContent = place.emoji + ' ' + place.name + ' ・ ' + band.label;
+    document.getElementById('placeLabel').textContent = place.emoji + ' ' + place.name + ' · ' + band.label;
   }
 
   updateSky();
