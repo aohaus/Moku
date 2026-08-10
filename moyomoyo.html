@@ -254,33 +254,21 @@ canvas {
   border: 1px solid #7A3D63;
   border-radius: 8px;
 }
-/* Cross-links to the sister games, anchored to the viewport-spanning
-   frame above rather than drawn inside the canvas. The canvas itself
-   is a narrow, centered column (portrait 624:918 shape inside a wide
-   landscape frame) so canvas-relative coordinates put these links in
-   the middle of the screen instead of the frame's actual top-right
-   corner, and made their on-screen spacing shrink along with the
-   canvas on short/wide viewports. Real fixed-position HTML anchors
-   sidestep both problems and always land in the same corner Angry
-   Mokumoku and MK Mobile use for their own links. */
-#cross-links {
+/* Single link back to the Moku series hub, anchored to the
+   viewport-spanning frame above rather than drawn inside the canvas
+   (per the series design system: full-screen chrome uses fixed HTML
+   elements, not canvas coordinates). */
+#hub-link {
   display: block;
   position: fixed;
   top: 33px; right: 33px;
   z-index: 6;
-  text-align: right;
-}
-#cross-links a {
-  display: block;
   font: bold 20px Arial, sans-serif;
+  color: #D96FB0;
   text-decoration: none;
-  animation: cross-link-pulse 2.6s ease-in-out infinite;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
 }
-#cross-links a + a { margin-top: 14px; }
-#cross-links a:nth-child(1) { color: #B0D8FF; }
-#cross-links a:nth-child(2) { color: #FFD37A; }
-#cross-links a:nth-child(3) { color: #F2A65A; }
-@keyframes cross-link-pulse {
+@keyframes hubLinkPulse {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
 }
@@ -288,17 +276,13 @@ canvas {
   #rotate-hint { display: flex; }
   #game-layout { display: none; }
   #title-frame { display: none; }
-  #cross-links { display: none; }
+  #hub-link { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
-<div id="cross-links">
-  <a href="angry-mokumoku.html">🦉 アングリーモクモクへ ▶</a>
-  <a href="mk-mobile.html">⚽ MK Mobileへ ▶</a>
-  <a href="angry-moku-battle-royal.html">🏆 バトルロイヤルへ ▶</a>
-</div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <div id="game-layout">
   <div id="wrapper">
     <canvas id="c"></canvas>
@@ -1042,7 +1026,7 @@ function drawTitleScreen() {
   // floating card instead of framing the whole screen like Angry
   // Mokumoku's own wide canvas naturally does.)
 
-  // (Cross-links to the sister games are now the #cross-links HTML
+  // (The hub link is now the #hub-link HTML
   // element, fixed to the viewport's top-right corner — see its CSS
   // for why: this canvas is a narrow centered column inside the wide
   // frame, so canvas-relative coordinates didn't reach the frame's
@@ -1405,7 +1389,7 @@ function startGame() {
   document.getElementById('right-col').style.visibility = 'visible';
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'none';
-  document.getElementById('cross-links').style.display = 'none';
+  document.getElementById('hub-link').style.display = 'none';
   updateHUD();
   updateTimeDisplay();
   trySpawnPiece();
@@ -1531,7 +1515,7 @@ function quitToTitle() {
   document.getElementById('left-col').style.visibility = 'hidden';
   document.getElementById('right-col').style.visibility = 'hidden';
   document.getElementById('title-frame').style.display = 'block';
-  document.getElementById('cross-links').style.display = 'block';
+  document.getElementById('hub-link').style.display = 'block';
 }
 
 function onDown(e) {
@@ -1545,7 +1529,7 @@ function onDown(e) {
     if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= item2Y - 28 && p.y <= item2Y + 28) {
       titleMenuSel = 1; openBoard(); return;
     }
-    // (Cross-links are now the #cross-links HTML anchors, not hit-tested
+    // (The hub link is now the #hub-link HTML anchor, not hit-tested
     // here — see their CSS for why.)
     return;
   }

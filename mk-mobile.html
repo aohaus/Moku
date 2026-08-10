@@ -181,15 +181,32 @@ canvas {
   border: 1px solid #8A6218;
   border-radius: 8px;
 }
+/* Single link back to the Moku series hub — HTML fixed element (not
+   canvas-drawn) per the series design system, shown/hidden in lockstep
+   with #title-frame. */
+#hub-link {
+  display: block;
+  position: fixed; top: 30px; right: 24px;
+  z-index: 6;
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  font-weight: bold;
+  color: #FFC94A;
+  text-decoration: none;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
+@keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 @media (max-width: 600px) and (orientation: portrait) {
   #rotate-hint { display: flex; }
   #game-layout { display: none; }
   #title-frame { display: none; }
+  #hub-link { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <div id="game-layout">
   <div id="wrapper">
     <canvas id="c"></canvas>
@@ -637,21 +654,8 @@ function drawTitleScreen() {
   // drawn on the canvas — shared structure with the other two games'
   // title screens so it always reads as full-screen.)
 
-  // Cross-links to the two sister games, stacked top-right — same
-  // corner both other titles use for their own "other game" links.
-  // Sized generously (2x the original) so they're comfortable to tap.
-  ctx.save();
-  ctx.textAlign = 'right';
-  ctx.font = 'bold 24px Arial';
-  const linkPulse = 0.7 + 0.3 * Math.sin(titleFrame * 0.05);
-  ctx.globalAlpha = linkPulse;
-  ctx.fillStyle = '#B0D8FF';
-  ctx.fillText('🦉 アングリーモクモクへ ▶', W - 26, 71);
-  ctx.fillStyle = '#FF9FCB';
-  ctx.fillText('🍬 モヨモヨへ ▶', W - 26, 107);
-  ctx.fillStyle = '#F2A65A';
-  ctx.fillText('🏆 バトルロイヤルへ ▶', W - 26, 143);
-  ctx.restore();
+  // Cross-links to the sister games now live in the #hub-link HTML
+  // element (single link to the series hub), not drawn on canvas.
 
   ctx.save();
   ctx.textAlign = 'center';
@@ -937,6 +941,7 @@ function startMatch(durationSeconds) {
   document.getElementById('shoot-btn').style.visibility = 'visible';
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'none';
+  document.getElementById('hub-link').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 
@@ -974,6 +979,7 @@ function quitToTitle() {
   resetStick();
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('hub-link').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 
@@ -991,12 +997,6 @@ function onDown(e) {
   const p = getPos(e);
   if (state === 'TITLE') {
     if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) { state = 'TIMESELECT'; return; }
-    // Pushed down from the very top edge (was y:18) so they clear the
-    // frame border with a comfortable tap margin instead of sitting
-    // flush against it.
-    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 45 && p.y <= 89) { window.location.href = 'angry-mokumoku.html'; return; }
-    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 89 && p.y <= 129) { window.location.href = 'moyomoyo.html'; return; }
-    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 129 && p.y <= 169) { window.location.href = 'angry-moku-battle-royal.html'; return; }
     return;
   }
   if (state === 'TIMESELECT') {

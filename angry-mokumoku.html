@@ -121,14 +121,31 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
   border: 1px solid #1A5020;
   border-radius: 8px;
 }
+/* Single link back to the Moku series hub — HTML fixed element (not
+   canvas-drawn) per the series design system, shown/hidden in lockstep
+   with #title-frame. */
+#hub-link {
+  display: block;
+  position: fixed; top: 30px; right: 24px;
+  z-index: 6;
+  font-family: "Courier New", monospace;
+  font-size: 15px;
+  font-weight: bold;
+  color: #FFD37A;
+  text-decoration: none;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
+@keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 @media (max-width: 600px) and (orientation: portrait) {
   #rotate-hint { display: flex; }
   #title-frame { display: none; }
+  #hub-link { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <div id="wrapper">
   <canvas id="c"></canvas>
   <div id="hud" style="visibility:hidden">
@@ -3599,6 +3616,7 @@ function startFromTitle() {
   particles = [];
   document.getElementById('hud').style.visibility = 'visible';
   document.getElementById('title-frame').style.display = 'none';
+  document.getElementById('hub-link').style.display = 'none';
   setupLevel(currentLevel);
   resetBird();
   updateHUD();
@@ -3624,26 +3642,11 @@ function onDown(e) {
     allClearParticles = []; shareCopied = false; shareCopiedTimer = 0;
     document.getElementById('hud').style.visibility = 'hidden';
     document.getElementById('title-frame').style.display = 'block';
+    document.getElementById('hub-link').style.display = 'block';
     return;
   }
   if (state === 'TITLE') {
     const p = getPos(e);
-    // Cross-links to the sister games (top-right corner, stacked). Pushed
-    // down from the very top edge (was y:16) so they clear the frame
-    // border with a comfortable tap margin instead of sitting flush
-    // against it.
-    if (p.x >= W - 280 && p.x <= W - 10 && p.y >= 30 && p.y <= 70) {
-      window.location.href = 'moyomoyo.html';
-      return;
-    }
-    if (p.x >= W - 280 && p.x <= W - 10 && p.y >= 70 && p.y <= 110) {
-      window.location.href = 'mk-mobile.html';
-      return;
-    }
-    if (p.x >= W - 280 && p.x <= W - 10 && p.y >= 110 && p.y <= 150) {
-      window.location.href = 'angry-moku-battle-royal.html';
-      return;
-    }
     const menuY = 345;
     if (p.y >= menuY - 24 && p.y < menuY + 30) { titleMenuSel = 0; startFromTitle(); return; }
     if (p.y >= menuY + 22) {
@@ -4090,22 +4093,8 @@ function drawTitleScreen() {
   ctx.fillText('★  K L  C I T Y  E D I T I O N  ★', W/2, 112);
   ctx.restore();
 
-  // Cross-links to the sister games — sized up from the original for
-  // easier tapping. Kept a bit narrower than the other two titles'
-  // links since this game's wide "ANGRY MOKUMOKU" logo shares this
-  // same corner's vertical band and needs the horizontal clearance.
-  ctx.save();
-  ctx.textAlign = 'right';
-  ctx.font = 'bold 19px "Courier New", monospace';
-  const linkPulse = 0.7 + 0.3 * Math.sin(titleFrame * 0.05);
-  ctx.globalAlpha = linkPulse;
-  ctx.fillStyle = '#FF8FC4';
-  ctx.fillText('🍬 モヨモヨへ ▶', W - 18, 54);
-  ctx.fillStyle = '#FFD37A';
-  ctx.fillText('⚽ MK Mobileへ ▶', W - 18, 92);
-  ctx.fillStyle = '#F2A65A';
-  ctx.fillText('🏆 バトルロイヤルへ ▶', W - 18, 130);
-  ctx.restore();
+  // Cross-links to the sister games now live in the #hub-link HTML
+  // element (single link to the series hub), not drawn on canvas.
 
   // Owl character
   const bob = Math.sin(titleFrame * 0.05) * 6;
