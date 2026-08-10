@@ -408,6 +408,31 @@ const VS_SPAWN_COL = 5;
 // keeps one huge chain from being an instant, unavoidable kill.
 const VS_GARBAGE_PER_DROP = GRID_COLS;
 
+// A 5-fight boss ladder, reusing Angry Mokumoku's rat cast (see its own
+// Rat class: baby/ninja/chef/suit/boss, ordered here by that game's own
+// `pts` values — its own implicit difficulty ranking — from weakest to
+// strongest). Each fight is a fresh 1-on-1 board reset; only fallInterval
+// changes between fights (larger = slower = easier), per the request to
+// tune CPU difficulty primarily through its fall speed rather than
+// through AI skill or board rules.
+const CPU_ENEMIES = [
+  { type: 'baby',  name: 'あかちゃんネズミ', fallInterval: 50 },
+  { type: 'ninja', name: 'にんじゃネズミ',   fallInterval: 40 },
+  { type: 'chef',  name: 'コックネズミ',     fallInterval: 32 },
+  { type: 'suit',  name: 'スーツネズミ',     fallInterval: 24 },
+  { type: 'boss',  name: 'ボスネズミ',       fallInterval: 16 },
+];
+function currentCpuEnemy() { return CPU_ENEMIES[cpuLevel - 1]; }
+
+// お邪魔 tiers: only a chain of 2+ that includes a real (max-stage) clear
+// sends anything at all — a single un-chained clear sends nothing.
+function garbageRowsForChain(chainCount) {
+  if (chainCount >= 4) return 5;
+  if (chainCount === 3) return 2;
+  if (chainCount === 2) return 1;
+  return 0;
+}
+
 // Colors are spread across distinct hues (not a same-family gradient) so
 // each stage reads at a glance during fast match play — size/name still
 // carry the growth story, color is purely the "which type is this" cue.
@@ -455,10 +480,11 @@ const RAINBOW_FACE = '#3A1848';
 const ROT_OFFSETS = [[0,-1],[1,0],[0,1],[-1,0]]; // up, right, down, left
 
 // ─── STATE ────────────────────────────────────────────────────
-let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER
+let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER | VS_LEVEL_CLEAR
 let mode = 'MARATHON'; // MARATHON | VS — which ruleset the PLAYING/PAUSED/GAMEOVER states refer to
 let vsP = null, vsC = null; // the two boards while mode === 'VS' (player / CPU)
 let vsWinnerIsPlayer = false; // set right before GAMEOVER in VS mode, drives the result text
+let cpuLevel = 1; // 1-5, index into CPU_ENEMIES — which boss the CPU board currently is
 let phase = 'FALL';  // FALL | LOCK_PAUSE | RESOLVING | SPAWN_PAUSE
 let pauseTimer = 0;
 let fallTimer = 0;
@@ -1171,6 +1197,13 @@ function drawTitleScreen() {
   // way Angry Mokumoku folds its saved level into つづきから, rather
   // than floating as a separate line below the whole menu.
   ctx.font = 'bold 34px Arial';
+  // 'middle' baseline (not the default 'alphabetic') so mixed emoji+text
+  // labels like "⚔️ VS CPU" stay vertically centered together — emoji
+  // glyphs are drawn centered on the given y regardless of baseline mode,
+  // while Latin text's alphabetic baseline sits well below its own visual
+  // center, so the default baseline made the sword hang visibly lower
+  // than the text next to it.
+  ctx.textBaseline = 'middle';
   TITLE_MENU_ITEMS.forEach((label, i) => {
     const sel = titleMenuSel === i;
     const y = titleMenuItemY(i);
@@ -1192,6 +1225,7 @@ function drawTitleScreen() {
       ctx.restore();
     }
   });
+  ctx.textBaseline = 'alphabetic';
   ctx.shadowBlur = 0;
 
   // Franchise footer tag — ties the three games together as one series.
@@ -1769,7 +1803,11 @@ function vbUpdateBoard(b, opponent) {
       if (b.aiTimer >= 5) { b.aiTimer = 0; vbAiStep(b); }
     }
     b.fallTimer++;
-    const interval = b.isCpu ? 20 : 28; // CPU falls a bit brisker than a Lv1 player board so it isn't purely passive
+    // Difficulty is tuned primarily through the CPU's own fall speed —
+    // slow and forgiving for the Lv1 boss, ramping up to faster than the
+    // player's own fixed 28-frame pace by Lv5. The player's speed never
+    // changes.
+    const interval = b.isCpu ? currentCpuEnemy().fallInterval : 28;
     if (b.fallTimer >= interval) {
       b.fallTimer = 0;
       if (vbCanPlace(b, b.piece.col, b.piece.row + 1, b.piece.rot)) b.piece.row++;
@@ -1786,8 +1824,8 @@ function vbUpdateBoard(b, opponent) {
         b.pauseTimer = 16;
       } else {
         if (b.topClearsThisChain > 0) {
-          const mult = 1 + (b.chainCount - 1) * 0.4;
-          opponent.pendingGarbage += Math.round(b.topClearsThisChain * 3 * mult);
+          const rows = garbageRowsForChain(b.chainCount);
+          if (rows > 0) opponent.pendingGarbage += rows * GRID_COLS;
         }
         b.chainCount = 0;
         b.topClearsThisChain = 0;
@@ -1871,6 +1909,98 @@ function vbAiStep(b) {
   vbSoftDrop(b);
 }
 
+// ─── VS ENEMY PORTRAITS ───────────────────────────────────────
+// Ported directly from angry-mokumoku.html's Rat drawing code
+// (_drawRatBase + its per-type decorations) rather than shared — per
+// SPEC.md, each Moku title is a single self-contained HTML file with no
+// cross-file dependencies, so the art is duplicated here rather than
+// imported.
+
+function _vsRatBase(r, bodyCol, earInnerCol) {
+  ctx.fillStyle = bodyCol;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = bodyCol === '#787878' ? '#A09090' : '#C0A0A0';
+  ctx.beginPath(); ctx.ellipse(r*0.55, r*0.08, r*0.42, r*0.28, 0, 0, Math.PI*2); ctx.fill();
+  [[-r*0.25, -r*0.88], [r*0.38, -r*0.88]].forEach(([ex, ey]) => {
+    ctx.fillStyle = bodyCol;
+    ctx.beginPath(); ctx.ellipse(ex, ey, r*0.22, r*0.28, ex > 0 ? 0.25 : -0.25, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = earInnerCol;
+    ctx.beginPath(); ctx.ellipse(ex, ey, r*0.12, r*0.16, ex > 0 ? 0.25 : -0.25, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(-r*0.05, -r*0.15, r*0.11, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.5, -r*0.05, r*0.09, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(-r*0.01, -r*0.2, r*0.04, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#FF8888';
+  ctx.beginPath(); ctx.arc(r*0.9, r*0.08, r*0.08, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,200,200,0.7)'; ctx.lineWidth = 0.8;
+  [[-0.3,0.1],[0.1,-0.05],[-0.1,0.3]].forEach(([a,b]) => {
+    ctx.beginPath(); ctx.moveTo(r*0.5,r*0.08); ctx.lineTo(r*1.5+a*r,r*0.08+b*r); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r*0.5,r*0.08); ctx.lineTo(-r*0.2+a*r*0.3,r*0.08+b*r); ctx.stroke();
+  });
+  ctx.strokeStyle = '#909090'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(-r,r*0.15);
+  ctx.bezierCurveTo(-r*1.6,-r*0.4,-r*2.1,r*0.7,-r*1.9,r*1.3); ctx.stroke();
+}
+
+function drawEnemyRat(x, y, r, type) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (type === 'boss') {
+    _vsRatBase(r, '#7A4A20', '#D08060');
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath(); ctx.moveTo(-r*0.5,-r*0.9); ctx.lineTo(-r*0.5,-r*1.5);
+    ctx.lineTo(-r*0.2,-r*1.2); ctx.lineTo(0,-r*1.6); ctx.lineTo(r*0.2,-r*1.2);
+    ctx.lineTo(r*0.5,-r*1.5); ctx.lineTo(r*0.5,-r*0.9); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#C8A000'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#FF4444';
+    ctx.beginPath(); ctx.arc(0,-r*1.6,r*0.1,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r*0.5,-r*1.5,r*0.08,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.5,-r*1.5,r*0.08,0,Math.PI*2); ctx.fill();
+  } else if (type === 'ninja') {
+    _vsRatBase(r, '#2A2A2A', '#550000');
+    ctx.fillStyle = '#CC0000';
+    ctx.beginPath(); ctx.ellipse(0,-r*0.55,r*0.7,r*0.18,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FF3333';
+    ctx.beginPath(); ctx.arc(0,-r*0.55,r*0.1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.ellipse(-r*0.2,-r*0.15,r*0.2,r*0.12,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r*0.4,-r*0.05,r*0.16,r*0.1,0,0,Math.PI*2); ctx.fill();
+  } else if (type === 'suit') {
+    _vsRatBase(r, '#606060', '#D08080');
+    ctx.fillStyle = '#2244CC';
+    ctx.beginPath(); ctx.moveTo(-r*0.12,r*0.25); ctx.lineTo(r*0.12,r*0.25);
+    ctx.lineTo(r*0.08,r*0.75); ctx.lineTo(0,r*0.9); ctx.lineTo(-r*0.08,r*0.75);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#1133AA';
+    ctx.beginPath(); ctx.moveTo(-r*0.1,r*0.25); ctx.lineTo(r*0.1,r*0.25);
+    ctx.lineTo(r*0.06,r*0.45); ctx.lineTo(-r*0.06,r*0.45); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'white'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-r*0.18,r*0.2); ctx.lineTo(0,r*0.32); ctx.lineTo(r*0.18,r*0.2); ctx.stroke();
+  } else if (type === 'baby') {
+    _vsRatBase(r, '#FFB0C8', '#FF8888');
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(-r*0.1,-r*0.1,r*0.18,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.45,-r*0.05,r*0.14,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='white';
+    ctx.beginPath(); ctx.arc(-r*0.05,-r*0.17,r*0.07,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FF4488';
+    ctx.beginPath(); ctx.ellipse(-r*0.3,-r*1.05,r*0.25,r*0.12,-0.4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r*0.3,-r*1.05,r*0.25,r*0.12,0.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#FF2266'; ctx.beginPath(); ctx.arc(0,-r*1.05,r*0.1,0,Math.PI*2); ctx.fill();
+  } else {
+    // chef (default)
+    _vsRatBase(r, '#787878', '#D08080');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(-r*0.35, -r*1.35, r*0.7, r*0.35);
+    ctx.beginPath(); ctx.ellipse(0,-r*1.55,r*0.28,r*0.28,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#DDD'; ctx.lineWidth=1;
+    ctx.strokeRect(-r*0.35,-r*1.35,r*0.7,r*0.35);
+  }
+  ctx.restore();
+}
+
 // ─── VS DRAW ──────────────────────────────────────────────────
 
 function vbDrawPanel(b) {
@@ -1930,14 +2060,18 @@ function vbDrawHud(b, label) {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = 'bold 15px Arial';
-  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 14);
-  ctx.font = 'bold 17px Arial';
+  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
+  // Score sits right under the name — small, same counting/scoring as
+  // marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
+  // formula) — instead of only at the bottom, so it reads immediately
+  // alongside "YOU" / the boss's name rather than needing a second look.
+  ctx.font = 'bold 14px Arial';
   ctx.fillStyle = '#FFE066';
-  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 24);
+  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 10);
   if (b.pendingGarbage > 0) {
     ctx.fillStyle = '#FF6F6F';
     ctx.font = 'bold 14px Arial';
-    ctx.fillText(`⚠ ${b.pendingGarbage}`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 44);
+    ctx.fillText(`⚠ ${b.pendingGarbage}`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 24);
   }
   ctx.restore();
 }
@@ -1956,7 +2090,7 @@ function drawVs() {
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '16px Arial';
-  ctx.fillText('最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！', VS_CANVAS_W / 2, 86);
+  ctx.fillText(`Lv.${cpuLevel}/${CPU_ENEMIES.length}　最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！`, VS_CANVAS_W / 2, 86);
   ctx.restore();
 
   ctx.save();
@@ -1971,7 +2105,7 @@ function drawVs() {
   if (vsC.phase === 'FALL') vbDrawPiece(vsC);
   drawParticles();
   vbDrawHud(vsP, 'YOU');
-  vbDrawHud(vsC, 'CPU');
+  vbDrawHud(vsC, currentCpuEnemy().name);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
@@ -1997,6 +2131,52 @@ function drawVs() {
   } else flashAlpha = 0;
 
   if (state === 'PAUSED') drawPausedOverlay(VS_CANVAS_W, VS_CANVAS_H);
+  if (state === 'VS_LEVEL_CLEAR') drawVsLevelClear();
+}
+
+// Position of the "つぎへ" button on the level-clear screen — shared
+// between the draw call and onDown's hit-test.
+const VS_LEVEL_CLEAR_BTN_Y = VS_CANVAS_H * 0.72;
+
+function drawVsLevelClear() {
+  const beaten = CPU_ENEMIES[cpuLevel - 1]; // the one just defeated
+  const isFinal = cpuLevel >= CPU_ENEMIES.length;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,5,30,0.82)';
+  ctx.fillRect(0, 0, VS_CANVAS_W, VS_CANVAS_H);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#FFE9F5';
+  ctx.font = 'bold 30px Arial';
+  ctx.fillText(`🎉 ${beaten.name}を倒した！`, VS_CANVAS_W / 2, VS_CANVAS_H * 0.28);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  drawEnemyRat(VS_CANVAS_W / 2, VS_CANVAS_H * 0.46, 44, beaten.type);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.font = '18px Arial';
+  ctx.fillText(
+    isFinal ? '🏆 5体すべて撃破！チャンピオン確定間近…' : `つぎ: Lv.${cpuLevel + 1} ${CPU_ENEMIES[cpuLevel].name}`,
+    VS_CANVAS_W / 2, VS_CANVAS_H * 0.60
+  );
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#FF6FA8';
+  ctx.beginPath(); ctx.roundRect(VS_CANVAS_W / 2 - 100, VS_LEVEL_CLEAR_BTN_Y - 29, 200, 58, 29); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 21px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ つぎへ', VS_CANVAS_W / 2, VS_LEVEL_CLEAR_BTN_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 function updateVs() {
@@ -2004,10 +2184,41 @@ function updateVs() {
   particles = particles.filter(p => p.alive);
   vbUpdateBoard(vsP, vsC);
   vbUpdateBoard(vsC, vsP);
-  if (!vsP.alive || !vsC.alive) {
-    vsWinnerIsPlayer = vsP.alive && !vsC.alive;
+  if (!vsP.alive) {
+    // Losing always ends the whole run, even mid-campaign.
+    vsWinnerIsPlayer = false;
     endRunVs();
+  } else if (!vsC.alive) {
+    if (cpuLevel < CPU_ENEMIES.length) {
+      state = 'VS_LEVEL_CLEAR';
+      playSfx('levelup');
+    } else {
+      vsWinnerIsPlayer = true;
+      endRunVs();
+    }
   }
+}
+
+// Called from the "つぎへ" button on the level-clear screen — advances to
+// the next boss with a fresh board for both sides. The player's score
+// carries over as their running campaign total; only their board (not
+// their score) resets, same as the CPU's.
+function advanceVsCampaign() {
+  cpuLevel++;
+  vsC = newVsBoard(VS_C_X0, true);
+  vsC.nextPair = vbRollPair();
+  vsP.grid = newGrid();
+  vsP.piece = null;
+  vsP.phase = 'FALL';
+  vsP.pauseTimer = 0;
+  vsP.fallTimer = 0;
+  vsP.chainCount = 0;
+  vsP.topClearsThisChain = 0;
+  vsP.pendingGarbage = 0;
+  vsP.lockedCols = [];
+  state = 'PLAYING';
+  vbTrySpawnPiece(vsP);
+  vbTrySpawnPiece(vsC);
 }
 
 function startVsGame() {
@@ -2016,6 +2227,7 @@ function startVsGame() {
   resizeCanvasTo(VS_CANVAS_W, VS_CANVAS_H);
   particles = [];
   flashAlpha = 0; shakeX = 0; shakeY = 0;
+  cpuLevel = 1;
   vsP = newVsBoard(VS_P_X0, false);
   vsC = newVsBoard(VS_C_X0, true);
   vsP.nextPair = vbRollPair();
@@ -2044,8 +2256,10 @@ function endRunVs() {
   playSfx(vsWinnerIsPlayer ? 'magic' : 'gameover');
   const ov = document.getElementById('overlay');
   ov.classList.remove('hidden');
-  document.getElementById('ov-title').textContent = vsWinnerIsPlayer ? '🎉 かち！' : '😵 まけ...';
-  document.getElementById('ov-sub').textContent = `あなた: ${vsP.score}pt　CPU: ${vsC.score}pt`;
+  document.getElementById('ov-title').textContent = vsWinnerIsPlayer ? '🏆 5体撃破！チャンピオン！' : '😵 まけ...';
+  document.getElementById('ov-sub').textContent = vsWinnerIsPlayer
+    ? `あなたのスコア: ${vsP.score}pt`
+    : `あなたのスコア: ${vsP.score}pt　到達: Lv.${cpuLevel} ${currentCpuEnemy().name}`;
   document.getElementById('ov-name-row').classList.add('hidden');
   document.getElementById('ov-board-btn').textContent = '🏠 タイトルへ';
   document.getElementById('left-col').style.visibility = 'hidden';
@@ -2154,6 +2368,13 @@ function onDown(e) {
     const resumeY = ch * 0.48, quitY = resumeY + 79;
     if (p.x >= cw/2-108 && p.x <= cw/2+108 && p.y >= resumeY-29 && p.y <= resumeY+29) { resumeGame(); return; }
     if (p.x >= cw/2-108 && p.x <= cw/2+108 && p.y >= quitY-26 && p.y <= quitY+26) { quitToTitle(); return; }
+    return;
+  }
+  if (state === 'VS_LEVEL_CLEAR') {
+    if (p.x >= VS_CANVAS_W/2-100 && p.x <= VS_CANVAS_W/2+100
+        && p.y >= VS_LEVEL_CLEAR_BTN_Y-29 && p.y <= VS_LEVEL_CLEAR_BTN_Y+29) {
+      advanceVsCampaign();
+    }
     return;
   }
 }
