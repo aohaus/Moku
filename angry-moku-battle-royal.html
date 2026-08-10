@@ -290,6 +290,28 @@
   }
   body.on-title #hub-link{ display:block; }
   @keyframes hubLinkPulse{ 0%,100%{opacity:.7;} 50%{opacity:1;} }
+  /* Back-to-hub button for play screens (home/battle/customize/spin),
+     per SPEC.md §4. Title screen uses #hub-link instead. */
+  .moku-back{
+    display:flex; align-items:center; justify-content:center;
+    position:fixed;
+    top:calc(env(safe-area-inset-top,0px) + 12px);
+    left:calc(env(safe-area-inset-left,0px) + 12px);
+    width:40px; height:40px;
+    border-radius:50%;
+    background:rgba(10,11,18,.55);
+    backdrop-filter:blur(4px);
+    color:#EDEEF6;
+    font-size:18px; font-weight:700;
+    text-decoration:none;
+    z-index:1000;
+    transition:background .15s ease, transform .15s ease;
+  }
+  .moku-back:hover, .moku-back:focus-visible{
+    background:rgba(10,11,18,.8);
+    transform:scale(1.05);
+  }
+  body.on-title .moku-back{ display:none; }
   #titleScreen{
     align-items:center; justify-content:center; text-align:center;
     min-height:100vh; gap:18px; padding:24px 20px;
@@ -329,6 +351,7 @@
 <body class="on-title">
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<a class="moku-back" href="index.html" aria-label="Back to Moku Series">←</a>
 <div id="app">
 
   <!-- TITLE SCREEN -->
