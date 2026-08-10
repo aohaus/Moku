@@ -131,6 +131,13 @@ canvas {
   padding: 5px 12px; border-radius: 20px;
   margin-top: 8px;
 }
+#next-lv-display {
+  background: rgba(40,15,55,0.4);
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+  padding: 5px 12px; border-radius: 20px;
+  margin-top: 6px;
+}
 #time-display {
   background: rgba(40,15,55,0.4);
   color: rgba(255,255,255,0.75);
@@ -290,6 +297,7 @@ canvas {
       <div>
         <div id="score-display">Lv.1  スコア: 0</div>
         <div id="best-display">ベスト: 0</div>
+        <div id="next-lv-display">つぎのLvまで: 0pt</div>
         <div id="time-display">⏱ 0:00</div>
       </div>
       <button id="pause-btn" title="一時停止">⏸</button>
@@ -365,6 +373,29 @@ const RAINBOW = -1; // sentinel grid value — not a STAGES index, never merges/
 const LEADERBOARD_KEY = 'moyomoyo-leaderboard';
 const LEADERBOARD_MAX = 10;
 
+// ─── CPU対戦 (VS MODE) config ────────────────────────────────
+// Same 10x9 grid shape as marathon mode, just rendered smaller so two
+// boards fit side by side in the existing canvas footprint instead of
+// needing a wider canvas/layout.
+const GARBAGE = -2; // sentinel grid value — colorless, inert: never joins a match, never clears, just falls
+const VS_CELL = 38;
+const VS_GRID_W = VS_CELL * GRID_COLS;
+const VS_GRID_H = VS_CELL * GRID_ROWS;
+const VS_MARGIN_X = 16;
+const VS_GAP = 20;
+// Vertically centered-ish within the tall portrait canvas (rather than
+// pinned under a marathon-style top HUD) — two side-by-side boards are
+// much wider than tall relative to the 828x852 canvas, so anchoring them
+// higher up left a big dead void at the bottom.
+const VS_GRID_Y0 = 220;
+const VS_P_X0 = VS_MARGIN_X;
+const VS_C_X0 = VS_MARGIN_X + VS_GRID_W + VS_GAP;
+const VS_SPAWN_COL = 5;
+// Big attacks rain down over a couple of spawn cycles instead of landing
+// all at once — closer to how a real ojama tray drops in bursts, and it
+// keeps one huge chain from being an instant, unavoidable kill.
+const VS_GARBAGE_PER_DROP = GRID_COLS;
+
 const PAUSE_RESUME_Y = H * 0.48;
 const PAUSE_QUIT_Y   = PAUSE_RESUME_Y + 79;
 
@@ -416,6 +447,9 @@ const ROT_OFFSETS = [[0,-1],[1,0],[0,1],[-1,0]]; // up, right, down, left
 
 // ─── STATE ────────────────────────────────────────────────────
 let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER
+let mode = 'MARATHON'; // MARATHON | VS — which ruleset the PLAYING/PAUSED/GAMEOVER states refer to
+let vsP = null, vsC = null; // the two boards while mode === 'VS' (player / CPU)
+let vsWinnerIsPlayer = false; // set right before GAMEOVER in VS mode, drives the result text
 let phase = 'FALL';  // FALL | LOCK_PAUSE | RESOLVING | SPAWN_PAUSE
 let pauseTimer = 0;
 let fallTimer = 0;
@@ -438,7 +472,7 @@ let popStage = 0;
 let level = 1;
 let pendingLevelPreset = false;
 let titleFrame = 0;
-let titleMenuSel = 0; // 0 = スタート, 1 = ランキング
+let titleMenuSel = 0; // 0 = スタート, 1 = CPU対戦, 2 = ランキング
 let shakeX = 0, shakeY = 0;
 let flashAlpha = 0;
 let playFrames = 0;
@@ -765,6 +799,17 @@ function applyLevelPreset() {
 function updateHUD() {
   document.getElementById('score-display').textContent = `Lv.${level}  スコア: ${score}`;
   document.getElementById('best-display').textContent = `ベスト: ${Math.max(score, bestScore)}`;
+  const nextLvEl = document.getElementById('next-lv-display');
+  if (level >= MAX_LEVEL) {
+    nextLvEl.style.display = 'none';
+  } else {
+    // Mirrors checkLevelUp's own cumulative-threshold formula (see its
+    // comment) — the score needed to reach level+1 is
+    // LEVEL_STEP*(1+2+...+level).
+    const threshold = LEVEL_STEP * level * (level + 1) / 2;
+    nextLvEl.style.display = '';
+    nextLvEl.textContent = `つぎのLvまで: ${Math.max(0, threshold - score)}pt`;
+  }
 }
 
 function updateTimeDisplay() {
@@ -991,8 +1036,16 @@ function drawComboAnnouncement() {
   }
 }
 
-const TITLE_MENU_Y = 636, TITLE_MENU_GAP = 63;
-const TITLE_MENU_ITEMS = ['スタート', '🏆 ランキング'];
+// Tightened from a 2-item (636 / gap 63) layout to fit the new CPU対戦
+// entry without the bottom item crowding the franchise footer tag below.
+const TITLE_MENU_Y = 578, TITLE_MENU_GAP = 44;
+const TITLE_MENU_ITEMS = ['スタート', '⚔️ CPU対戦', '🏆 ランキング'];
+
+function activateTitleMenu(i) {
+  if (i === 0) startGame();
+  else if (i === 1) startVsGame();
+  else if (i === 2) openBoard();
+}
 
 function drawTitleScreen() {
   titleFrame++;
@@ -1054,7 +1107,7 @@ function drawTitleScreen() {
 
   // Idle sparkles orbiting the mascot — echoes the ✦ stars Angry
   // Mokumoku floats around its owl on its own title screen.
-  const mascotY = 330 + bob;
+  const mascotY = 315 + bob;
   const sparkT = (titleFrame * 0.04) % (Math.PI * 2);
   [[W/2-216,mascotY-71],[W/2+228,mascotY-57],[W/2-183,mascotY+88],[W/2+195,mascotY+80]].forEach(([sx,sy],i) => {
     const s = 0.5 + 0.5 * Math.sin(sparkT + i * 1.5);
@@ -1067,9 +1120,9 @@ function drawTitleScreen() {
     ctx.restore();
   });
 
-  drawGummyShape(W/2, mascotY, 105, lastStage.color, lastStage.face, tilt, 1, true);
+  drawGummyShape(W/2, mascotY, 97, lastStage.color, lastStage.face, tilt, 1, true);
 
-  const chainY = 515;
+  const chainY = 462;
   const startX = W/2 - 123;
   STAGES.forEach((st, i) => {
     const x = startX + i * 82;
@@ -1085,8 +1138,8 @@ function drawTitleScreen() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '20px Arial';
-  ctx.fillText('同じ段階を4つ以上つなげて進化させよう', W/2, 562);
-  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W/2, 585);
+  ctx.fillText('同じ段階を4つ以上つなげて進化させよう', W/2, 505);
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W/2, 528);
   ctx.restore();
 
   // Menu — a selectable list like Angry Mokumoku's own title menu
@@ -1098,7 +1151,7 @@ function drawTitleScreen() {
   // option" role instead, folded inline under the スタート item the
   // way Angry Mokumoku folds its saved level into つづきから, rather
   // than floating as a separate line below the whole menu.
-  ctx.font = 'bold 41px Arial';
+  ctx.font = 'bold 34px Arial';
   TITLE_MENU_ITEMS.forEach((label, i) => {
     const sel = titleMenuSel === i;
     const y = TITLE_MENU_Y + i * TITLE_MENU_GAP;
@@ -1179,6 +1232,7 @@ function drawPausedOverlay() {
 function draw() {
   ctx.clearRect(0, 0, W, H);
   if (state === 'TITLE') { drawTitleScreen(); return; }
+  if (mode === 'VS') { drawVs(); return; }
 
   ctx.save();
   ctx.translate(shakeX, shakeY);
@@ -1214,6 +1268,7 @@ function draw() {
 
 function update() {
   if (state !== 'PLAYING') return;
+  if (mode === 'VS') { updateVs(); return; }
 
   playFrames++;
   if (playFrames % 60 === 0) updateTimeDisplay();
@@ -1365,6 +1420,7 @@ function winClear() {
 }
 
 function startGame() {
+  mode = 'MARATHON';
   state = 'PLAYING';
   phase = 'FALL';
   score = 0;
@@ -1385,11 +1441,16 @@ function startGame() {
   document.getElementById('pause-btn').textContent = '⏸';
   nextPair = rollPair();
   document.getElementById('hud').style.visibility = 'visible';
+  document.getElementById('score-display').style.visibility = 'visible';
+  document.getElementById('best-display').style.visibility = 'visible';
+  document.getElementById('next-lv-display').style.visibility = 'visible';
+  document.getElementById('time-display').style.visibility = 'visible';
   document.getElementById('left-col').style.visibility = 'visible';
   document.getElementById('right-col').style.visibility = 'visible';
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
+  document.getElementById('ov-board-btn').textContent = '🏆 ランキング';
   updateHUD();
   updateTimeDisplay();
   trySpawnPiece();
@@ -1443,6 +1504,528 @@ function beep(freq, dur, { type = 'square', gain = 0.16, delay = 0, slideTo = nu
   osc.connect(g); g.connect(audioCtx.destination);
   osc.start(t0);
   osc.stop(t0 + dur + 0.03);
+}
+
+// ─── CPU対戦 (VS MODE) ────────────────────────────────────────
+// A self-contained parallel implementation rather than threading a board
+// parameter through the marathon functions above — marathon's grid/piece/
+// score/etc. stay plain globals exactly as before (zero risk of a VS
+// refactor regressing the score-attack mode), while every vb*-prefixed
+// function here operates on an explicit board object `b` so two boards
+// (vsP, vsC) can run side by side. Shared pure helpers (rotOffset,
+// STAGES, rainbowColor, Particle/addParticles/addShake, drawGummyShape,
+// stageVisual, newGrid) are reused as-is.
+
+function vbSimCanPlace(g, col, row, rot) {
+  if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return false;
+  if (g[col][row] !== null) return false;
+  const sat = rotOffset(col, row, rot);
+  if (sat.col < 0 || sat.col >= GRID_COLS || sat.row < 0 || sat.row >= GRID_ROWS) return false;
+  if (g[sat.col][sat.row] !== null) return false;
+  return true;
+}
+
+function vbFindGroups(g) {
+  const visited = Array.from({ length: GRID_COLS }, () => new Array(GRID_ROWS).fill(false));
+  const groups = [];
+  for (let c = 0; c < GRID_COLS; c++) {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      if (g[c][r] === null || g[c][r] === RAINBOW || g[c][r] === GARBAGE || visited[c][r]) continue;
+      const stage = g[c][r];
+      const stack = [[c, r]];
+      visited[c][r] = true;
+      const cells = [];
+      while (stack.length) {
+        const [cc, rr] = stack.pop();
+        cells.push([cc, rr]);
+        [[cc+1,rr],[cc-1,rr],[cc,rr+1],[cc,rr-1]].forEach(([nc, nr]) => {
+          if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) return;
+          if (visited[nc][nr] || g[nc][nr] !== stage) return;
+          visited[nc][nr] = true;
+          stack.push([nc, nr]);
+        });
+      }
+      if (cells.length >= MATCH_MIN) groups.push({ stage, cells });
+    }
+  }
+  return groups;
+}
+
+function vbApplyGravity(g, cols) {
+  const targets = cols || Array.from({ length: GRID_COLS }, (_, i) => i);
+  for (const c of targets) {
+    const vals = [];
+    for (let r = 0; r < GRID_ROWS; r++) if (g[c][r] !== null) vals.push(g[c][r]);
+    for (let r = 0; r < GRID_ROWS; r++) g[c][r] = null;
+    const startRow = GRID_ROWS - vals.length;
+    vals.forEach((v, i) => { g[c][startRow + i] = v; });
+  }
+}
+
+function newVsBoard(x0, isCpu) {
+  return {
+    x0, isCpu,
+    grid: newGrid(),
+    piece: null,
+    phase: 'FALL',
+    pauseTimer: 0,
+    fallTimer: 0,
+    aiTimer: 0,
+    chainCount: 0,
+    topClearsThisChain: 0,
+    score: 0,
+    nextPair: null,
+    lockedCols: [],
+    pendingGarbage: 0,
+    aiTarget: null,
+    alive: true,
+  };
+}
+
+// VS mode has no level-up (no board-wiping reset mid-match), so both
+// boards always draw from the fixed Lv1-2 spawn pool for fairness.
+function vbRollStage() {
+  if (Math.random() < MAGIC_CHANCE) return RAINBOW;
+  const pool = getSpawnPool(1);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function vbRollPair() { return { s1: vbRollStage(), s2: vbRollStage() }; }
+
+function vbCellCenter(b, col, row) {
+  return { x: b.x0 + col * VS_CELL + VS_CELL / 2, y: VS_GRID_Y0 + row * VS_CELL + VS_CELL / 2 };
+}
+
+function vbCanPlace(b, col, row, rot) { return vbSimCanPlace(b.grid, col, row, rot); }
+
+function vbMoveLeft(b)  { if (b.piece && vbCanPlace(b, b.piece.col - 1, b.piece.row, b.piece.rot)) { b.piece.col--; if (!b.isCpu) playSfx('move'); } }
+function vbMoveRight(b) { if (b.piece && vbCanPlace(b, b.piece.col + 1, b.piece.row, b.piece.rot)) { b.piece.col++; if (!b.isCpu) playSfx('move'); } }
+function vbRotate(b) {
+  if (!b.piece) return;
+  const newRot = (b.piece.rot + 3) % 4;
+  if (vbCanPlace(b, b.piece.col, b.piece.row, newRot)) { b.piece.rot = newRot; if (!b.isCpu) playSfx('rotate'); return; }
+  if (vbCanPlace(b, b.piece.col - 1, b.piece.row, newRot)) { b.piece.col--; b.piece.rot = newRot; if (!b.isCpu) playSfx('rotate'); return; }
+  if (vbCanPlace(b, b.piece.col + 1, b.piece.row, newRot)) { b.piece.col++; b.piece.rot = newRot; if (!b.isCpu) playSfx('rotate'); return; }
+}
+function vbSoftDrop(b) { if (b.piece && vbCanPlace(b, b.piece.col, b.piece.row + 1, b.piece.rot)) { b.piece.row++; if (!b.isCpu) playSfx('drop'); } }
+
+function vbLockPiece(b) {
+  const sat = rotOffset(b.piece.col, b.piece.row, b.piece.rot);
+  b.grid[b.piece.col][b.piece.row] = b.piece.s1;
+  b.grid[sat.col][sat.row] = b.piece.s2;
+  b.lockedCols = [b.piece.col, sat.col];
+  b.piece = null;
+  b.aiTarget = null;
+  b.phase = 'LOCK_PAUSE';
+  b.pauseTimer = 10;
+  if (!b.isCpu) playSfx('lock');
+}
+
+function vbTrySpawnPiece(b) {
+  if (b.grid[VS_SPAWN_COL][1] !== null || b.grid[VS_SPAWN_COL][0] !== null) { b.alive = false; return; }
+  b.piece = { col: VS_SPAWN_COL, row: 1, rot: 0, s1: b.nextPair.s1, s2: b.nextPair.s2 };
+  b.nextPair = vbRollPair();
+  b.fallTimer = 0;
+  if (b.isCpu) b.aiTarget = vbAiPickTarget(b);
+}
+
+function vbTriggerRainbows(b, seedCells, affectedCols) {
+  const triggered = new Set();
+  const queue = seedCells.slice();
+  let fired = false;
+
+  function detonate(c, r) {
+    const key = c + ',' + r;
+    if (triggered.has(key)) return;
+    triggered.add(key);
+    fired = true;
+    const { x, y } = vbCellCenter(b, c, r);
+    addParticles(x, y, rainbowColor(0), 14, 5);
+    b.score += 30;
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue;
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+        const stage = b.grid[nc][nr];
+        if (stage === null || stage === GARBAGE) continue; // garbage is inert — it doesn't ride along with a blast
+        if (stage === RAINBOW) {
+          b.grid[nc][nr] = null;
+          affectedCols.add(nc);
+          detonate(nc, nr);
+        } else {
+          const { x: ex, y: ey } = vbCellCenter(b, nc, nr);
+          b.score += Math.round(STAGES[stage].pts * 2);
+          addParticles(ex, ey, STAGES[stage].color, 8, 4);
+          b.grid[nc][nr] = null;
+          affectedCols.add(nc);
+          queue.push([nc, nr]);
+        }
+      }
+    }
+  }
+
+  while (queue.length) {
+    const [c, r] = queue.pop();
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue;
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+        if (b.grid[nc][nr] !== RAINBOW) continue;
+        b.grid[nc][nr] = null;
+        affectedCols.add(nc);
+        detonate(nc, nr);
+      }
+    }
+  }
+  return fired;
+}
+
+// Attack trigger: only a max-stage group actually vanishing (the branch
+// below where a group doesn't merge up into a new stage) counts toward
+// お邪魔 — merges into a higher stage stay on the board, same as marathon.
+function vbResolveStep(b) {
+  const groups = vbFindGroups(b.grid);
+  if (groups.length === 0) return false;
+  b.chainCount++;
+  const mult = 1 + (b.chainCount - 1) * 0.5;
+  const affectedCols = new Set();
+  const clearedCells = [];
+
+  groups.forEach(g => {
+    let anchor = g.cells[0];
+    g.cells.forEach(cell => {
+      if (cell[1] > anchor[1] || (cell[1] === anchor[1] && cell[0] < anchor[0])) anchor = cell;
+    });
+    g.cells.forEach(([c, r]) => { b.grid[c][r] = null; affectedCols.add(c); clearedCells.push([c, r]); });
+    const { x: mx, y: my } = vbCellCenter(b, anchor[0], anchor[1]);
+    if (g.stage < STAGES.length - 1) {
+      const newStage = g.stage + 1;
+      b.grid[anchor[0]][anchor[1]] = newStage;
+      b.score += Math.round(STAGES[newStage].pts * mult);
+      addParticles(mx, my, STAGES[newStage].color, 16, 5);
+    } else {
+      b.score += Math.round(150 * mult);
+      b.topClearsThisChain++;
+      addParticles(mx, my, STAGES[g.stage].color, 22, 6);
+    }
+    addParticles(mx, my, STAGES[g.stage].color, 8 + g.cells.length, 3);
+  });
+
+  const rainbowFired = vbTriggerRainbows(b, clearedCells, affectedCols);
+  addShake(rainbowFired ? 10 : (3 + b.chainCount));
+  if (!b.isCpu) playSfx(rainbowFired ? 'magic' : 'match', b.chainCount);
+  vbApplyGravity(b.grid, [...affectedCols]);
+  return true;
+}
+
+// Garbage lands like a normal piece would — one per column, settling on
+// top of whatever's already stacked there — rather than shoving the
+// existing stack upward. A big attack is spread over a few spawn cycles
+// (VS_GARBAGE_PER_DROP per drop) instead of dumping it all at once.
+function vbDropGarbage(b) {
+  if (b.pendingGarbage <= 0) return;
+  const n = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
+  let placed = 0;
+  const startCol = Math.floor(Math.random() * GRID_COLS);
+  for (let i = 0; i < GRID_COLS && placed < n; i++) {
+    const c = (startCol + i) % GRID_COLS;
+    for (let r = GRID_ROWS - 1; r >= 0; r--) {
+      if (b.grid[c][r] === null) { b.grid[c][r] = GARBAGE; placed++; break; }
+    }
+  }
+  b.pendingGarbage -= placed; // a full column that couldn't take garbage just carries the remainder to the next drop
+  if (b.grid[VS_SPAWN_COL][1] !== null || b.grid[VS_SPAWN_COL][0] !== null) b.alive = false;
+}
+
+function vbUpdateBoard(b, opponent) {
+  if (!b.alive) return;
+  if (b.phase === 'FALL') {
+    if (b.isCpu) {
+      b.aiTimer++;
+      if (b.aiTimer >= 5) { b.aiTimer = 0; vbAiStep(b); }
+    }
+    b.fallTimer++;
+    const interval = b.isCpu ? 20 : 28; // CPU falls a bit brisker than a Lv1 player board so it isn't purely passive
+    if (b.fallTimer >= interval) {
+      b.fallTimer = 0;
+      if (vbCanPlace(b, b.piece.col, b.piece.row + 1, b.piece.rot)) b.piece.row++;
+      else vbLockPiece(b);
+    }
+  } else if (b.phase === 'LOCK_PAUSE') {
+    if (--b.pauseTimer <= 0) {
+      vbApplyGravity(b.grid, b.lockedCols);
+      b.phase = 'RESOLVING';
+    }
+  } else if (b.phase === 'RESOLVING') {
+    if (--b.pauseTimer <= 0) {
+      if (vbResolveStep(b)) {
+        b.pauseTimer = 16;
+      } else {
+        if (b.topClearsThisChain > 0) {
+          const mult = 1 + (b.chainCount - 1) * 0.4;
+          opponent.pendingGarbage += Math.round(b.topClearsThisChain * 3 * mult);
+        }
+        b.chainCount = 0;
+        b.topClearsThisChain = 0;
+        b.phase = 'SPAWN_PAUSE';
+        b.pauseTimer = 10;
+      }
+    }
+  } else if (b.phase === 'SPAWN_PAUSE') {
+    if (--b.pauseTimer <= 0) {
+      vbDropGarbage(b);
+      if (!b.alive) return;
+      b.phase = 'FALL';
+      vbTrySpawnPiece(b);
+    }
+  }
+}
+
+// ─── CPU AI ───────────────────────────────────────────────────
+// Simple evaluation-function AI: at spawn, scores every (column, rotation)
+// landing spot on a cloned grid — flat stacks, no deep holes, bonus for
+// sitting next to same-stage cells, bigger bonus if it would pop a match
+// immediately — and picks the best. It then steers toward that spot a
+// few times a second (vbAiStep, throttled via aiTimer) using the exact
+// same move/rotate primitives the player uses.
+function vbCloneGrid(g) { return g.map(col => col.slice()); }
+
+function vbColumnHeights(g) {
+  return Array.from({ length: GRID_COLS }, (_, c) => {
+    for (let r = 0; r < GRID_ROWS; r++) if (g[c][r] !== null) return GRID_ROWS - r;
+    return 0;
+  });
+}
+
+function vbDropRow(g, col, rot) {
+  let r = 1;
+  if (!vbSimCanPlace(g, col, r, rot)) return -1;
+  while (vbSimCanPlace(g, col, r + 1, rot)) r++;
+  return r;
+}
+
+function vbEvaluateGrid(g) {
+  const heights = vbColumnHeights(g);
+  let sc = 0;
+  for (let c = 0; c < GRID_COLS - 1; c++) sc -= Math.abs(heights[c] - heights[c + 1]) * 2;
+  heights.forEach(h => { if (h > GRID_ROWS - 2) sc -= (h - (GRID_ROWS - 2)) * 12; });
+  for (let c = 0; c < GRID_COLS; c++) {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      const v = g[c][r];
+      if (v === null || v === RAINBOW || v === GARBAGE) continue;
+      if (c + 1 < GRID_COLS && g[c + 1][r] === v) sc += 3;
+      if (r + 1 < GRID_ROWS && g[c][r + 1] === v) sc += 3;
+    }
+  }
+  return sc;
+}
+
+function vbAiPickTarget(b) {
+  if (!b.piece) return null;
+  let best = null, bestScore = -Infinity;
+  for (let rot = 0; rot < 4; rot++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      const row = vbDropRow(b.grid, col, rot);
+      if (row < 0) continue;
+      const sat = rotOffset(col, row, rot);
+      const g2 = vbCloneGrid(b.grid);
+      g2[col][row] = b.piece.s1;
+      g2[sat.col][sat.row] = b.piece.s2;
+      const popBonus = vbFindGroups(g2).reduce((n, gr) => n + gr.cells.length, 0) * 6;
+      const sc = vbEvaluateGrid(g2) + popBonus;
+      if (sc > bestScore) { bestScore = sc; best = { col, rot }; }
+    }
+  }
+  return best;
+}
+
+function vbAiStep(b) {
+  if (!b.piece || !b.aiTarget) return;
+  if (b.piece.rot !== b.aiTarget.rot) { vbRotate(b); return; }
+  if (b.piece.col < b.aiTarget.col) { vbMoveRight(b); return; }
+  if (b.piece.col > b.aiTarget.col) { vbMoveLeft(b); return; }
+  vbSoftDrop(b);
+}
+
+// ─── VS DRAW ──────────────────────────────────────────────────
+
+function vbDrawPanel(b) {
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath(); ctx.roundRect(b.x0 - 5, VS_GRID_Y0 - 5, VS_GRID_W + 10, VS_GRID_H + 10, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let c = 1; c < GRID_COLS; c++) {
+    const x = b.x0 + c * VS_CELL;
+    ctx.beginPath(); ctx.moveTo(x, VS_GRID_Y0); ctx.lineTo(x, VS_GRID_Y0 + VS_GRID_H); ctx.stroke();
+  }
+  for (let r = 1; r < GRID_ROWS; r++) {
+    const y = VS_GRID_Y0 + r * VS_CELL;
+    ctx.beginPath(); ctx.moveTo(b.x0, y); ctx.lineTo(b.x0 + VS_GRID_W, y); ctx.stroke();
+  }
+  ctx.strokeStyle = b.isCpu ? 'rgba(255,180,120,0.4)' : 'rgba(255,143,196,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(b.x0, VS_GRID_Y0, VS_GRID_W, VS_GRID_H);
+}
+
+function drawGarbageBlock(x, y, cell) {
+  const s = cell * 0.82;
+  ctx.save();
+  ctx.fillStyle = '#5A5A66';
+  ctx.beginPath(); ctx.roundRect(x - s / 2, y - s / 2, s, s, cell * 0.18); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.roundRect(x - s / 2 + s * 0.12, y - s / 2 + s * 0.1, s * 0.35, s * 0.2, cell * 0.1); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(x - s / 2, y - s / 2, s, s, cell * 0.18); ctx.stroke();
+  ctx.restore();
+}
+
+function vbDrawCells(b) {
+  for (let c = 0; c < GRID_COLS; c++) {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      const stage = b.grid[c][r];
+      if (stage === null) continue;
+      const { x, y } = vbCellCenter(b, c, r);
+      if (stage === GARBAGE) { drawGarbageBlock(x, y, VS_CELL); continue; }
+      const v = stageVisual(stage);
+      drawGummyShape(x, y, VS_CELL * 0.42, v.color, v.face, 0, 1, v.legendary, v.magic);
+    }
+  }
+}
+
+function vbDrawPiece(b) {
+  if (!b.piece) return;
+  const sat = rotOffset(b.piece.col, b.piece.row, b.piece.rot);
+  const a = vbCellCenter(b, b.piece.col, b.piece.row);
+  const c2 = vbCellCenter(b, sat.col, sat.row);
+  const v1 = stageVisual(b.piece.s1), v2 = stageVisual(b.piece.s2);
+  drawGummyShape(a.x, a.y, VS_CELL * 0.42, v1.color, v1.face, 0, 1, v1.legendary, v1.magic);
+  drawGummyShape(c2.x, c2.y, VS_CELL * 0.42, v2.color, v2.face, 0, 1, v2.legendary, v2.magic);
+}
+
+function vbDrawHud(b, label) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 15px Arial';
+  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 14);
+  ctx.font = 'bold 17px Arial';
+  ctx.fillStyle = '#FFE066';
+  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 24);
+  if (b.pendingGarbage > 0) {
+    ctx.fillStyle = '#FF6F6F';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(`⚠ ${b.pendingGarbage}`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 44);
+  }
+  ctx.restore();
+}
+
+function drawVs() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#2A1840'); bg.addColorStop(0.55, '#4A2560'); bg.addColorStop(1, '#331A48');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#FFE9F5';
+  ctx.font = 'bold 40px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
+  ctx.fillText('⚔️ CPU対戦', W / 2, 88);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '16px Arial';
+  ctx.fillText('最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！', W / 2, 118);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+  shakeX *= 0.7; shakeY *= 0.7;
+  if (Math.abs(shakeX) < 0.1) shakeX = 0;
+  if (Math.abs(shakeY) < 0.1) shakeY = 0;
+
+  vbDrawPanel(vsP); vbDrawPanel(vsC);
+  vbDrawCells(vsP); vbDrawCells(vsC);
+  if (vsP.phase === 'FALL') vbDrawPiece(vsP);
+  if (vsC.phase === 'FALL') vbDrawPiece(vsC);
+  drawParticles();
+  vbDrawHud(vsP, 'YOU');
+  vbDrawHud(vsC, 'CPU');
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = 'bold 20px Arial';
+  ctx.fillText('VS', W / 2, VS_GRID_Y0 + VS_GRID_H / 2);
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '18px Arial';
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W / 2, H - 24);
+  ctx.restore();
+
+  if (flashAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = flashAlpha;
+    ctx.fillStyle = '#FFE9A0';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    flashAlpha *= 0.82;
+  } else flashAlpha = 0;
+
+  if (state === 'PAUSED') drawPausedOverlay();
+}
+
+function updateVs() {
+  particles.forEach(p => p.update());
+  particles = particles.filter(p => p.alive);
+  vbUpdateBoard(vsP, vsC);
+  vbUpdateBoard(vsC, vsP);
+  if (!vsP.alive || !vsC.alive) {
+    vsWinnerIsPlayer = vsP.alive && !vsC.alive;
+    endRunVs();
+  }
+}
+
+function startVsGame() {
+  mode = 'VS';
+  state = 'PLAYING';
+  particles = [];
+  flashAlpha = 0; shakeX = 0; shakeY = 0;
+  vsP = newVsBoard(VS_P_X0, false);
+  vsC = newVsBoard(VS_C_X0, true);
+  vsP.nextPair = vbRollPair();
+  vsC.nextPair = vbRollPair();
+  vsWinnerIsPlayer = false;
+  document.getElementById('pause-btn').textContent = '⏸';
+  // Keep #hud itself visible (it's the pause button's own container) but
+  // hide the marathon-only score/best/time readout inside it — VS mode
+  // draws its own per-board score directly on the canvas instead.
+  document.getElementById('hud').style.visibility = 'visible';
+  document.getElementById('score-display').style.visibility = 'hidden';
+  document.getElementById('best-display').style.visibility = 'hidden';
+  document.getElementById('next-lv-display').style.visibility = 'hidden';
+  document.getElementById('time-display').style.visibility = 'hidden';
+  document.getElementById('left-col').style.visibility = 'visible';
+  document.getElementById('right-col').style.visibility = 'visible';
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('title-frame').style.display = 'none';
+  document.getElementById('hub-link').style.display = 'none';
+  vbTrySpawnPiece(vsP);
+  vbTrySpawnPiece(vsC);
+}
+
+function endRunVs() {
+  state = 'GAMEOVER';
+  playSfx(vsWinnerIsPlayer ? 'magic' : 'gameover');
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent = vsWinnerIsPlayer ? '🎉 かち！' : '😵 まけ...';
+  document.getElementById('ov-sub').textContent = `あなた: ${vsP.score}pt　CPU: ${vsC.score}pt`;
+  document.getElementById('ov-name-row').classList.add('hidden');
+  document.getElementById('ov-board-btn').textContent = '🏠 タイトルへ';
+  document.getElementById('left-col').style.visibility = 'hidden';
+  document.getElementById('right-col').style.visibility = 'hidden';
 }
 
 function playSfx(kind, arg) {
@@ -1508,6 +2091,7 @@ function resumeGame() {
 }
 function quitToTitle() {
   state = 'TITLE';
+  mode = 'MARATHON';
   titleFrame = 0;
   titleMenuSel = 0;
   document.getElementById('pause-btn').textContent = '⏸';
@@ -1522,12 +2106,11 @@ function onDown(e) {
   e.preventDefault();
   const p = getPos(e);
   if (state === 'TITLE') {
-    if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= TITLE_MENU_Y - 28 && p.y <= TITLE_MENU_Y + 28) {
-      titleMenuSel = 0; startGame(); return;
-    }
-    const item2Y = TITLE_MENU_Y + TITLE_MENU_GAP;
-    if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= item2Y - 28 && p.y <= item2Y + 28) {
-      titleMenuSel = 1; openBoard(); return;
+    for (let i = 0; i < TITLE_MENU_ITEMS.length; i++) {
+      const y = TITLE_MENU_Y + i * TITLE_MENU_GAP;
+      if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= y - 22 && p.y <= y + 22) {
+        titleMenuSel = i; activateTitleMenu(i); return;
+      }
     }
     // (The hub link is now the #hub-link HTML anchor, not hit-tested
     // here — see their CSS for why.)
@@ -1550,7 +2133,16 @@ canvas.addEventListener('touchstart', onDown, { passive: false });
 canvas.addEventListener('touchend',   onUp,   { passive: false });
 
 function ctrlAction(action) {
-  if (state !== 'PLAYING' || phase !== 'FALL') return;
+  if (state !== 'PLAYING') return;
+  if (mode === 'VS') {
+    if (!vsP || vsP.phase !== 'FALL') return;
+    if (action === 'left') vbMoveLeft(vsP);
+    else if (action === 'right') vbMoveRight(vsP);
+    else if (action === 'rotate') vbRotate(vsP);
+    else if (action === 'down') vbSoftDrop(vsP);
+    return;
+  }
+  if (phase !== 'FALL') return;
   if (action === 'left') moveLeft();
   else if (action === 'right') moveRight();
   else if (action === 'rotate') rotatePiece();
@@ -1589,7 +2181,7 @@ document.querySelectorAll('.ctrl-btn').forEach(btn => {
 
 document.getElementById('ov-btn').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
-  startGame();
+  if (mode === 'VS') startVsGame(); else startGame();
 });
 
 document.getElementById('ov-register-btn').addEventListener('click', () => {
@@ -1601,7 +2193,10 @@ document.getElementById('ov-register-btn').addEventListener('click', () => {
   btn.textContent = '登録済み';
 });
 
-document.getElementById('ov-board-btn').addEventListener('click', openBoard);
+document.getElementById('ov-board-btn').addEventListener('click', () => {
+  if (mode === 'VS') { document.getElementById('overlay').classList.add('hidden'); quitToTitle(); }
+  else openBoard();
+});
 document.getElementById('board-close-btn').addEventListener('click', closeBoard);
 
 document.getElementById('pause-btn').addEventListener('click', () => {
@@ -1611,10 +2206,12 @@ document.getElementById('pause-btn').addEventListener('click', () => {
 
 document.addEventListener('keydown', e => {
   if (state === 'TITLE') {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      titleMenuSel = titleMenuSel === 0 ? 1 : 0;
+    if (e.key === 'ArrowUp') {
+      titleMenuSel = (titleMenuSel + TITLE_MENU_ITEMS.length - 1) % TITLE_MENU_ITEMS.length;
+    } else if (e.key === 'ArrowDown') {
+      titleMenuSel = (titleMenuSel + 1) % TITLE_MENU_ITEMS.length;
     } else if (e.key === 'Enter' || e.key === ' ') {
-      if (titleMenuSel === 0) startGame(); else openBoard();
+      activateTitleMenu(titleMenuSel);
     }
     return;
   }
@@ -1622,11 +2219,11 @@ document.addEventListener('keydown', e => {
     if (state === 'PLAYING') pauseGame(); else resumeGame();
     return;
   }
-  if (state !== 'PLAYING' || phase !== 'FALL') return;
-  if (e.key === 'ArrowLeft') moveLeft();
-  else if (e.key === 'ArrowRight') moveRight();
-  else if (e.key === 'ArrowUp' || e.key === ' ') rotatePiece();
-  else if (e.key === 'ArrowDown') softDrop();
+  if (state !== 'PLAYING') return;
+  if (e.key === 'ArrowLeft') ctrlAction('left');
+  else if (e.key === 'ArrowRight') ctrlAction('right');
+  else if (e.key === 'ArrowUp' || e.key === ' ') ctrlAction('rotate');
+  else if (e.key === 'ArrowDown') ctrlAction('down');
 });
 
 // ─── MAIN LOOP ────────────────────────────────────────────────
