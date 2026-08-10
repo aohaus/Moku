@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Moku Series</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(42,122,48,0.10), transparent 40%),
+    radial-gradient(circle at 82% 20%, rgba(217,111,176,0.09), transparent 42%),
+    radial-gradient(circle at 55% 85%, rgba(255,201,74,0.08), transparent 45%),
+    linear-gradient(180deg, #0A0B12 0%, #121320 55%, #0A0B12 100%);
+  color: #EDEEF6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: clamp(28px, 6vw, 64px) 20px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(28px, 5vw, 44px);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.owl {
+  font-size: clamp(44px, 9vw, 64px);
+  animation: bob 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(255,255,255,0.15));
+}
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+h1 {
+  font-size: clamp(30px, 6.5vw, 46px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 24px rgba(255,255,255,0.12);
+}
+header p {
+  color: rgba(237,238,246,0.55);
+  font-size: clamp(13px, 2.4vw, 15px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.cards {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 560px) {
+  .cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 860px) {
+  .cards { grid-template-columns: repeat(3, 1fr); }
+}
+.card {
+  --hi: #888;
+  --lo: #444;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 20px 20px;
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  background: linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+  border: 2px solid var(--hi);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  transition: transform .18s ease, box-shadow .18s ease;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid var(--lo);
+  border-radius: 11px;
+  pointer-events: none;
+}
+.card:hover, .card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 0 1px var(--hi);
+}
+.card:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
+.card .emoji { font-size: 34px; line-height: 1; }
+.card h2 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.card .sub {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--hi);
+  text-transform: uppercase;
+}
+.card p.desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: rgba(237,238,246,0.7);
+  flex: 1;
+}
+.card .cta {
+  margin-top: 4px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--hi);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card.am { --hi: #4CBE55; --lo: #1A5020; }
+.card.mm { --hi: #E98FC7; --lo: #7A3D63; }
+.card.mk { --hi: #FFC94A; --lo: #8A6218; }
+
+.card.soon {
+  --hi: rgba(237,238,246,0.22);
+  --lo: rgba(237,238,246,0.1);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-style: dashed;
+  background: rgba(255,255,255,0.02);
+  box-shadow: none;
+  cursor: default;
+  min-height: 150px;
+}
+.card.soon:hover, .card.soon:focus-visible { transform: none; box-shadow: none; }
+.card.soon .emoji { font-size: 26px; opacity: 0.5; }
+.card.soon h2 { font-size: 14px; font-weight: 700; color: rgba(237,238,246,0.4); letter-spacing: 0.04em; }
+.card.soon .sub { color: rgba(237,238,246,0.28); }
+
+footer {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.tag-line {
+  width: min(320px, 70%);
+  height: 1px;
+  background: rgba(255,255,255,0.14);
+}
+.tag {
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  color: rgba(237,238,246,0.4);
+  text-align: center;
+}
+.repo-note {
+  font-size: 11px;
+  color: rgba(237,238,246,0.25);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="owl">🦉</div>
+    <h1>Moku Series</h1>
+    <p>Pick a game to play · 9 titles planned (3 live now)</p>
+  </header>
+
+  <div class="cards">
+    <a class="card am" href="angry-mokumoku.html">
+      <div class="emoji">🦉</div>
+      <div class="sub">Action / Puzzle</div>
+      <h2>Angry Mokumoku</h2>
+      <p class="desc">Launch an owl to take down enemies in this slingshot action game. 30 stages.</p>
+      <div class="cta">Play ▶</div>
+    </a>
+    <a class="card mm" href="moyomoyo.html">
+      <div class="emoji">🍬</div>
+      <div class="sub">Falling Block</div>
+      <h2>Moyomoyo</h2>
+      <p class="desc">Match 4 or more gummies of the same stage to evolve them in this falling-block puzzle.</p>
+      <div class="cta">Play ▶</div>
+    </a>
+    <a class="card mk" href="mk-mobile.html">
+      <div class="emoji">⚽</div>
+      <div class="sub">Sports</div>
+      <h2>MK Mobile</h2>
+      <p class="desc">Score more goals than your opponent before time runs out in this quick soccer match.</p>
+      <div class="cta">Play ▶</div>
+    </a>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
+  </div>
+
+  <footer>
+    <div class="tag-line"></div>
+    <div class="tag">🦉 × 🍬 × ⚽ &nbsp; M O K U M O K U &nbsp; S E R I E S</div>
+    <div class="repo-note">aohaus/Moku</div>
+  </footer>
+</div>
+</body>
+</html>
