@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="icons/moyomoyo-apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/moyomoyo-icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/moyomoyo-icon-512.png">
+<link rel="manifest" href="hub-manifest.json">
 <meta name="apple-mobile-web-app-title" content="Moku Series">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -129,6 +130,116 @@ header p {
   letter-spacing: 0.06em;
   color: var(--place-accent);
   transition: color 1.4s ease;
+}
+#a2hsBtn {
+  margin-top: 2px;
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: #EDEEF6;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 9px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease, border-color .15s ease;
+}
+#a2hsBtn:hover, #a2hsBtn:focus-visible {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.3);
+}
+#a2hsBtn:active { transform: translateY(1px); }
+
+#a2hsOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5,5,10,0.68);
+  backdrop-filter: blur(3px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#a2hsOverlay.open { display: flex; }
+#a2hsModal {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #16171F;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+#a2hsClose {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: #EDEEF6;
+  font-size: 14px;
+  cursor: pointer;
+}
+#a2hsClose:hover { background: rgba(255,255,255,0.16); }
+.a2hs-panel h2 {
+  font-size: 19px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  padding-right: 26px;
+}
+.a2hs-sub {
+  font-size: 13.5px;
+  color: rgba(237,238,246,0.65);
+  margin-bottom: 18px;
+  line-height: 1.6;
+}
+.a2hs-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.a2hs-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.a2hs-icon {
+  flex: none;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  font-size: 16px;
+}
+.a2hs-step-text { flex: 1 1 auto; min-width: 0; }
+.a2hs-note {
+  font-size: 12px;
+  color: rgba(237,238,246,0.45);
+  line-height: 1.6;
+}
+#a2hsInstallBtn {
+  appearance: none;
+  border: none;
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: var(--place-accent, #93A0FF);
+  color: #10111A;
+  font: inherit;
+  font-weight: 800;
+  font-size: 14.5px;
+  cursor: pointer;
+  margin-bottom: 14px;
 }
 .cards {
   width: 100%;
@@ -261,6 +372,7 @@ footer {
       <div id="clock">----年--月--日(-) --:--</div>
       <div id="placeLabel">・・・</div>
     </div>
+    <button id="a2hsBtn" type="button">📲 ホーム画面に追加</button>
   </header>
 
   <div class="cards">
@@ -304,6 +416,36 @@ footer {
     <div class="repo-note">aohaus/Moku</div>
   </footer>
 </div>
+
+<div id="a2hsOverlay">
+  <div id="a2hsModal" role="dialog" aria-modal="true" aria-labelledby="a2hsTitle">
+    <button id="a2hsClose" type="button" aria-label="閉じる">✕</button>
+
+    <div class="a2hs-panel" id="a2hsIOS">
+      <h2 id="a2hsTitle">📲 ホーム画面に追加(iPhone / iPad)</h2>
+      <p class="a2hs-sub">Safariで開いている場合、下の手順でアプリのように起動できます。</p>
+      <ol class="a2hs-steps">
+        <li><span class="a2hs-icon">📤</span><span class="a2hs-step-text">画面下(iPadは上)の<strong>共有ボタン</strong>をタップ</span></li>
+        <li><span class="a2hs-icon">➕</span><span class="a2hs-step-text">メニューから<strong>「ホーム画面に追加」</strong>を選択</span></li>
+        <li><span class="a2hs-icon">✅</span><span class="a2hs-step-text">右上の<strong>「追加」</strong>をタップして完了</span></li>
+      </ol>
+      <p class="a2hs-note">Chrome等の他ブラウザで開いている場合は、一度Safariで開き直してください。</p>
+    </div>
+
+    <div class="a2hs-panel" id="a2hsAndroid" hidden>
+      <h2>📲 ホーム画面に追加(Android)</h2>
+      <p class="a2hs-sub">この端末なら、下のボタンからそのまま追加できます。</p>
+      <button id="a2hsInstallBtn" type="button">ホーム画面に追加する</button>
+      <p class="a2hs-note">ボタンが反応しない場合はブラウザメニュー(⋮)から「ホーム画面に追加」を選んでください。</p>
+    </div>
+
+    <div class="a2hs-panel" id="a2hsDesktop" hidden>
+      <h2>📲 ホーム画面に追加</h2>
+      <p class="a2hs-sub">この機能はiPhone・iPad・Androidのブラウザで利用できます。お使いの端末でこのページを開き、案内に従ってください。</p>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   // Background = time-of-day band (4) × place (7: 6 SE Asian cities + one
@@ -367,6 +509,66 @@ footer {
 
   updateSky();
   setInterval(updateSky, 30000);
+})();
+
+(function () {
+  // "Add to Home Screen" helper. iOS/iPadOS Safari has no JS API to
+  // trigger the install prompt, so those platforms just get an
+  // illustrated instruction panel (share icon → Add to Home Screen).
+  // Chrome/Edge on Android (and desktop) expose beforeinstallprompt,
+  // which we capture and wire to a real "install" button instead.
+  var overlay = document.getElementById('a2hsOverlay');
+  var openBtn = document.getElementById('a2hsBtn');
+  var closeBtn = document.getElementById('a2hsClose');
+  var panelIOS = document.getElementById('a2hsIOS');
+  var panelAndroid = document.getElementById('a2hsAndroid');
+  var panelDesktop = document.getElementById('a2hsDesktop');
+  var installBtn = document.getElementById('a2hsInstallBtn');
+
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS "desktop" UA
+  var isAndroid = /Android/.test(ua);
+
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  function showPanel() {
+    [panelIOS, panelAndroid, panelDesktop].forEach(function (p) { p.hidden = true; });
+    if (isIOS) {
+      panelIOS.hidden = false;
+    } else if (isAndroid) {
+      panelAndroid.hidden = false;
+    } else {
+      panelDesktop.hidden = false;
+    }
+  }
+
+  function openModal() {
+    showPanel();
+    overlay.classList.add('open');
+  }
+  function closeModal() {
+    overlay.classList.remove('open');
+  }
+
+  openBtn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+  });
+
+  installBtn.addEventListener('click', function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function () { deferredPrompt = null; });
+  });
 })();
 </script>
 </body>
