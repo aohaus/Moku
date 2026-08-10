@@ -18,7 +18,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 .wrap {
-  max-width: 900px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: clamp(28px, 6vw, 64px) 20px 40px;
   display: flex;
@@ -30,9 +30,12 @@ html, body {
 }
 header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .owl {
-  font-size: clamp(44px, 9vw, 64px);
+  width: clamp(72px, 12vw, 100px);
+  height: clamp(72px, 12vw, 100px);
+  border-radius: 50%;
   animation: bob 3.2s ease-in-out infinite;
   filter: drop-shadow(0 0 18px rgba(255,255,255,0.15));
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
 }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 h1 {
@@ -57,7 +60,7 @@ header p {
   .cards { grid-template-columns: repeat(2, 1fr); }
 }
 @media (min-width: 860px) {
-  .cards { grid-template-columns: repeat(3, 1fr); }
+  .cards { grid-template-columns: repeat(4, 1fr); }
 }
 .card {
   --hi: #888;
@@ -168,7 +171,7 @@ footer {
 <body>
 <div class="wrap">
   <header>
-    <div class="owl">🦉</div>
+    <img class="owl" src="icons/icon-512.png" alt="モクモク">
     <h1>Moku Series</h1>
     <p>Pick a game to play · 9 titles planned (4 live now)</p>
   </header>
@@ -202,7 +205,6 @@ footer {
       <p class="desc">4v4 slingshot showdown — team up and knock out the rival owls first.</p>
       <div class="cta">Play ▶</div>
     </a>
-    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
     <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
     <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
     <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>

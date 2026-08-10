@@ -88,15 +88,6 @@
   .homeBtn.customize{border-left-color:var(--teal);}
   .homeBtn.spin{border-left-color:var(--gold);}
 
-  #seriesLinks{display:flex; align-items:center; justify-content:center; margin-top:18px;}
-  .seriesLink{
-    display:inline-flex; align-items:center; gap:5px;
-    background:var(--navy-panel); border:1px solid #384073; color:var(--cream);
-    font-size:12px; font-weight:700; text-decoration:none;
-    padding:6px 12px; border-radius:999px; opacity:.9;
-  }
-  .seriesLink:active{transform:translateY(1px);}
-
   /* ---------- Battle screen (2x scale) ---------- */
   #battleTop{display:flex; justify-content:space-between; gap:10px; padding:0 6px 12px; flex-wrap:wrap;}
   .hpblock{flex:1; min-width:130px;}
@@ -265,10 +256,91 @@
   }
   .navbtn .ic{font-size:18px;}
   .navbtn.active{opacity:1; background:rgba(232,184,74,.12); color:var(--gold);}
+
+  /* ---------- TITLE SCREEN (Moku series design system) ---------- */
+  body.on-title{ background:
+      radial-gradient(circle at 20% 15%, rgba(110,123,255,0.14), transparent 42%),
+      linear-gradient(180deg, #0B0C1F 0%, #171A3D 55%, #0B0C1F 100%);
+  }
+  body.on-title #hud, body.on-title #bottomnav{ display:none; }
+  #title-frame{
+    display:none;
+    position:fixed; inset:14px;
+    border:3px solid #6E7BFF;
+    border-radius:10px;
+    pointer-events:none;
+    z-index:5;
+  }
+  #title-frame::after{
+    content:'';
+    position:absolute; inset:5px;
+    border:1px solid #2B2F80;
+    border-radius:8px;
+  }
+  body.on-title #title-frame{ display:block; }
+  #hub-link{
+    display:none;
+    position:fixed; top:30px; right:24px;
+    z-index:6;
+    font-family: ui-rounded, "Segoe UI Rounded", "Baloo 2", system-ui, sans-serif;
+    font-size:15px; font-weight:800;
+    color:#93A0FF;
+    text-decoration:none;
+    animation:hubLinkPulse 2.2s ease-in-out infinite;
+  }
+  body.on-title #hub-link{ display:block; }
+  @keyframes hubLinkPulse{ 0%,100%{opacity:.7;} 50%{opacity:1;} }
+  #titleScreen{
+    align-items:center; justify-content:center; text-align:center;
+    min-height:100vh; gap:18px; padding:24px 20px;
+  }
+  #titleMascot{
+    width:104px; height:104px; border-radius:50%;
+    box-shadow:0 0 34px rgba(110,123,255,.45);
+    animation:titleMascotBob 3.2s ease-in-out infinite;
+  }
+  @keyframes titleMascotBob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+  #titleLogo{
+    margin:6px 0 0; font-weight:800; letter-spacing:.02em;
+    font-size:clamp(26px,7vw,40px); line-height:1.15;
+    color:#EBEDF6;
+    text-shadow:0 0 24px rgba(110,123,255,.4);
+  }
+  #titleLogo span{ color:#93A0FF; }
+  #titleSub{
+    margin:0; font-size:12.5px; letter-spacing:.14em; font-weight:700;
+    color:#8890D6; text-transform:uppercase;
+  }
+  #titleMenu{ margin-top:18px; display:flex; flex-direction:column; align-items:center; }
+  .titleMenuItem{
+    appearance:none; border:none; background:none; cursor:pointer;
+    font-family:inherit; font-weight:800; font-size:19px;
+    color:#93A0FF; padding:8px 18px;
+    text-shadow:0 0 14px rgba(147,160,255,.7);
+  }
+  .titleMenuItem:active{ transform:translateY(1px); }
+  #titleFooterTag{
+    margin-top:34px; padding-top:14px; width:min(320px,80%);
+    border-top:1px solid rgba(255,255,255,.12);
+    font-size:11px; letter-spacing:.05em; color:#5B6099;
+  }
 </style>
 </head>
-<body>
+<body class="on-title">
+<div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <div id="app">
+
+  <!-- TITLE SCREEN -->
+  <section class="screen active" id="titleScreen">
+    <img id="titleMascot" src="icons/icon-512.png" alt="モクモク">
+    <h1 id="titleLogo">ANGRY MOKU<br><span>BATTLE ROYAL</span></h1>
+    <p id="titleSub">4 V 4 &nbsp; S L I N G S H O T &nbsp; S H O W D O W N</p>
+    <nav id="titleMenu">
+      <button class="titleMenuItem" id="titleStartBtn">▶ はじめる</button>
+    </nav>
+    <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆&nbsp; M O K U M O K U &nbsp;S E R I E S</div>
+  </section>
 
   <div id="hud">
     <h1>ANGRY <span>MOKU</span></h1>
@@ -279,7 +351,7 @@
   </div>
 
   <!-- HOME SCREEN -->
-  <section class="screen active" id="homeScreen">
+  <section class="screen" id="homeScreen">
     <h2 id="homeTitle">Welcome back,<br>trainer.</h2>
     <div id="homePreviewWrap"><canvas id="homePreview" width="170" height="170"></canvas></div>
     <div id="homeStats">Level <span id="homeLevel">1</span> · <span id="homeDiff">Easy</span> · 🪙 <span id="homeCoins">0</span></div>
@@ -287,9 +359,6 @@
       <button class="homeBtn battle" data-screen="battleScreen"><span class="bic">⚔️</span> Battle</button>
       <button class="homeBtn customize" data-screen="customizeScreen"><span class="bic">🧣</span> Customize</button>
       <button class="homeBtn spin" data-screen="spinScreen"><span class="bic">🎡</span> Spin</button>
-    </div>
-    <div id="seriesLinks">
-      <a class="seriesLink" href="index.html">🦉 Mokuシリーズ ▶</a>
     </div>
   </section>
 
@@ -1302,6 +1371,12 @@
   });
   document.querySelectorAll(".homeBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>goToScreen(btn.dataset.screen));
+  });
+
+  /* ================= TITLE SCREEN ================= */
+  document.getElementById("titleStartBtn").addEventListener("click", ()=>{
+    document.body.classList.remove("on-title");
+    goToScreen("homeScreen");
   });
 
   /* ================= INIT ================= */
