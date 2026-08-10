@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>モヨモヨ - Moyomoyo</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  /* Soft candy bokeh dots tiled across the full viewport, so on wide
+     screens (e.g. iPad landscape) the margins beside the portrait game
+     read as intentional decoration instead of empty dead space. */
+  background:
+    radial-gradient(circle, rgba(255,180,220,0.09) 0 5px, transparent 6px) 20px 30px / 220px 220px repeat,
+    radial-gradient(circle, rgba(255,180,220,0.07) 0 7px, transparent 8px) 140px 160px / 320px 320px repeat,
+    radial-gradient(circle, rgba(200,160,255,0.08) 0 4px, transparent 5px) 60px 220px / 260px 260px repeat,
+    radial-gradient(circle, rgba(255,210,230,0.06) 0 6px, transparent 7px) 200px 60px / 380px 380px repeat,
+    linear-gradient(160deg, #2A1840 0%, #4A2560 55%, #331A48 100%);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  user-select: none;
+  overflow: hidden;
+  touch-action: none;
+}
+/* Left/right control columns sit outside the canvas so they can be big
+   and work the same way in portrait or landscape — the canvas no longer
+   reserves its own bottom strip for buttons. */
+#game-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  /* Side padding keeps the control buttons off the physical screen
+     edge — flush-to-edge buttons are harder to land a thumb on and
+     can conflict with OS edge-swipe gestures (back navigation) or get
+     clipped by a notch/rounded-corner safe area. */
+  padding: 0 clamp(16px, 3vw, 40px);
+}
+/* Anchored inside #wrapper (the rounded card that holds the HUD and
+   canvas) rather than as flex columns outside it — sitting outside
+   the card put them past its visible edge in the plain page
+   background, which read as "stuck to the outside" even after giving
+   them clearance from the physical viewport edge. Positioned below
+   the score/best/time readout so they land inside the card's own
+   left/right margin instead of overlapping the puzzle grid. */
+.side-col {
+  display: flex;
+  flex-direction: column;
+  /* Wider gap than before (was 8-18px) — that little clearance made the
+     bottom button an easy mis-tap right after the top one. */
+  gap: clamp(20px, 5vw, 44px);
+  position: absolute;
+  top: 140px;
+  visibility: hidden;
+}
+#left-col { left: clamp(14px, 3vw, 32px); }
+#right-col { right: clamp(14px, 3vw, 32px); }
+.ctrl-btn {
+  /* Sized from both vw and vh (not just vw) so the buttons shrink in
+     step with the canvas — which is height-bound via dvh — instead of
+     staying pinned near their max on wide screens whose real estate
+     (browser chrome, etc.) has eaten into the available height. */
+  width: clamp(52px, min(11vw, 12vh), 96px);
+  height: clamp(52px, min(11vw, 12vh), 96px);
+  border-radius: clamp(14px, 3vw, 22px);
+  background: rgba(255,111,168,0.85);
+  border: none;
+  color: white;
+  font-size: clamp(26px, 7vw, 46px);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255,111,168,0.4);
+  touch-action: manipulation;
+}
+.ctrl-btn:active { background: #FF8FBC; }
+#wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  /* No explicit height: the wrapper shrink-wraps to the canvas below it
+     so the HUD (absolutely positioned against this box) sits flush
+     against the grid instead of floating in leftover vertical space. */
+}
+/* Canvas keeps its 828:852 aspect ratio and fills up to the available
+   height (100dvh, mobile-Safari-toolbar-safe), shrinking by width
+   instead whenever the side button columns leave less room than that.
+   No fixed px cap on the height (previously capped at 950px, which
+   under-sized the canvas on any monitor taller than that) — it now
+   grows all the way to the viewport height, minus a small clearance
+   from the frame border, so tall desktop windows get a genuinely
+   bigger board instead of one arbitrarily capped short of the room
+   actually available. */
+canvas {
+  display: block;
+  cursor: pointer;
+  aspect-ratio: 828 / 852; /* must match the canvas's internal W:H below */
+  height: 100vh;
+  height: 100dvh;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  max-width: 100%;
+  width: auto;
+}
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 12px 14px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none;
+}
+#score-display {
+  background: linear-gradient(135deg, rgba(255,111,168,0.30), rgba(79,157,255,0.25));
+  color: #FFE066;
+  font-size: 21px; font-weight: 900;
+  padding: 6px 16px; border-radius: 14px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 12px rgba(255,224,102,0.75), 0 2px 4px rgba(0,0,0,0.5);
+  border: 1.5px solid rgba(255,224,102,0.35);
+}
+#best-display {
+  background: rgba(40,15,55,0.4);
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  padding: 5px 12px; border-radius: 20px;
+  margin-top: 8px;
+}
+#time-display {
+  background: rgba(40,15,55,0.4);
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  padding: 5px 12px; border-radius: 20px;
+  margin-top: 6px;
+}
+#pause-btn {
+  pointer-events: all;
+  background: rgba(40,15,55,0.55);
+  color: white;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 50%;
+  width: 44px; height: 44px;
+  font-size: 18px;
+  cursor: pointer;
+}
+#overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(20,5,30,0.6);
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+}
+#overlay.hidden { display: none; }
+#overlay h1 { color: #fff; font-size: 30px; margin-bottom: 8px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); text-align: center; }
+#overlay p { color: #FFE066; font-size: 16px; margin-bottom: 24px; text-align: center; white-space: pre-line; }
+#overlay button {
+  background: #FF6FA8; color: #fff;
+  border: none; border-radius: 30px;
+  padding: 12px 32px; font-size: 18px; font-weight: 700;
+  cursor: pointer; transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 4px 16px rgba(255,111,168,0.4);
+}
+#overlay button:hover { background: #FF8FBC; transform: scale(1.05); }
+#ov-name-row {
+  display: flex; gap: 8px; margin-bottom: 18px;
+}
+#ov-name-row.hidden { display: none; }
+#ov-name-input {
+  width: 190px;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  border-radius: 20px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #fff;
+  text-align: center;
+}
+#ov-name-input::placeholder { color: rgba(255,255,255,0.5); }
+.btn-row { display: flex; gap: 10px; }
+#overlay button.secondary {
+  background: rgba(255,255,255,0.15);
+  box-shadow: none;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  font-size: 15px;
+  padding: 12px 22px;
+}
+#overlay button.secondary:hover { background: rgba(255,255,255,0.25); }
+#board-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(20,5,30,0.78);
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+  z-index: 10;
+}
+#board-overlay.hidden { display: none; }
+#board-overlay h1 { color: #fff; font-size: 26px; margin-bottom: 16px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+#board-list {
+  width: min(86%, 340px);
+  max-height: 55%;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+.board-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 9px 14px;
+  margin-bottom: 6px;
+  color: #fff;
+}
+.board-row .rank { width: 26px; font-weight: 900; color: #FFE066; text-align: center; }
+.board-row .name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-row .score { font-variant-numeric: tabular-nums; color: #FFE066; font-weight: 700; }
+.board-row.empty { color: rgba(255,255,255,0.5); justify-content: center; font-size: 14px; }
+#board-close-btn {
+  background: #FF6FA8; color: #fff;
+  border: none; border-radius: 30px;
+  padding: 12px 32px; font-size: 16px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(255,111,168,0.4);
+}
+#rotate-hint {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #241238;
+  flex-direction: column; align-items: center; justify-content: center;
+  color: white; font-size: 18px; gap: 16px;
+}
+#rotate-hint span { font-size: 56px; animation: rotate-hint-spin 1.5s ease-in-out infinite alternate; }
+@keyframes rotate-hint-spin { from { transform: rotate(-30deg); } to { transform: rotate(30deg); } }
+/* Console-style frame spanning the whole viewport on the title screen —
+   moyomoyo's canvas itself is tall/narrow (built for the puzzle grid),
+   so a border drawn inside it alone reads as a small floating card
+   with dead space on either side. Framing the full window instead
+   matches how Angry Mokumoku's own wide canvas fills its screen. */
+#title-frame {
+  display: block;
+  position: fixed; inset: 14px;
+  border: 3px solid #D96FB0;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#title-frame::after {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid #7A3D63;
+  border-radius: 8px;
+}
+/* Cross-links to the sister games, anchored to the viewport-spanning
+   frame above rather than drawn inside the canvas. The canvas itself
+   is a narrow, centered column (portrait 624:918 shape inside a wide
+   landscape frame) so canvas-relative coordinates put these links in
+   the middle of the screen instead of the frame's actual top-right
+   corner, and made their on-screen spacing shrink along with the
+   canvas on short/wide viewports. Real fixed-position HTML anchors
+   sidestep both problems and always land in the same corner Angry
+   Mokumoku and MK Mobile use for their own links. */
+#cross-links {
+  display: block;
+  position: fixed;
+  top: 33px; right: 33px;
+  z-index: 6;
+  text-align: right;
+}
+#cross-links a {
+  display: block;
+  font: bold 20px Arial, sans-serif;
+  text-decoration: none;
+  animation: cross-link-pulse 2.6s ease-in-out infinite;
+}
+#cross-links a + a { margin-top: 14px; }
+#cross-links a:nth-child(1) { color: #B0D8FF; }
+#cross-links a:nth-child(2) { color: #FFD37A; }
+#cross-links a:nth-child(3) { color: #F2A65A; }
+@keyframes cross-link-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  #rotate-hint { display: flex; }
+  #game-layout { display: none; }
+  #title-frame { display: none; }
+  #cross-links { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="title-frame"></div>
+<div id="cross-links">
+  <a href="angry-mokumoku.html">🦉 アングリーモクモクへ ▶</a>
+  <a href="mk-mobile.html">⚽ MK Mobileへ ▶</a>
+  <a href="angry-moku-battle-royal.html">🏆 バトルロイヤルへ ▶</a>
+</div>
+<div id="game-layout">
+  <div id="wrapper">
+    <canvas id="c"></canvas>
+    <div id="hud" style="visibility:hidden">
+      <div>
+        <div id="score-display">Lv.1  スコア: 0</div>
+        <div id="best-display">ベスト: 0</div>
+        <div id="time-display">⏱ 0:00</div>
+      </div>
+      <button id="pause-btn" title="一時停止">⏸</button>
+    </div>
+    <div class="side-col" id="left-col">
+      <button class="ctrl-btn" data-action="left" aria-label="左へ">◀</button>
+      <button class="ctrl-btn" data-action="down" aria-label="下へ">▼</button>
+    </div>
+    <div class="side-col" id="right-col">
+      <button class="ctrl-btn" data-action="right" aria-label="右へ">▶</button>
+      <button class="ctrl-btn" data-action="rotate" aria-label="回転">🔄</button>
+    </div>
+    <div id="overlay" class="hidden">
+      <h1 id="ov-title"></h1>
+      <p id="ov-sub"></p>
+      <div id="ov-name-row" class="hidden">
+        <input id="ov-name-input" maxlength="8" placeholder="なまえ（8文字まで）">
+        <button id="ov-register-btn">登録</button>
+      </div>
+      <div class="btn-row">
+        <button id="ov-board-btn" class="secondary">🏆 ランキング</button>
+        <button id="ov-btn">もう一度！</button>
+      </div>
+    </div>
+    <div id="board-overlay" class="hidden">
+      <h1>🏆 ランキング</h1>
+      <div id="board-list"></div>
+      <button id="board-close-btn">とじる</button>
+    </div>
+  </div>
+</div>
+<div id="rotate-hint">
+  <span>📱</span>
+  <p>横向きにしてプレイ！</p>
+</div>
+
+<script>
+// ─── CANVAS ───────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// ─── CONFIG ───────────────────────────────────────────────────
+// Board reshaped from a tall 9x12 grid to a more compact 10x9 one so the
+// same viewport-height budget (the canvas is height:100dvh-bound, so its
+// on-screen physical size doesn't change just from scaling internal
+// units — only a less-tall aspect ratio actually grows the display
+// scale) buys noticeably bigger cells instead of just more of them.
+const CELL       = 78;  // up from 64 — bigger, easier-to-read gummies
+const GRID_COLS  = 10;  // up from 9
+const GRID_ROWS  = 9;   // down from 12 — trades some vertical buffer for cell size
+const GRID_W     = CELL * GRID_COLS;
+const GRID_H     = CELL * GRID_ROWS;
+const GRID_MARGIN_X = 24; // same side margin the old 624-wide board used
+const GRID_X0    = GRID_MARGIN_X;
+const GRID_Y0    = 130; // tall enough to clear the 3-line HTML HUD overlay
+const SPAWN_COL  = 5;   // re-centered for the wider 10-column board
+const W = GRID_W + GRID_MARGIN_X * 2, H = GRID_Y0 + GRID_H + 20;
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width  = W * DPR;
+canvas.height = H * DPR;
+ctx.scale(DPR, DPR);
+const MATCH_MIN  = 4;
+// Retuned from 200 for a finite Lv1-10 run with a real ending (MAX_LEVEL
+// below) instead of endless play — the old value's quadratic cumulative
+// cost (LEVEL_STEP*L*(L+1)/2) would need 9000pts to reach Lv10, an
+// unreasonably long grind for a run that's now meant to actually finish.
+// At 120, Lv10 needs a cumulative 5400pts (120,360,720,1200,1800,2520,
+// 3360,4320,5400 through Lv2-10), still a real climb but a completable one.
+const LEVEL_STEP = 120;
+const MAX_LEVEL  = 10; // reaching this triggers 全面クリア instead of another preset
+const MAGIC_CHANCE = 0.025; // ~2.5% of spawned pieces are レインボーモクモク instead of a normal stage
+const RAINBOW = -1; // sentinel grid value — not a STAGES index, never merges/matches on its own
+const LEADERBOARD_KEY = 'moyomoyo-leaderboard';
+const LEADERBOARD_MAX = 10;
+
+const PAUSE_RESUME_Y = H * 0.48;
+const PAUSE_QUIT_Y   = PAUSE_RESUME_Y + 79;
+
+// Colors are spread across distinct hues (not a same-family gradient) so
+// each stage reads at a glance during fast match play — size/name still
+// carry the growth story, color is purely the "which type is this" cue.
+// The old yellow/orange/pink trio all sat within ~60° of hue (23-38°
+// apart from each other), clustered enough to be hard to tell apart at
+// a glance — especially during fast play. Replaced yellow and orange
+// with teal and violet, evenly spread ~60-80° apart from every
+// neighboring stage around the wheel (mint/teal/violet/pink/blue), while
+// keeping mint, pink, and blue untouched — pink stays because the title
+// mascot below is deliberately pinned to it for brand consistency (see
+// its own comment), and mint/blue were never part of the complaint.
+// デカモク (blue) is back as the 5th and final tier — a 4+ group of it
+// clears outright instead of evolving further. モクモク (pink) is no
+// longer the ceiling: it now merges up into デカモク like every other
+// stage, and (from Lv3) spawns directly instead of only being reachable
+// by merging the stage below it.
+// Radii scaled up with CELL (78/64 ≈ 1.22x) so each stage still fills its
+// cell the same way it did before, just bigger.
+const STAGES = [
+  { name: 'たまごモク', r: 32, color: '#CFF2C2', face: '#8A6A40', pts: 1 },  // mint
+  { name: 'ひよこモク', r: 46, color: '#2DD4A8', face: '#0A4A3E', pts: 2 },  // teal
+  { name: 'ひなモク',   r: 61, color: '#9B5DE5', face: '#3A1060', pts: 4 },  // violet
+  { name: 'モクモク',   r: 78, color: '#FF5C7A', face: '#4A2800', pts: 8 },  // pink
+  { name: 'デカモク',   r: 98, color: '#4F9DFF', face: '#3A1800', pts: 16, legendary: true }, // blue, final tier
+];
+// Which stages can drop directly, gated by level — colors climb in as the
+// board gets harder (Lv1-2: 3 colors, Lv3-4: +pink, Lv5+: +デカモク) so
+// the increasing variety itself is what raises the difficulty, on top of
+// the fall-speed and preset changes.
+function getSpawnPool(lv) {
+  if (lv >= 5) return [0, 1, 2, 3, 4];
+  if (lv >= 3) return [0, 1, 2, 3];
+  return [0, 1, 2];
+}
+// レインボーモクモク's own body color — cycles through the hue wheel so it
+// always reads as "not one of the 5 regular colors" at a glance, instead
+// of looking like a normal gummy with a decorative ring on top.
+function rainbowColor(offset) {
+  const hue = (Date.now() * 0.25 + (offset || 0)) % 360;
+  return `hsl(${hue}, 82%, 66%)`;
+}
+const RAINBOW_FACE = '#3A1848';
+
+// Satellite offset (dCol,dRow) relative to the axis cell, per rotation state
+const ROT_OFFSETS = [[0,-1],[1,0],[0,1],[-1,0]]; // up, right, down, left
+
+// ─── STATE ────────────────────────────────────────────────────
+let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER
+let phase = 'FALL';  // FALL | LOCK_PAUSE | RESOLVING | SPAWN_PAUSE
+let pauseTimer = 0;
+let fallTimer = 0;
+let chainCount = 0;
+let score = 0;
+let bestScore = parseInt(localStorage.getItem('moyomoyo-best') || '0', 10);
+let grid = [];        // grid[col][row] = stage number | RAINBOW | null
+let piece = null;     // { col, row, rot, s1, s2 } — s1/s2 may be RAINBOW
+let lockedCols = [];  // columns the most recently locked piece occupied
+let nextPair = null;  // { s1, s2 } pre-rolled preview
+let particles = [];
+let comboText = '';
+let comboTimer = 0;
+let legendText = '';
+let legendTimer = 0;
+let celebrateText = '';
+let celebrateTimer = 0;
+let popTimer = 0;
+let popStage = 0;
+let level = 1;
+let pendingLevelPreset = false;
+let titleFrame = 0;
+let titleMenuSel = 0; // 0 = スタート, 1 = ランキング
+let shakeX = 0, shakeY = 0;
+let flashAlpha = 0;
+let playFrames = 0;
+
+function rollStage() {
+  if (Math.random() < MAGIC_CHANCE) return RAINBOW;
+  const pool = getSpawnPool(level);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function rollPair() {
+  return { s1: rollStage(), s2: rollStage() };
+}
+function newGrid() { return Array.from({ length: GRID_COLS }, () => new Array(GRID_ROWS).fill(null)); }
+
+// ─── PARTICLES ────────────────────────────────────────────────
+
+class Particle {
+  constructor(x, y, vx, vy, col, sz, life) {
+    this.x = x; this.y = y;
+    this.vx = vx; this.vy = vy;
+    this.col = col; this.sz = sz;
+    this.alpha = 1;
+    this.life = life || 30;
+    this.age = 0;
+  }
+  update() {
+    this.vy += 0.15;
+    this.x += this.vx; this.y += this.vy;
+    this.age++;
+    this.alpha = 1 - this.age / this.life;
+    this.sz *= 0.94;
+  }
+  get alive() { return this.age < this.life; }
+}
+
+function addParticles(x, y, col, count, sz) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.PI * 2 * i / count + Math.random() * 0.5;
+    const sp = 1.5 + Math.random() * 4;
+    particles.push(new Particle(x, y, Math.cos(a)*sp, Math.sin(a)*sp - 1.5, col, sz || 4));
+  }
+}
+
+function addShake(intensity) {
+  shakeX = (Math.random() - 0.5) * intensity * 2;
+  shakeY = (Math.random() - 0.5) * intensity * 2;
+}
+
+// ─── GRID HELPERS ─────────────────────────────────────────────
+
+function rotOffset(col, row, rot) {
+  const d = ROT_OFFSETS[rot];
+  return { col: col + d[0], row: row + d[1] };
+}
+
+function canPlace(col, row, rot) {
+  if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return false;
+  if (grid[col][row] !== null) return false;
+  const sat = rotOffset(col, row, rot);
+  if (sat.col < 0 || sat.col >= GRID_COLS || sat.row < 0 || sat.row >= GRID_ROWS) return false;
+  if (grid[sat.col][sat.row] !== null) return false;
+  return true;
+}
+
+function moveLeft()  { if (piece && canPlace(piece.col - 1, piece.row, piece.rot)) { piece.col--; playSfx('move'); } }
+function moveRight() { if (piece && canPlace(piece.col + 1, piece.row, piece.rot)) { piece.col++; playSfx('move'); } }
+function rotatePiece() {
+  if (!piece) return;
+  const newRot = (piece.rot + 3) % 4; // counter-clockwise
+  if (canPlace(piece.col, piece.row, newRot)) { piece.rot = newRot; playSfx('rotate'); return; }
+  if (canPlace(piece.col - 1, piece.row, newRot)) { piece.col--; piece.rot = newRot; playSfx('rotate'); return; }
+  if (canPlace(piece.col + 1, piece.row, newRot)) { piece.col++; piece.rot = newRot; playSfx('rotate'); return; }
+}
+function softDrop() {
+  if (!piece) return;
+  if (canPlace(piece.col, piece.row + 1, piece.rot)) { piece.row++; playSfx('drop'); }
+}
+
+function lockPiece() {
+  const sat = rotOffset(piece.col, piece.row, piece.rot);
+  grid[piece.col][piece.row] = piece.s1;
+  grid[sat.col][sat.row] = piece.s2;
+  lockedCols = [piece.col, sat.col];
+  piece = null;
+  phase = 'LOCK_PAUSE';
+  pauseTimer = 10;
+  playSfx('lock');
+}
+
+function trySpawnPiece() {
+  if (grid[SPAWN_COL][1] !== null || grid[SPAWN_COL][0] !== null) { gameOver(); return; }
+  piece = { col: SPAWN_COL, row: 1, rot: 0, s1: nextPair.s1, s2: nextPair.s2 };
+  nextPair = rollPair();
+  fallTimer = 0;
+}
+
+function findGroups() {
+  const visited = Array.from({ length: GRID_COLS }, () => new Array(GRID_ROWS).fill(false));
+  const groups = [];
+  for (let c = 0; c < GRID_COLS; c++) {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      if (grid[c][r] === null || grid[c][r] === RAINBOW || visited[c][r]) continue;
+      const stage = grid[c][r];
+      const stack = [[c, r]];
+      visited[c][r] = true;
+      const cells = [];
+      while (stack.length) {
+        const [cc, rr] = stack.pop();
+        cells.push([cc, rr]);
+        [[cc+1,rr],[cc-1,rr],[cc,rr+1],[cc,rr-1]].forEach(([nc, nr]) => {
+          if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) return;
+          if (visited[nc][nr] || grid[nc][nr] !== stage) return;
+          visited[nc][nr] = true;
+          stack.push([nc, nr]);
+        });
+      }
+      if (cells.length >= MATCH_MIN) groups.push({ stage, cells });
+    }
+  }
+  return groups;
+}
+
+function applyGravity(cols) {
+  // Accepts an optional list of columns to settle — omitting it settles
+  // the whole grid (used after a match clears cells, since anything
+  // above the gap needs to fall). Passing the touched columns instead
+  // (used right after a piece locks) keeps gravity from silently
+  // sweeping away an untouched preset column's intentional gaps just
+  // because some other piece happened to land elsewhere on the board.
+  const targets = cols || Array.from({ length: GRID_COLS }, (_, i) => i);
+  for (const c of targets) {
+    const stages = [];
+    for (let r = 0; r < GRID_ROWS; r++) {
+      if (grid[c][r] !== null) stages.push(grid[c][r]);
+    }
+    for (let r = 0; r < GRID_ROWS; r++) grid[c][r] = null;
+    const startRow = GRID_ROWS - stages.length;
+    stages.forEach((stage, i) => { grid[c][startRow + i] = stage; });
+  }
+}
+
+function cellCenter(col, row) {
+  return { x: GRID_X0 + col*CELL + CELL/2, y: GRID_Y0 + row*CELL + CELL/2 };
+}
+
+// レインボーモクモク doesn't join matches itself — instead, whenever a
+// piece next to it disappears (from a match, or from another rainbow's
+// own blast), it detonates: clears its own 8 surrounding cells and is
+// cleared itself. A rainbow caught in another's blast detonates too, so
+// several close together chain into one bigger burst. `seedCells` is
+// where this step's normal matches were cleared; `affectedCols` is
+// mutated so the caller's gravity pass also resettles anything this
+// touches.
+function triggerRainbows(seedCells, affectedCols) {
+  const triggered = new Set();
+  const queue = seedCells.slice();
+  let fired = false;
+
+  function detonate(c, r) {
+    const key = c + ',' + r;
+    if (triggered.has(key)) return;
+    triggered.add(key);
+    fired = true;
+    const { x, y } = cellCenter(c, r);
+    addParticles(x, y, rainbowColor(0), 20, 6);
+    score += 30;
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue;
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+        if (grid[nc][nr] === null) continue;
+        const stage = grid[nc][nr];
+        if (stage === RAINBOW) {
+          grid[nc][nr] = null;
+          affectedCols.add(nc);
+          detonate(nc, nr); // chain — this neighbor rainbow detonates too
+        } else {
+          const { x: ex, y: ey } = cellCenter(nc, nr);
+          score += Math.round(STAGES[stage].pts * 2);
+          addParticles(ex, ey, STAGES[stage].color, 12, 5);
+          grid[nc][nr] = null;
+          affectedCols.add(nc);
+          queue.push([nc, nr]); // its own neighbors might include another rainbow
+        }
+      }
+    }
+  }
+
+  while (queue.length) {
+    const [c, r] = queue.pop();
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue;
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+        if (grid[nc][nr] !== RAINBOW) continue;
+        grid[nc][nr] = null;
+        affectedCols.add(nc);
+        detonate(nc, nr);
+      }
+    }
+  }
+  return fired;
+}
+
+function resolveStep() {
+  const groups = findGroups();
+  if (groups.length === 0) return false;
+  chainCount++;
+  const mult = 1 + (chainCount - 1) * 0.5;
+  let topStageThisStep = 0;
+  // Columns actually touched by a clear this step — gravity below only
+  // resettles these, so an untouched preset column elsewhere on the
+  // board never gets swept just because a match happened somewhere else.
+  const affectedCols = new Set();
+  const clearedCells = [];
+
+  groups.forEach(g => {
+    let anchor = g.cells[0];
+    g.cells.forEach(cell => {
+      if (cell[1] > anchor[1] || (cell[1] === anchor[1] && cell[0] < anchor[0])) anchor = cell;
+    });
+    g.cells.forEach(([c, r]) => { grid[c][r] = null; affectedCols.add(c); clearedCells.push([c, r]); });
+    const { x: mx, y: my } = cellCenter(anchor[0], anchor[1]);
+    if (g.stage < STAGES.length - 1) {
+      const newStage = g.stage + 1;
+      grid[anchor[0]][anchor[1]] = newStage;
+      score += Math.round(STAGES[newStage].pts * mult);
+      topStageThisStep = Math.max(topStageThisStep, newStage);
+      if (STAGES[newStage].legendary) {
+        score += 100;
+        legendText = `🎉 ${STAGES[newStage].name}進化！ +100`;
+        legendTimer = 130;
+        addParticles(mx, my, STAGES[newStage].color, 26, 6);
+      }
+    } else {
+      score += Math.round(150 * mult);
+      topStageThisStep = Math.max(topStageThisStep, g.stage);
+      legendText = `🎉 ${STAGES[g.stage].name}大連鎖！ +150`;
+      legendTimer = 130;
+      addParticles(mx, my, STAGES[g.stage].color, 30, 7);
+    }
+    addParticles(mx, my, STAGES[g.stage].color, 10 + g.cells.length * 2, 4);
+  });
+
+  const rainbowFired = triggerRainbows(clearedCells, affectedCols);
+
+  if (rainbowFired) {
+    legendText = '🌈 レインボーモクモク発動！';
+    legendTimer = 130;
+    addShake(14);
+    playSfx('magic');
+  } else {
+    playSfx('match', chainCount);
+  }
+
+  addShake(4 + chainCount * 2);
+  if (chainCount > 1) {
+    comboText = `${chainCount}れんさ！ ×${mult.toFixed(1)}`;
+    comboTimer = 90;
+  }
+  if (chainCount >= 2) {
+    popStage = topStageThisStep;
+    popTimer = 50;
+  }
+  if (chainCount >= 3) {
+    const isBig = chainCount >= 5;
+    celebrateText = isBig ? '🎉🎉 大連鎖！！ 🎉🎉' : '🎉 3連鎖ボーナス！';
+    celebrateTimer = 110;
+    flashAlpha = isBig ? 0.7 : 0.5;
+    const burstCols = [...STAGES.map(s => s.color), '#FFD700', '#FF6FA8'];
+    const burstCount = isBig ? 10 : 6;
+    for (let i = 0; i < burstCount; i++) {
+      const bx = GRID_X0 + Math.random() * GRID_W;
+      const by = GRID_Y0 + Math.random() * GRID_H * 0.7;
+      addParticles(bx, by, burstCols[Math.floor(Math.random() * burstCols.length)], 24, 6);
+    }
+    addShake(16 + chainCount * 2);
+    playSfx('chainBig');
+  }
+  checkLevelUp();
+  updateHUD();
+  applyGravity([...affectedCols]);
+  return true;
+}
+
+function checkLevelUp() {
+  // Cumulative score needed to reach level L+1 is LEVEL_STEP*(1+2+...+L),
+  // so each level takes progressively more score than the last instead
+  // of a flat amount every time. Capped at MAX_LEVEL so a single huge
+  // chain can't overshoot past the 全面クリア level.
+  const rawLevel = 1 + Math.floor((-1 + Math.sqrt(1 + 8 * score / LEVEL_STEP)) / 2);
+  const newLevel = Math.min(rawLevel, MAX_LEVEL);
+  if (newLevel <= level) return;
+  level = newLevel;
+  pendingLevelPreset = true;
+  celebrateText = level >= MAX_LEVEL
+    ? `⬆️ Lv.${level} UP！ラスト！`
+    : `⬆️ Lv.${level} UP！盤面リセット！`;
+  celebrateTimer = 100;
+  flashAlpha = 0.5;
+  addShake(10);
+  playSfx('levelup');
+}
+
+function applyLevelPreset() {
+  // Instead of adding garbage onto the existing board, the level-up wipes
+  // the board and seeds it with a fresh preset — bottom rows fill in as
+  // the level climbs, mirroring how falling-block games raise the floor.
+  grid = newGrid();
+  // Capped at ~42% of the board's height (same proportion as the old
+  // 5-of-12-row cap) now that the board is a shorter 9 rows, so a
+  // maxed-out preset doesn't eat nearly all the player's headroom.
+  const presetRows = Math.min(level - 1, 4);
+  for (let i = 0; i < presetRows; i++) {
+    const r = GRID_ROWS - 1 - i;
+    for (let c = 0; c < GRID_COLS; c++) {
+      if (Math.random() < 0.78) grid[c][r] = rollStage();
+    }
+  }
+}
+
+function updateHUD() {
+  document.getElementById('score-display').textContent = `Lv.${level}  スコア: ${score}`;
+  document.getElementById('best-display').textContent = `ベスト: ${Math.max(score, bestScore)}`;
+}
+
+function updateTimeDisplay() {
+  const secs = Math.floor(playFrames / 60);
+  const mm = Math.floor(secs / 60);
+  const ss = secs % 60;
+  document.getElementById('time-display').textContent = `⏱ ${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+// ─── DRAW ─────────────────────────────────────────────────────
+
+function drawGummyShape(x, y, r, color, face, angle, scale, legendary, magic) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+
+  if (magic) {
+    const hue = (Date.now() * 0.25) % 360;
+    ctx.save();
+    ctx.strokeStyle = `hsl(${hue},90%,68%)`;
+    ctx.lineWidth = r * 0.16;
+    ctx.shadowColor = `hsl(${hue},90%,68%)`; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.roundRect(-r*1.0, -r*1.0, r*2.0, r*2.0, r*0.55); ctx.stroke();
+    ctx.restore();
+  }
+
+  if (legendary) { ctx.shadowColor = '#FFE080'; ctx.shadowBlur = 18; }
+
+  const s = r * 1.62;
+  const rad = r * 0.42;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(-s/2, -s/2, s, s, rad);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.beginPath();
+  ctx.roundRect(-s/2 + s*0.12, -s/2 + s*0.1, s*0.4, s*0.22, rad*0.6);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = 'rgba(232,213,176,0.92)';
+  ctx.beginPath(); ctx.ellipse(0, r*0.05, r*0.56, r*0.6, 0, 0, Math.PI*2); ctx.fill();
+
+  const eyeR = r * 0.13;
+  ctx.fillStyle = '#181818';
+  ctx.beginPath(); ctx.ellipse(-r*0.27, -r*0.04, eyeR*0.8, eyeR, -0.08, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r*0.27, -r*0.04, eyeR*0.8, eyeR, 0.08, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(-r*0.22, -r*0.09, eyeR*0.28, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.31, -r*0.09, eyeR*0.28, 0, Math.PI*2); ctx.fill();
+
+  ctx.strokeStyle = '#4A1800'; ctx.lineWidth = r * 0.075; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-r*0.42, -r*0.27); ctx.lineTo(-r*0.12, -r*0.15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r*0.12, -r*0.15); ctx.lineTo(r*0.42, -r*0.27); ctx.stroke();
+
+  ctx.fillStyle = '#D97818';
+  ctx.beginPath(); ctx.ellipse(0, r*0.17, r*0.1, r*0.12, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = '#3DA890';
+  ctx.beginPath(); ctx.ellipse(-r*0.18, r*0.44, r*0.16, r*0.085, -0.35, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r*0.18, r*0.44, r*0.16, r*0.085, 0.35, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2A7868';
+  ctx.beginPath(); ctx.arc(0, r*0.44, r*0.05, 0, Math.PI*2); ctx.fill();
+
+  if (magic) {
+    ctx.save();
+    ctx.font = `${Math.round(r*0.55)}px Arial`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('✨', r*0.62, -r*0.62);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawGridPanel() {
+  // Same stops as the body's CSS background gradient, so the canvas
+  // blends into the page instead of showing a seam where the narrow
+  // canvas card meets the body background visible in the margins.
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#2A1840'); bg.addColorStop(0.55, '#4A2560'); bg.addColorStop(1, '#331A48');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath(); ctx.roundRect(GRID_X0 - 6, GRID_Y0 - 6, GRID_W + 12, GRID_H + 12, 10); ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let c = 1; c < GRID_COLS; c++) {
+    const x = GRID_X0 + c * CELL;
+    ctx.beginPath(); ctx.moveTo(x, GRID_Y0); ctx.lineTo(x, GRID_Y0 + GRID_H); ctx.stroke();
+  }
+  for (let r = 1; r < GRID_ROWS; r++) {
+    const y = GRID_Y0 + r * CELL;
+    ctx.beginPath(); ctx.moveTo(GRID_X0, y); ctx.lineTo(GRID_X0 + GRID_W, y); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255,143,196,0.35)'; ctx.lineWidth = 2;
+  ctx.strokeRect(GRID_X0, GRID_Y0, GRID_W, GRID_H);
+}
+
+// Resolves a grid/piece stage value (0-4, or RAINBOW) into what
+// drawGummyShape needs — rainbow's fill cycles hue every frame instead
+// of looking up a fixed STAGES color, and always gets the sparkle-ring
+// treatment so it reads as "not a regular color" at a glance.
+function stageVisual(stage) {
+  if (stage === RAINBOW) return { color: rainbowColor(0), face: RAINBOW_FACE, legendary: false, magic: true };
+  const st = STAGES[stage];
+  return { color: st.color, face: st.face, legendary: st.legendary, magic: false };
+}
+
+function drawGridCells() {
+  for (let c = 0; c < GRID_COLS; c++) {
+    for (let r = 0; r < GRID_ROWS; r++) {
+      const stage = grid[c][r];
+      if (stage === null) continue;
+      const { x, y } = cellCenter(c, r);
+      const v = stageVisual(stage);
+      drawGummyShape(x, y, CELL * 0.42, v.color, v.face, 0, 1, v.legendary, v.magic);
+    }
+  }
+}
+
+function drawPiece() {
+  if (!piece) return;
+  const sat = rotOffset(piece.col, piece.row, piece.rot);
+  const a = cellCenter(piece.col, piece.row);
+  const b = cellCenter(sat.col, sat.row);
+  const pulse = 1 + 0.04 * Math.sin(Date.now() * 0.012);
+  const v1 = stageVisual(piece.s1), v2 = stageVisual(piece.s2);
+  drawGummyShape(a.x, a.y, CELL * 0.42 * pulse, v1.color, v1.face, 0, 1, v1.legendary, v1.magic);
+  drawGummyShape(b.x, b.y, CELL * 0.42 * pulse, v2.color, v2.face, 0, 1, v2.legendary, v2.magic);
+}
+
+function drawNextPreview() {
+  // Top-right of the grid — clear of both the HTML score/best/time text
+  // (top-left) and the pause button (above the canvas entirely). Sized
+  // up with CELL (78/64 ≈ 1.22x) to match the bigger board.
+  const bx = GRID_X0 + GRID_W - 130;
+  const by = GRID_Y0 + 10;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath(); ctx.roundRect(bx, by, 112, 150, 20); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '16px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('つぎ', bx + 56, by + 24);
+  ctx.restore();
+  if (nextPair) {
+    const r = 24;
+    const v1 = stageVisual(nextPair.s1), v2 = stageVisual(nextPair.s2);
+    drawGummyShape(bx + 56, by + 63, r, v1.color, v1.face, 0, 1, false, v1.magic);
+    drawGummyShape(bx + 56, by + 118, r, v2.color, v2.face, 0, 1, false, v2.magic);
+  }
+}
+
+function drawChainPop() {
+  if (popTimer <= 0) return;
+  popTimer--;
+  const t = popTimer / 50; // 1 -> 0
+  const stage = STAGES[popStage] || STAGES[STAGES.length - 1];
+  const cx = GRID_X0 + GRID_W / 2;
+  const cy = GRID_Y0 + GRID_H / 2;
+  const pop = 1 - Math.pow(1 - Math.min(1, (1 - t) * 3), 2); // fast ease-out over first third
+  const scale = 0.3 + pop * 1.3;
+  const alpha = t < 0.3 ? t / 0.3 : 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawGummyShape(cx, cy, 107, stage.color, stage.face, 0, scale, stage.legendary, false);
+  ctx.restore();
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawComboAnnouncement() {
+  if (comboTimer > 0 && comboText) {
+    comboTimer--;
+    const alpha = comboTimer > 60 ? 1 : comboTimer / 60;
+    const scale = comboTimer > 75 ? 1 + (90 - comboTimer) * 0.02 : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(W / 2, GRID_Y0 + GRID_H * 0.35);
+    ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 26px Arial';
+    ctx.shadowColor = '#FF6600'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(comboText, 0, 0);
+    ctx.restore();
+  }
+  if (legendTimer > 0 && legendText) {
+    legendTimer--;
+    const alpha = legendTimer > 90 ? 1 : legendTimer / 90;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 19px Arial';
+    ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#FFF3C0';
+    ctx.fillText(legendText, W / 2, GRID_Y0 + GRID_H * 0.22);
+    ctx.restore();
+  }
+  if (celebrateTimer > 0 && celebrateText) {
+    celebrateTimer--;
+    const alpha = celebrateTimer > 75 ? 1 : celebrateTimer / 75;
+    const scale = celebrateTimer > 100 ? 1 + (110 - celebrateTimer) * 0.05
+                : 1 + Math.sin(celebrateTimer * 0.35) * 0.05;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(W / 2, GRID_Y0 + GRID_H * 0.46);
+    ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 41px Arial';
+    ctx.shadowColor = '#FF6FA8'; ctx.shadowBlur = 34;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(celebrateText, 0, 0);
+    ctx.restore();
+  }
+}
+
+const TITLE_MENU_Y = 636, TITLE_MENU_GAP = 63;
+const TITLE_MENU_ITEMS = ['スタート', '🏆 ランキング'];
+
+function drawTitleScreen() {
+  titleFrame++;
+  // Same stops as the body's CSS background gradient (and the gameplay
+  // panel's), so the canvas blends into the page instead of showing a
+  // seam where the narrow canvas card meets the body background
+  // visible in the margins.
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#2A1840'); bg.addColorStop(0.55, '#4A2560'); bg.addColorStop(1, '#331A48');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Soft scanline texture — the same technique Angry Mokumoku uses for
+  // its CRT feel, toned way down so it reads as a texture rather than
+  // a harsh retro effect against moyomoyo's softer candy palette.
+  for (let y = 0; y < H; y += 4) {
+    ctx.fillStyle = 'rgba(255,180,220,0.035)';
+    ctx.fillRect(0, y, W, 2);
+  }
+
+  const dots = [[35,90,9],[490,70,7],[70,690,11],[470,600,8],[150,60,7],[430,330,6],[75,470,9],
+                [500,780,10],[40,780,8],[260,30,6],[490,470,9],[60,240,7],[420,140,8],[150,760,10]];
+  dots.forEach(([dx,dy,dr],i) => {
+    const a = 0.15 + 0.1 * Math.sin(titleFrame * 0.02 + i);
+    ctx.fillStyle = `rgba(255,180,220,${a})`;
+    ctx.beginPath(); ctx.arc(dx, dy, dr, 0, Math.PI*2); ctx.fill();
+  });
+
+  // (Frame border is now the full-viewport #title-frame HTML element,
+  // not drawn on the canvas — this canvas is narrow/tall for the
+  // puzzle grid, so a border drawn inside it alone read as a small
+  // floating card instead of framing the whole screen like Angry
+  // Mokumoku's own wide canvas naturally does.)
+
+  // (Cross-links to the sister games are now the #cross-links HTML
+  // element, fixed to the viewport's top-right corner — see its CSS
+  // for why: this canvas is a narrow centered column inside the wide
+  // frame, so canvas-relative coordinates didn't reach the frame's
+  // actual corner and shrank along with the canvas on wide screens.)
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 30;
+  ctx.fillStyle = '#FFE9F5';
+  ctx.font = 'bold 110px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
+  ctx.fillText('モヨモヨ', W/2, 165);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#FFB0DC';
+  ctx.font = '22px Arial';
+  ctx.fillText('M O K U M O K U   C H A I N', W/2, 195);
+  ctx.restore();
+
+  const bob = Math.sin(titleFrame * 0.05) * 8;
+  const tilt = Math.sin(titleFrame * 0.03) * 0.1;
+  // Pinned to モクモク (pink) specifically, not "whichever stage is the
+  // current ceiling" — the game's whole brand (name, frame, buttons) is
+  // pink, and デカモク taking over as the new final tier shouldn't change
+  // the mascot's color out from under it.
+  const lastStage = STAGES[3];
+
+  // Idle sparkles orbiting the mascot — echoes the ✦ stars Angry
+  // Mokumoku floats around its owl on its own title screen.
+  const mascotY = 330 + bob;
+  const sparkT = (titleFrame * 0.04) % (Math.PI * 2);
+  [[W/2-216,mascotY-71],[W/2+228,mascotY-57],[W/2-183,mascotY+88],[W/2+195,mascotY+80]].forEach(([sx,sy],i) => {
+    const s = 0.5 + 0.5 * Math.sin(sparkT + i * 1.5);
+    ctx.save();
+    ctx.globalAlpha = s * 0.85;
+    ctx.fillStyle = '#FFE9A0';
+    ctx.font = '29px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦', sx, sy);
+    ctx.restore();
+  });
+
+  drawGummyShape(W/2, mascotY, 105, lastStage.color, lastStage.face, tilt, 1, true);
+
+  const chainY = 515;
+  const startX = W/2 - 123;
+  STAGES.forEach((st, i) => {
+    const x = startX + i * 82;
+    drawGummyShape(x, chainY, Math.min(st.r, 27), st.color, st.face, 0, 1, false);
+    if (i < STAGES.length - 1) {
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '19px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('▶', x + 41, chainY + 5);
+    }
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '20px Arial';
+  ctx.fillText('同じ段階を4つ以上つなげて進化させよう', W/2, 562);
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', W/2, 585);
+  ctx.restore();
+
+  // Menu — a selectable list like Angry Mokumoku's own title menu
+  // (glowing highlight + ▶ prefix on the active item, ArrowUp/Down to
+  // move, Enter/Space to activate) instead of moyomoyo's old separate
+  // pill buttons. moyomoyo is score-attack rather than level-checkpoint
+  // based, so there's no real "つづきから" to resume — the best-score
+  // readout plays that same "show my progress right at the start
+  // option" role instead, folded inline under the スタート item the
+  // way Angry Mokumoku folds its saved level into つづきから, rather
+  // than floating as a separate line below the whole menu.
+  ctx.font = 'bold 41px Arial';
+  TITLE_MENU_ITEMS.forEach((label, i) => {
+    const sel = titleMenuSel === i;
+    const y = TITLE_MENU_Y + i * TITLE_MENU_GAP;
+    ctx.textAlign = 'center';
+    if (sel) {
+      ctx.fillStyle = '#FFE9F5';
+      ctx.shadowColor = '#FF6FA8'; ctx.shadowBlur = 20;
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.shadowBlur = 0;
+    }
+    ctx.fillText((sel ? '▶ ' : '   ') + label, W/2, y);
+    if (i === 0 && bestScore > 0) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = sel ? 'rgba(255,233,245,0.75)' : 'rgba(255,255,255,0.45)';
+      ctx.font = '19px Arial';
+      ctx.fillText(`ベスト ${bestScore}pt`, W/2, y + 24);
+      ctx.restore();
+    }
+  });
+  ctx.shadowBlur = 0;
+
+  // Franchise footer tag — ties the three games together as one series.
+  const tagY = 778;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W/2 - 119, tagY - 24) ; ctx.lineTo(W/2 + 119, tagY - 24); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '17px Arial';
+  ctx.fillText('🍬 × 🦉 × ⚽  M O K U M O K U   S E R I E S', W/2, tagY);
+  ctx.restore();
+
+  // Footer instruction line, mirroring Angry Mokumoku's own utilitarian
+  // footer at the very bottom of its title screen.
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '18px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('タップ / クリックで選択　・　↑↓キーで移動', W/2, H - 24);
+}
+
+function drawPausedOverlay() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,5,30,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFE9F5';
+  ctx.font = 'bold 36px Arial';
+  ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
+  ctx.fillText('⏸ 一時停止中', W/2, H * 0.36);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#FF6FA8';
+  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_RESUME_Y - 29, 216, 58, 29); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 23px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_QUIT_Y - 26, 216, 53, 26); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(W/2 - 108, PAUSE_QUIT_Y - 26, 216, 53, 26); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '19px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (state === 'TITLE') { drawTitleScreen(); return; }
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+  shakeX *= 0.7; shakeY *= 0.7;
+  if (Math.abs(shakeX) < 0.1) shakeX = 0;
+  if (Math.abs(shakeY) < 0.1) shakeY = 0;
+
+  drawGridPanel();
+  drawGridCells();
+  if (phase === 'FALL') drawPiece();
+  drawParticles();
+  drawNextPreview();
+  drawChainPop();
+  drawComboAnnouncement();
+
+  ctx.restore();
+
+  if (flashAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = flashAlpha;
+    ctx.fillStyle = '#FFE9A0';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    flashAlpha *= 0.82;
+  } else {
+    flashAlpha = 0;
+  }
+
+  if (state === 'PAUSED') drawPausedOverlay();
+}
+
+// ─── GAME LOGIC ───────────────────────────────────────────────
+
+function update() {
+  if (state !== 'PLAYING') return;
+
+  playFrames++;
+  if (playFrames % 60 === 0) updateTimeDisplay();
+
+  particles.forEach(p => p.update());
+  particles = particles.filter(p => p.alive);
+
+  if (phase === 'FALL') {
+    fallTimer++;
+    const interval = Math.max(14, 46 - (level - 1) * 3);
+    if (fallTimer >= interval) {
+      fallTimer = 0;
+      if (canPlace(piece.col, piece.row + 1, piece.rot)) {
+        piece.row++;
+      } else {
+        lockPiece();
+      }
+    }
+  } else if (phase === 'LOCK_PAUSE') {
+    if (--pauseTimer <= 0) {
+      // The falling pair locks as a rigid unit, so over uneven column
+      // heights one cell can end up floating with a gap beneath it.
+      // Settle only the piece's own columns before checking for matches
+      // — settling the whole grid here would also sweep away any
+      // untouched preset column's intentional gaps the instant any
+      // piece locks anywhere on the board.
+      applyGravity(lockedCols);
+      phase = 'RESOLVING';
+    }
+  } else if (phase === 'RESOLVING') {
+    if (--pauseTimer <= 0) {
+      if (resolveStep()) {
+        pauseTimer = 18;
+      } else {
+        phase = 'SPAWN_PAUSE';
+        pauseTimer = 12;
+        chainCount = 0;
+      }
+    }
+  } else if (phase === 'SPAWN_PAUSE') {
+    if (--pauseTimer <= 0 && state === 'PLAYING') {
+      if (pendingLevelPreset) {
+        pendingLevelPreset = false;
+        if (level >= MAX_LEVEL) { winClear(); return; }
+        applyLevelPreset();
+      }
+      phase = 'FALL';
+      trySpawnPiece();
+    }
+  }
+}
+
+// ─── LEADERBOARD (device-local, via localStorage) ──────────────
+
+function loadLeaderboard() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]');
+    if (Array.isArray(raw)) return raw;
+  } catch (e) {}
+  return [];
+}
+function saveLeaderboard(list) {
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(list));
+}
+function qualifiesForLeaderboard(s) {
+  const list = loadLeaderboard();
+  if (list.length < LEADERBOARD_MAX) return true;
+  return s > list[list.length - 1].score;
+}
+function registerScore(name, s, lv) {
+  const list = loadLeaderboard();
+  list.push({ name: name || 'モヨラー', score: s, level: lv, date: new Date().toISOString().slice(0, 10) });
+  list.sort((a, b) => b.score - a.score);
+  list.length = Math.min(list.length, LEADERBOARD_MAX);
+  saveLeaderboard(list);
+  renderBoard();
+}
+function renderBoard() {
+  const list = loadLeaderboard();
+  const el = document.getElementById('board-list');
+  if (list.length === 0) {
+    el.innerHTML = '<div class="board-row empty">まだ記録がありません</div>';
+    return;
+  }
+  el.innerHTML = list.map((e, i) => `
+    <div class="board-row">
+      <span class="rank">${i + 1}</span>
+      <span class="name">${escapeHtml(e.name)}</span>
+      <span class="score">${e.score}pt</span>
+    </div>`).join('');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function openBoard() {
+  renderBoard();
+  document.getElementById('board-overlay').classList.remove('hidden');
+}
+function closeBoard() {
+  document.getElementById('board-overlay').classList.add('hidden');
+}
+
+// Shared by both endings — a run stops either by overflowing (gameOver)
+// or by clearing all the way to MAX_LEVEL (winClear). Same overlay,
+// same leaderboard rules, just a different headline and sound.
+function endRun(title, sfxKind) {
+  state = 'GAMEOVER';
+  piece = null;
+  playSfx(sfxKind);
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('moyomoyo-best', String(bestScore));
+  }
+  const secs = Math.floor(playFrames / 60);
+  const mm = Math.floor(secs / 60);
+  const ss = secs % 60;
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-sub').textContent =
+    `Lv.${level}　スコア: ${score}pt　ベスト: ${bestScore}pt\n⏱ ${mm}:${String(ss).padStart(2,'0')}`;
+  const nameRow = document.getElementById('ov-name-row');
+  if (qualifiesForLeaderboard(score)) {
+    nameRow.classList.remove('hidden');
+    document.getElementById('ov-name-input').value = '';
+    document.getElementById('ov-register-btn').disabled = false;
+    document.getElementById('ov-register-btn').textContent = '登録';
+  } else {
+    nameRow.classList.add('hidden');
+  }
+  document.getElementById('left-col').style.visibility = 'hidden';
+  document.getElementById('right-col').style.visibility = 'hidden';
+}
+
+function gameOver() {
+  endRun('😵 モヨモヨがあふれた！', 'gameover');
+}
+
+function winClear() {
+  addShake(20);
+  flashAlpha = 0.8;
+  const burstCols = [...STAGES.map(s => s.color), '#FFD700', '#FF6FA8'];
+  for (let i = 0; i < 20; i++) {
+    const bx = GRID_X0 + Math.random() * GRID_W;
+    const by = GRID_Y0 + Math.random() * GRID_H;
+    addParticles(bx, by, burstCols[Math.floor(Math.random() * burstCols.length)], 30, 7);
+  }
+  endRun('🎉 全面クリア！おめでとう！', 'magic');
+}
+
+function startGame() {
+  state = 'PLAYING';
+  phase = 'FALL';
+  score = 0;
+  level = 1;
+  pendingLevelPreset = false;
+  playFrames = 0;
+  grid = newGrid();
+  particles = [];
+  chainCount = 0;
+  fallTimer = 0;
+  pauseTimer = 0;
+  comboText = ''; comboTimer = 0;
+  legendText = ''; legendTimer = 0;
+  celebrateText = ''; celebrateTimer = 0;
+  popTimer = 0; popStage = 0;
+  flashAlpha = 0;
+  shakeX = 0; shakeY = 0;
+  document.getElementById('pause-btn').textContent = '⏸';
+  nextPair = rollPair();
+  document.getElementById('hud').style.visibility = 'visible';
+  document.getElementById('left-col').style.visibility = 'visible';
+  document.getElementById('right-col').style.visibility = 'visible';
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('title-frame').style.display = 'none';
+  document.getElementById('cross-links').style.display = 'none';
+  updateHUD();
+  updateTimeDisplay();
+  trySpawnPiece();
+}
+
+// ─── SFX (short synthesized sounds, gameplay only — no BGM) ────
+
+let audioCtx = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  audioCtx = new AC();
+}
+
+// iOS Safari only unlocks the audio hardware inside the very first
+// user-gesture handler on the page — unlocking as early as possible
+// (rather than waiting for the first sound effect) avoids any edge
+// case where a later, indirect call misses that window and SFX stay
+// silent even though the game logic runs fine. Just calling resume()
+// isn't always enough on iOS in practice, so also fire one truly
+// silent buffer through the graph in the same gesture — the standard
+// "unlock" trick that fully engages the hardware.
+function unlockAudioOnce() {
+  initAudio();
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const buf = audioCtx.createBuffer(1, 1, 22050);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audioCtx.destination);
+  src.start(0);
+  document.removeEventListener('touchstart', unlockAudioOnce);
+  document.removeEventListener('mousedown', unlockAudioOnce);
+}
+document.addEventListener('touchstart', unlockAudioOnce, { passive: true });
+document.addEventListener('mousedown', unlockAudioOnce, { passive: true });
+
+function beep(freq, dur, { type = 'square', gain = 0.16, delay = 0, slideTo = null } = {}) {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gain, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+}
+
+function playSfx(kind, arg) {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  switch (kind) {
+    case 'move':
+      beep(520, 0.045, { type: 'square', gain: 0.1 });
+      break;
+    case 'rotate':
+      beep(440, 0.055, { type: 'triangle', gain: 0.12, slideTo: 700 });
+      break;
+    case 'drop':
+      beep(300, 0.03, { type: 'square', gain: 0.06, slideTo: 210 });
+      break;
+    case 'lock':
+      beep(190, 0.08, { type: 'square', gain: 0.13, slideTo: 90 });
+      break;
+    case 'match': {
+      const chain = arg || 1;
+      const base = Math.min(440 * Math.pow(1.13, chain - 1), 1100);
+      beep(base, 0.13, { type: 'square', gain: 0.17, slideTo: base * 1.6 });
+      beep(base * 1.5, 0.1, { type: 'triangle', gain: 0.08, delay: 0.03, slideTo: base * 2 });
+      break;
+    }
+    case 'chainBig':
+      [0, 0.08, 0.16].forEach((d, i) => beep(523 * Math.pow(2, i / 12 * 4), 0.14, { type: 'triangle', gain: 0.14, delay: d }));
+      break;
+    case 'magic':
+      [880, 1175, 1568].forEach((f, i) => beep(f, 0.09, { type: 'triangle', gain: 0.1, delay: i * 0.045 }));
+      break;
+    case 'levelup':
+      [523, 659, 784].forEach((f, i) => beep(f, 0.12, { type: 'square', gain: 0.13, delay: i * 0.07 }));
+      break;
+    case 'gameover':
+      beep(220, 0.45, { type: 'sine', gain: 0.16, slideTo: 70 });
+      break;
+  }
+}
+
+// ─── INPUT ────────────────────────────────────────────────────
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY,
+  };
+}
+
+function pauseGame() {
+  if (state !== 'PLAYING') return;
+  state = 'PAUSED';
+  document.getElementById('pause-btn').textContent = '▶';
+}
+function resumeGame() {
+  if (state !== 'PAUSED') return;
+  state = 'PLAYING';
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+function quitToTitle() {
+  state = 'TITLE';
+  titleFrame = 0;
+  titleMenuSel = 0;
+  document.getElementById('pause-btn').textContent = '⏸';
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('left-col').style.visibility = 'hidden';
+  document.getElementById('right-col').style.visibility = 'hidden';
+  document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('cross-links').style.display = 'block';
+}
+
+function onDown(e) {
+  e.preventDefault();
+  const p = getPos(e);
+  if (state === 'TITLE') {
+    if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= TITLE_MENU_Y - 28 && p.y <= TITLE_MENU_Y + 28) {
+      titleMenuSel = 0; startGame(); return;
+    }
+    const item2Y = TITLE_MENU_Y + TITLE_MENU_GAP;
+    if (p.x >= W/2 - 239 && p.x <= W/2 + 239 && p.y >= item2Y - 28 && p.y <= item2Y + 28) {
+      titleMenuSel = 1; openBoard(); return;
+    }
+    // (Cross-links are now the #cross-links HTML anchors, not hit-tested
+    // here — see their CSS for why.)
+    return;
+  }
+  if (state === 'PAUSED') {
+    if (p.x >= W/2-108 && p.x <= W/2+108 && p.y >= PAUSE_RESUME_Y-29 && p.y <= PAUSE_RESUME_Y+29) { resumeGame(); return; }
+    if (p.x >= W/2-108 && p.x <= W/2+108 && p.y >= PAUSE_QUIT_Y-26 && p.y <= PAUSE_QUIT_Y+26) { quitToTitle(); return; }
+    return;
+  }
+}
+
+function onUp(e) {
+  e.preventDefault();
+}
+
+canvas.addEventListener('mousedown',  onDown, { passive: false });
+canvas.addEventListener('mouseup',    onUp,   { passive: false });
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchend',   onUp,   { passive: false });
+
+function ctrlAction(action) {
+  if (state !== 'PLAYING' || phase !== 'FALL') return;
+  if (action === 'left') moveLeft();
+  else if (action === 'right') moveRight();
+  else if (action === 'rotate') rotatePiece();
+  else if (action === 'down') softDrop();
+}
+
+let holdRepeatTimer = null;
+let holdRepeatDelay = null;
+
+function stopHoldRepeat() {
+  clearTimeout(holdRepeatDelay); holdRepeatDelay = null;
+  clearInterval(holdRepeatTimer); holdRepeatTimer = null;
+}
+
+document.querySelectorAll('.ctrl-btn').forEach(btn => {
+  const action = btn.dataset.action;
+  const press = (e) => {
+    e.preventDefault();
+    ctrlAction(action);
+    if (action === 'down') {
+      stopHoldRepeat();
+      holdRepeatDelay = setTimeout(() => {
+        holdRepeatTimer = setInterval(() => ctrlAction('down'), 45);
+      }, 220);
+    }
+  };
+  btn.addEventListener('mousedown', press, { passive: false });
+  btn.addEventListener('touchstart', press, { passive: false });
+  if (action === 'down') {
+    btn.addEventListener('mouseup', stopHoldRepeat);
+    btn.addEventListener('mouseleave', stopHoldRepeat);
+    btn.addEventListener('touchend', stopHoldRepeat);
+    btn.addEventListener('touchcancel', stopHoldRepeat);
+  }
+});
+
+document.getElementById('ov-btn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  startGame();
+});
+
+document.getElementById('ov-register-btn').addEventListener('click', () => {
+  const btn = document.getElementById('ov-register-btn');
+  if (btn.disabled) return;
+  const name = document.getElementById('ov-name-input').value.trim().slice(0, 8);
+  registerScore(name, score, level);
+  btn.disabled = true;
+  btn.textContent = '登録済み';
+});
+
+document.getElementById('ov-board-btn').addEventListener('click', openBoard);
+document.getElementById('board-close-btn').addEventListener('click', closeBoard);
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+  if (state === 'PLAYING') pauseGame();
+  else if (state === 'PAUSED') resumeGame();
+});
+
+document.addEventListener('keydown', e => {
+  if (state === 'TITLE') {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      titleMenuSel = titleMenuSel === 0 ? 1 : 0;
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (titleMenuSel === 0) startGame(); else openBoard();
+    }
+    return;
+  }
+  if (e.key === 'Escape' && (state === 'PLAYING' || state === 'PAUSED')) {
+    if (state === 'PLAYING') pauseGame(); else resumeGame();
+    return;
+  }
+  if (state !== 'PLAYING' || phase !== 'FALL') return;
+  if (e.key === 'ArrowLeft') moveLeft();
+  else if (e.key === 'ArrowRight') moveRight();
+  else if (e.key === 'ArrowUp' || e.key === ' ') rotatePiece();
+  else if (e.key === 'ArrowDown') softDrop();
+});
+
+// ─── MAIN LOOP ────────────────────────────────────────────────
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function init() {
+  state = 'TITLE';
+  titleFrame = 0;
+  grid = newGrid();
+  loop();
+}
+
+init();
+</script>
+</body>
+</html>

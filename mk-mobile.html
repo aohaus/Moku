@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>MK Mobile</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background:
+    radial-gradient(circle, rgba(255,201,74,0.08) 0 5px, transparent 6px) 20px 30px / 220px 220px repeat,
+    radial-gradient(circle, rgba(255,201,74,0.06) 0 7px, transparent 8px) 140px 160px / 320px 320px repeat,
+    radial-gradient(circle, rgba(120,200,255,0.06) 0 4px, transparent 5px) 60px 220px / 260px 260px repeat,
+    linear-gradient(160deg, #0B1330 0%, #162454 55%, #0A1228 100%);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  user-select: none;
+  overflow: hidden;
+  touch-action: none;
+}
+#game-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+#wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+}
+/* Canvas keeps its 960:560 aspect ratio and fills up to the available
+   height (100dvh, mobile-Safari-toolbar-safe), shrinking by width
+   instead whenever the viewport is narrower than that ratio needs. */
+canvas {
+  display: block;
+  cursor: pointer;
+  aspect-ratio: 1260 / 574;
+  height: 100vh;
+  height: 100dvh;
+  max-height: min(900px, calc(100vh - 16px));
+  max-height: min(900px, calc(100dvh - 16px));
+  max-width: 100%;
+  width: auto;
+}
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 12px 14px;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none;
+}
+#score-display {
+  background: linear-gradient(135deg, rgba(255,201,74,0.28), rgba(80,160,255,0.22));
+  color: #FFE9A8;
+  font-size: 26px; font-weight: 900;
+  padding: 6px 22px; border-radius: 14px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 14px rgba(255,224,102,0.6), 0 2px 4px rgba(0,0,0,0.5);
+  border: 1.5px solid rgba(255,224,102,0.35);
+  font-variant-numeric: tabular-nums;
+}
+#time-display {
+  margin-top: 6px;
+  background: rgba(5,10,25,0.45);
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  padding: 4px 14px; border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+}
+#pause-btn {
+  position: absolute; top: 14px; right: 14px;
+  pointer-events: all;
+  background: rgba(5,10,25,0.55);
+  color: white;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 50%;
+  width: 42px; height: 42px;
+  font-size: 17px;
+  cursor: pointer;
+}
+/* Sized as a % of #wrapper's WIDTH (which shrink-wraps the canvas 1:1),
+   not vw — vw is relative to the raw viewport and drifts out of sync
+   with the canvas's actual rendered size, which is what determines
+   whether these controls actually land inside the pitch-free side
+   margins reserved for them outside PITCH_X0/PITCH_X1. Anchored to the
+   left/right edges and vertically centered, beside the pitch rather
+   than overlapping it. */
+#joystick {
+  position: absolute;
+  left: 6px; top: 64%; transform: translateY(-50%);
+  width: clamp(60px, 12%, 140px);
+  height: clamp(60px, 12%, 140px);
+  border-radius: 50%;
+  background: rgba(255,201,74,0.12);
+  border: 2px solid rgba(255,201,74,0.4);
+  box-shadow: inset 0 0 20px rgba(255,201,74,0.15);
+  visibility: hidden;
+  touch-action: none;
+  pointer-events: all;
+}
+#joystick-knob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 44%; height: 44%;
+  border-radius: 50%;
+  background: rgba(255,201,74,0.85);
+  box-shadow: 0 3px 14px rgba(255,201,74,0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+#shoot-btn {
+  position: absolute;
+  right: 6px; top: 64%; transform: translateY(-50%);
+  width: clamp(48px, 9%, 106px);
+  height: clamp(48px, 9%, 106px);
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.5);
+  background: radial-gradient(circle at 35% 30%, #FF9A52, #E4483A 70%);
+  color: #fff;
+  font-size: clamp(12px, 2vw, 16px);
+  font-weight: 900;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 18px rgba(228,72,58,0.55), inset 0 2px 6px rgba(255,255,255,0.35);
+  visibility: hidden;
+  touch-action: none;
+  cursor: pointer;
+}
+#shoot-btn:active {
+  transform: translateY(-50%) scale(0.9);
+  background: radial-gradient(circle at 35% 30%, #FFB374, #FF6A3D 70%);
+}
+#overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(5,10,25,0.68);
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+}
+#overlay.hidden { display: none; }
+#overlay h1 { color: #fff; font-size: 30px; margin-bottom: 8px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); text-align: center; }
+#overlay p { color: #FFE9A8; font-size: 16px; margin-bottom: 24px; text-align: center; white-space: pre-line; }
+#overlay button {
+  background: #FFC94A; color: #201200;
+  border: none; border-radius: 30px;
+  padding: 12px 32px; font-size: 18px; font-weight: 700;
+  cursor: pointer; transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 4px 16px rgba(255,201,74,0.4);
+}
+#overlay button:hover { background: #FFDD8F; transform: scale(1.05); }
+#rotate-hint {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #0A1228;
+  flex-direction: column; align-items: center; justify-content: center;
+  color: white; font-size: 18px; gap: 16px;
+}
+#rotate-hint span { font-size: 56px; animation: rotate-hint-spin 1.5s ease-in-out infinite alternate; }
+@keyframes rotate-hint-spin { from { transform: rotate(-30deg); } to { transform: rotate(30deg); } }
+/* Console-style frame spanning the whole viewport on the title screen —
+   shared structure with the other two games' title screens, so the
+   frame always reads as full-screen regardless of this canvas's own
+   aspect ratio. */
+#title-frame {
+  display: block;
+  position: fixed; inset: 14px;
+  border: 3px solid #FFC94A;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#title-frame::after {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid #8A6218;
+  border-radius: 8px;
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  #rotate-hint { display: flex; }
+  #game-layout { display: none; }
+  #title-frame { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="title-frame"></div>
+<div id="game-layout">
+  <div id="wrapper">
+    <canvas id="c"></canvas>
+    <div id="hud" style="visibility:hidden">
+      <div id="score-display">0 - 0</div>
+      <div id="time-display">1:00</div>
+      <button id="pause-btn" title="一時停止">⏸</button>
+    </div>
+    <div id="joystick" aria-label="移動スティック">
+      <div id="joystick-knob"></div>
+    </div>
+    <button id="shoot-btn" aria-label="シュート">シュート</button>
+    <div id="overlay" class="hidden">
+      <h1 id="ov-title"></h1>
+      <p id="ov-sub"></p>
+      <button id="ov-btn">もう一度！</button>
+    </div>
+  </div>
+</div>
+<div id="rotate-hint">
+  <span>📱</span>
+  <p>横向きにしてプレイ！</p>
+</div>
+
+<script>
+// ─── CANVAS ───────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 1260, H = 574;
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width  = W * DPR;
+canvas.height = H * DPR;
+ctx.scale(DPR, DPR);
+
+// ─── CONFIG ───────────────────────────────────────────────────
+// The pitch itself is full size again (same 900x438 as the original).
+// The canvas is widened instead, leaving dedicated off-pitch margins on
+// the left and right (plain stadium background) for the joystick and
+// SHOOT button — they used to overlap the grass itself, which put a
+// thumb right over the ball whenever it reached that corner.
+const PITCH_X0 = 180, PITCH_Y0 = 106, PITCH_X1 = PITCH_X0 + 900, PITCH_Y1 = H - 30;
+const PITCH_W  = PITCH_X1 - PITCH_X0, PITCH_H = PITCH_Y1 - PITCH_Y0;
+const PITCH_CY = (PITCH_Y0 + PITCH_Y1) / 2;
+const HALF_X   = (PITCH_X0 + PITCH_X1) / 2;
+const GOAL_H   = 140;
+const GOAL_Y0  = PITCH_Y0 + (PITCH_H - GOAL_H) / 2;
+const GOAL_Y1  = GOAL_Y0 + GOAL_H;
+const NET_DEPTH = 22;
+
+const PLAYER_R = 28, CPU_R = 24, BALL_R = 13;
+const PLAYER_MAX_SPEED = 6.6;
+const BALL_FRICTION = 0.994;
+const WALL_BOUNCE = 0.85;
+const BALL_MAX_SPEED = 15;
+const PADDLE_HIT_BASE_SPEED = 6.2;
+const PADDLE_HIT_MOMENTUM = 0.6;
+const SHOOT_WINDOW_FRAMES = 9;   // how long a shoot press stays "primed" before a contact
+const SHOOT_COOLDOWN_FRAMES = 18; // min frames between accepted presses, discourages button-mashing
+const POWER_SHOT_SPEED = 12.5;
+
+const MATCH_DURATIONS = [60, 180, 300]; // 1 / 3 / 5 minutes, in seconds
+const CPU_LEVELS = [
+  { label: 'かんたん',   accel: 0.55, maxSpeed: 4.4, wanderAmp: 0.9, wanderMax: 46 },
+  { label: 'ふつう',     accel: 0.8,  maxSpeed: 5.6, wanderAmp: 0.6, wanderMax: 30 },
+  { label: 'むずかしい', accel: 1.05, maxSpeed: 6.8, wanderAmp: 0.3, wanderMax: 14 },
+];
+
+// Time-select screen layout (shared between draw & hit-testing)
+const TS_CARD_W = 170, TS_CARD_H = 140, TS_CARD_GAP = 30, TS_CARD_Y = 178;
+const TS_LVL_W = 140, TS_LVL_H = 46, TS_LVL_GAP = 16;
+const TS_LVL_Y = TS_CARD_Y + TS_CARD_H + 46;
+
+// ─── STATE ────────────────────────────────────────────────────
+let state = 'TITLE'; // TITLE | TIMESELECT | PLAYING | PAUSED | GOAL_PAUSE | GAMEOVER
+let titleFrame = 0;
+let matchFramesTotal = MATCH_DURATIONS[0] * 60;
+let matchFramesLeft = matchFramesTotal;
+let cpuLevel = 1; // index into CPU_LEVELS, chosen on the time-select screen
+let scoreHome = 0, scoreAway = 0;
+let goalPauseTimer = 0;
+let goalMessage = '';
+let particles = [];
+let shakeX = 0, shakeY = 0;
+let flashAlpha = 0;
+let frameCount = 0;
+let shootPressFrame = -Infinity; // frameCount when the shoot button was last accepted
+let shootReadyFrame = -Infinity; // frameCount after which a new press is accepted (cooldown)
+let shotMessage = '';
+let shotMessageTimer = 0;
+
+const player = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
+const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
+const ball   = { x: 0, y: 0, vx: 0, vy: 0, spin: 0 };
+const held = { up: false, down: false, left: false, right: false };
+let stickX = 0, stickY = 0; // analog joystick tilt, each axis in [-1, 1]
+
+function homePositions() {
+  player.x = PITCH_X0 + PITCH_W * 0.22; player.y = PITCH_CY; player.vx = 0; player.vy = 0;
+  cpu.x    = PITCH_X1 - PITCH_W * 0.22; cpu.y    = PITCH_CY; cpu.vx = 0; cpu.vy = 0;
+}
+function centerBall(dir) {
+  ball.x = HALF_X; ball.y = PITCH_CY;
+  const angle = (Math.random() * 0.7 - 0.35) + (dir < 0 ? Math.PI : 0);
+  const speed = 3 + Math.random() * 1.5;
+  ball.vx = Math.cos(angle) * speed;
+  ball.vy = Math.sin(angle) * speed;
+}
+
+// ─── PARTICLES ────────────────────────────────────────────────
+function addParticles(x, y, col, n, spread) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * spread + 1;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 30 + Math.random() * 20, sz: 2 + Math.random() * 3, col });
+  }
+}
+function updateParticles() {
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.life--; });
+  particles = particles.filter(p => p.life > 0);
+}
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life / 40);
+    ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+function addShake(amt) { shakeX = (Math.random() - 0.5) * amt; shakeY = (Math.random() - 0.5) * amt; }
+
+// ─── MASCOT FACE (small paddle token, shared "moku" family look) ──
+function drawMokuFace(x, y, r, bodyColor, faceColor, angle) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.roundRect(-r, -r, r * 2, r * 2, r * 0.4); ctx.fill();
+  ctx.fillStyle = faceColor;
+  ctx.beginPath(); ctx.ellipse(0, r * 0.08, r * 0.62, r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+  const eyeW = r * 0.16, eyeH = r * 0.13;
+  ctx.fillStyle = '#181818';
+  ctx.beginPath(); ctx.ellipse(-r * 0.28, -r * 0.08, eyeW, eyeH, -0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r * 0.28, -r * 0.08, eyeW, eyeH, 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = r * 0.08; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-r * 0.45, -r * 0.28); ctx.lineTo(-r * 0.12, -r * 0.22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r * 0.12, -r * 0.22); ctx.lineTo(r * 0.45, -r * 0.28); ctx.stroke();
+  ctx.restore();
+}
+
+// Mokumoku, ported from angry-mokumoku.html's title mascot (always drawn
+// "neutral" here — MK Mobile has no angry-mood states). Used for both the
+// title screen icon and the player token, so the player reads as the same
+// franchise character shown on the other games' title screens.
+function drawMokumoku(x, y, r, angle) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle || 0);
+
+  ctx.fillStyle = '#C8956A';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  const bodyShade = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+  bodyShade.addColorStop(0, 'rgba(255,255,255,0.15)');
+  bodyShade.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = bodyShade;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#E8D5B0';
+  ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.66, r * 0.76, 0, 0, Math.PI * 2); ctx.fill();
+
+  const eyeH = r * 0.235, eyeW = r * 0.19;
+  ctx.fillStyle = '#151515';
+  ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.stroke();
+
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(-r * 0.27, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r * 0.37, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#E89230';
+  ctx.beginPath(); ctx.ellipse(0, -r * 0.02, r * 0.24, r * 0.115, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#D07818';
+  ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.115, r * 0.135, 0, 0, Math.PI); ctx.fill();
+
+  ctx.fillStyle = '#3DA890';
+  ctx.beginPath(); ctx.ellipse(-r * 0.28, r * 0.47, r * 0.24, r * 0.13, -0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r * 0.28, r * 0.47, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2A7868';
+  ctx.beginPath(); ctx.arc(0, r * 0.47, r * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2A7868'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(-r * 0.04, r * 0.47); ctx.lineTo(-r * 0.48, r * 0.45); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r * 0.04, r * 0.47); ctx.lineTo(r * 0.48, r * 0.45); ctx.stroke();
+
+  ctx.fillStyle = '#E89230';
+  ctx.beginPath(); ctx.ellipse(-r * 0.26, r * 0.88, r * 0.13, r * 0.08, 0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r * 0.26, r * 0.88, r * 0.13, r * 0.08, -0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#C06810'; ctx.lineWidth = 1.2;
+  [-r * 0.26, r * 0.26].forEach(fx => {
+    ctx.beginPath(); ctx.moveTo(fx - r * 0.07, r * 0.9); ctx.lineTo(fx - r * 0.15, r * 0.96); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fx, r * 0.92); ctx.lineTo(fx, r * 1.0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fx + r * 0.07, r * 0.9); ctx.lineTo(fx + r * 0.15, r * 0.96); ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+// ─── BALL ─────────────────────────────────────────────────────
+// Stylized Trionda-esque tri-color pinwheel panels on a white base,
+// rather than a classic black-and-white pentagon ball. Spins with speed.
+const BALL_PANEL_COLORS = ['#2FAE66', '#2C93D6', '#F0632F'];
+function drawBall() {
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+
+  ctx.fillStyle = '#F8F8F2';
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.rotate(ball.spin);
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.clip();
+  BALL_PANEL_COLORS.forEach((col, i) => {
+    ctx.save();
+    ctx.rotate((i * Math.PI * 2) / 3);
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(BALL_R * 0.85, -BALL_R * 0.5, BALL_R * 1.3, BALL_R * 0.15);
+    ctx.quadraticCurveTo(BALL_R * 0.55, BALL_R * 0.25, 0, 0);
+    ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath(); ctx.arc(-BALL_R * 0.32, -BALL_R * 0.38, BALL_R * 0.24, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+}
+
+// ─── PITCH ────────────────────────────────────────────────────
+function drawPitch() {
+  const g = ctx.createLinearGradient(0, PITCH_Y0, 0, PITCH_Y1);
+  g.addColorStop(0, '#2E8B3E'); g.addColorStop(1, '#256E32');
+  ctx.fillStyle = g; ctx.fillRect(PITCH_X0, PITCH_Y0, PITCH_W, PITCH_H);
+
+  // mowed-stripe texture
+  const stripeW = PITCH_W / 8;
+  for (let i = 0; i < 8; i += 2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.035)';
+    ctx.fillRect(PITCH_X0 + i * stripeW, PITCH_Y0, stripeW, PITCH_H);
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(PITCH_X0, PITCH_Y0, PITCH_W, PITCH_H);
+  ctx.beginPath(); ctx.moveTo(HALF_X, PITCH_Y0); ctx.lineTo(HALF_X, PITCH_Y1); ctx.stroke();
+  ctx.beginPath(); ctx.arc(HALF_X, PITCH_CY, 44, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(HALF_X, PITCH_CY, 3, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+
+  // goal boxes (decorative, crosshatched net)
+  [PITCH_X0, PITCH_X1].forEach((gx, side) => {
+    const boxW = 46, boxH = GOAL_H + 30;
+    const bx = side === 0 ? gx : gx - boxW;
+    const by = PITCH_Y0 + (PITCH_H - boxH) / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, boxW, boxH);
+
+    // net crosshatch behind the goal mouth itself
+    const nx = side === 0 ? gx - NET_DEPTH : gx;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(nx, GOAL_Y0, NET_DEPTH, GOAL_H); ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1;
+    for (let i = -NET_DEPTH; i < GOAL_H + NET_DEPTH; i += 8) {
+      ctx.beginPath(); ctx.moveTo(nx, GOAL_Y0 + i); ctx.lineTo(nx + NET_DEPTH, GOAL_Y0 + i + NET_DEPTH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(nx, GOAL_Y0 + i + NET_DEPTH); ctx.lineTo(nx + NET_DEPTH, GOAL_Y0 + i); ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  // goal mouth posts
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+  [PITCH_X0, PITCH_X1].forEach(gx => {
+    ctx.beginPath(); ctx.moveTo(gx, GOAL_Y0); ctx.lineTo(gx, GOAL_Y1); ctx.stroke();
+  });
+}
+
+// ─── PLAYER / CPU MOVEMENT ────────────────────────────────────
+// No inertia: velocity snaps directly to the target speed/direction (or to
+// zero) every frame — direct, arcade-style control rather than a physics
+// ramp-up/glide-down that read as too smooth/floaty.
+function applyMovement(entity, dx, dy, maxSpeed, minX, maxX, minY, maxY) {
+  const len = Math.hypot(dx, dy);
+  if (len > 0.001) {
+    const pull = Math.min(len, 1); // analog stick tilt scales speed; digital input is always full tilt
+    entity.vx = (dx / len) * maxSpeed * pull;
+    entity.vy = (dy / len) * maxSpeed * pull;
+  } else {
+    entity.vx = 0;
+    entity.vy = 0;
+  }
+  entity.x = Math.min(maxX, Math.max(minX, entity.x + entity.vx));
+  entity.y = Math.min(maxY, Math.max(minY, entity.y + entity.vy));
+}
+
+function updatePlayer() {
+  let dx = (held.right ? 1 : 0) - (held.left ? 1 : 0) + stickX;
+  let dy = (held.down ? 1 : 0) - (held.up ? 1 : 0) + stickY;
+  applyMovement(player, dx, dy, PLAYER_MAX_SPEED,
+    PITCH_X0 + PLAYER_R, HALF_X - PLAYER_R, PITCH_Y0 + PLAYER_R, PITCH_Y1 - PLAYER_R);
+}
+
+let cpuWander = 0;
+function updateCPU() {
+  const lvl = CPU_LEVELS[cpuLevel];
+  cpuWander += (Math.random() - 0.5) * lvl.wanderAmp;
+  cpuWander = Math.max(-lvl.wanderMax, Math.min(lvl.wanderMax, cpuWander));
+  const ballInCpuHalf = ball.x > HALF_X;
+  const targetX = ballInCpuHalf
+    ? Math.min(PITCH_X1 - CPU_R, ball.x + 14)
+    : HALF_X + PITCH_W * 0.18;
+  const targetY = Math.max(PITCH_Y0 + CPU_R, Math.min(PITCH_Y1 - CPU_R, ball.y + cpuWander));
+  const dx = targetX - cpu.x, dy = targetY - cpu.y;
+  const dist = Math.hypot(dx, dy);
+  const nx = dist > 4 ? dx / dist : 0, ny = dist > 4 ? dy / dist : 0;
+  applyMovement(cpu, nx, ny, lvl.maxSpeed,
+    HALF_X + CPU_R, PITCH_X1 - CPU_R, PITCH_Y0 + CPU_R, PITCH_Y1 - CPU_R);
+}
+
+// ─── BALL PHYSICS ─────────────────────────────────────────────
+function resolvePaddleHit(entity, radius) {
+  const dx = ball.x - entity.x, dy = ball.y - entity.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = BALL_R + radius;
+  if (dist < minDist && dist > 0.001) {
+    const nx = dx / dist, ny = dy / dist;
+    const overlap = minDist - dist;
+    ball.x += nx * overlap; ball.y += ny * overlap;
+    // Only inject a fresh kick on a NEW contact. Against a wall/corner the
+    // push-away direction points straight back into the wall, so without
+    // this guard the ball gets re-floored to full hit speed every frame it
+    // stays pinned there — an infinite-energy loop that (combined with the
+    // paddle also parking at its target) reads as everything freezing solid
+    // in the corner. Sustained overlap just gets separated positionally and
+    // lets normal wall restitution/friction bleed the energy off.
+    if (!entity.touching) {
+      const curSpeed = Math.hypot(ball.vx, ball.vy);
+      let speed = Math.max(PADDLE_HIT_BASE_SPEED, curSpeed);
+      let isPowerShot = false;
+      if (entity === player && frameCount - shootPressFrame <= SHOOT_WINDOW_FRAMES) {
+        speed = Math.max(POWER_SHOT_SPEED, curSpeed * 1.4);
+        isPowerShot = true;
+        shootPressFrame = -Infinity; // consume the buffered press
+      }
+      ball.vx = nx * speed + entity.vx * PADDLE_HIT_MOMENTUM;
+      ball.vy = ny * speed + entity.vy * PADDLE_HIT_MOMENTUM;
+      const newSpeed = Math.hypot(ball.vx, ball.vy);
+      if (newSpeed > BALL_MAX_SPEED) { ball.vx = ball.vx / newSpeed * BALL_MAX_SPEED; ball.vy = ball.vy / newSpeed * BALL_MAX_SPEED; }
+      if (isPowerShot) {
+        addParticles(ball.x, ball.y, '#FF6A3D', 16, 6);
+        addShake(9);
+        shotMessage = '⚡ 強シュート！';
+        shotMessageTimer = 36;
+      } else {
+        addParticles(ball.x, ball.y, '#FFE9A8', 6, 3);
+      }
+    }
+    entity.touching = true;
+  } else {
+    entity.touching = false;
+  }
+}
+
+function updateBall() {
+  ball.x += ball.vx; ball.y += ball.vy;
+  ball.vx *= BALL_FRICTION; ball.vy *= BALL_FRICTION;
+  ball.spin += Math.hypot(ball.vx, ball.vy) * 0.07;
+
+  // Paddle collisions resolve first; the wall clamp below runs last and is
+  // authoritative, so a paddle push can never leave the ball resting outside
+  // the pitch. (Doing this the other way around let a corner paddle push
+  // shove the ball back past the wall it had just bounced off, which made
+  // the ball + paddle settle into an exact repeating position/velocity each
+  // frame — a permanent freeze whenever the ball got trapped in a corner.)
+  resolvePaddleHit(player, PLAYER_R);
+  resolvePaddleHit(cpu, CPU_R);
+
+  if (ball.y - BALL_R < PITCH_Y0) { ball.y = PITCH_Y0 + BALL_R; ball.vy = -ball.vy * WALL_BOUNCE; }
+  if (ball.y + BALL_R > PITCH_Y1) { ball.y = PITCH_Y1 - BALL_R; ball.vy = -ball.vy * WALL_BOUNCE; }
+
+  const inGoalMouth = ball.y > GOAL_Y0 && ball.y < GOAL_Y1;
+  if (ball.x - BALL_R < PITCH_X0) {
+    if (inGoalMouth && ball.x < PITCH_X0 - BALL_R * 0.6) { scoreGoal('away'); return; }
+    if (!inGoalMouth) { ball.x = PITCH_X0 + BALL_R; ball.vx = -ball.vx * WALL_BOUNCE; }
+  }
+  if (ball.x + BALL_R > PITCH_X1) {
+    if (inGoalMouth && ball.x > PITCH_X1 + BALL_R * 0.6) { scoreGoal('home'); return; }
+    if (!inGoalMouth) { ball.x = PITCH_X1 - BALL_R; ball.vx = -ball.vx * WALL_BOUNCE; }
+  }
+}
+
+function scoreGoal(who) {
+  if (who === 'home') { scoreHome++; goalMessage = '⚽ ゴール！'; }
+  else { scoreAway++; goalMessage = '😵 失点...'; }
+  updateHUD();
+  addParticles(who === 'home' ? PITCH_X1 : PITCH_X0, PITCH_CY, '#FFC94A', 26, 6);
+  addShake(14);
+  flashAlpha = 0.5;
+  state = 'GOAL_PAUSE';
+  goalPauseTimer = 90;
+}
+
+// ─── HUD ──────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('score-display').textContent = `${scoreHome} - ${scoreAway}`;
+}
+function updateTimeDisplay() {
+  const secs = Math.max(0, Math.ceil(matchFramesLeft / 60));
+  const mm = Math.floor(secs / 60), ss = secs % 60;
+  document.getElementById('time-display').textContent = `${mm}:${String(ss).padStart(2, '0')}`;
+}
+
+// ─── TITLE SCREEN ─────────────────────────────────────────────
+function drawTitleScreen() {
+  titleFrame++;
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(0.55, '#162454'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Coordinates as fractions of W/H so the spread stays even regardless
+  // of the canvas's own width (widened to fit the side controls).
+  const dots = [[.042,.105,7],[.938,.139,9],[.063,.819,8],[.917,.836,10],[.5,.07,6],[.854,.453,7],[.104,.453,9],[.521,.889,8],[.156,.732,6],[.792,.209,8]];
+  dots.forEach(([fx,fy,dr],i) => {
+    const a = 0.12 + 0.1 * Math.sin(titleFrame * 0.02 + i);
+    ctx.fillStyle = `rgba(255,201,74,${a})`;
+    ctx.beginPath(); ctx.arc(fx * W, fy * H, dr, 0, Math.PI*2); ctx.fill();
+  });
+
+  // (Frame border is the full-viewport #title-frame HTML element, not
+  // drawn on the canvas — shared structure with the other two games'
+  // title screens so it always reads as full-screen.)
+
+  // Cross-links to the two sister games, stacked top-right — same
+  // corner both other titles use for their own "other game" links.
+  // Sized generously (2x the original) so they're comfortable to tap.
+  ctx.save();
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 24px Arial';
+  const linkPulse = 0.7 + 0.3 * Math.sin(titleFrame * 0.05);
+  ctx.globalAlpha = linkPulse;
+  ctx.fillStyle = '#B0D8FF';
+  ctx.fillText('🦉 アングリーモクモクへ ▶', W - 26, 71);
+  ctx.fillStyle = '#FF9FCB';
+  ctx.fillText('🍬 モヨモヨへ ▶', W - 26, 107);
+  ctx.fillStyle = '#F2A65A';
+  ctx.fillText('🏆 バトルロイヤルへ ▶', W - 26, 143);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 22;
+  ctx.fillStyle = '#EFFFEA';
+  ctx.font = 'bold 50px Arial';
+  ctx.fillText('MK MOBILE', W/2, 120);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#FFC94A';
+  ctx.font = '13px Arial';
+  ctx.fillText('M O K U M O K U   K I C K', W/2, 145);
+  ctx.restore();
+
+  // Mokumoku mascot with idle sparkles — same bob/tilt idle as its
+  // appearance on angry-mokumoku.html's own title screen.
+  const bob = Math.sin(titleFrame * 0.05) * 6;
+  const tilt = Math.sin(titleFrame * 0.028) * 0.07;
+  const mascotY = 235 + bob;
+  const sparkT = (titleFrame * 0.04) % (Math.PI * 2);
+  [[W/2-95,mascotY-45],[W/2+100,mascotY-35],[W/2-80,mascotY+55],[W/2+85,mascotY+50]].forEach(([sx,sy],i) => {
+    const s = 0.5 + 0.5 * Math.sin(sparkT + i * 1.5);
+    ctx.save();
+    ctx.globalAlpha = s * 0.85;
+    ctx.fillStyle = '#FFE9A8';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦', sx, sy);
+    ctx.restore();
+  });
+  drawMokumoku(W/2, mascotY, 42, tilt);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '13px Arial';
+  ctx.fillText('制限時間内によりたくさんゴールを決めよう', W/2, 320);
+  ctx.fillText('スティックで移動・シュートでタイミングよく強打！', W/2, 340);
+  ctx.restore();
+
+  const btnY = 390;
+  const pulse = 0.6 + 0.4 * Math.sin(titleFrame * 0.06);
+  ctx.save();
+  ctx.shadowColor = '#FFC94A'; ctx.shadowBlur = 14 + pulse * 8;
+  ctx.fillStyle = '#FFC94A';
+  ctx.beginPath(); ctx.roundRect(W/2 - 85, btnY - 24, 170, 48, 24); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#201200';
+  ctx.font = 'bold 19px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ スタート', W/2, btnY);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  const tagY = btnY + 90;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W/2 - 70, tagY - 20); ctx.lineTo(W/2 + 70, tagY - 20); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '11px Arial';
+  ctx.fillText('🦉 × 🍬 × ⚽  M O K U M O K U   S E R I E S', W/2, tagY);
+  ctx.restore();
+
+  // Footer instruction line, matching the other two games' title screens.
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('タップ / クリックで選択　・　Enterでスタート', W/2, H - 20);
+}
+
+// ─── TIME SELECT SCREEN ───────────────────────────────────────
+const TIME_LABELS = ['1 分', '3 分', '5 分'];
+function drawTimeSelect() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,201,74,0.3)'; ctx.lineWidth = 3;
+  ctx.strokeRect(12, 12, W - 24, H - 24);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EFFFEA';
+  ctx.font = 'bold 28px Arial';
+  ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 16;
+  ctx.fillText('試合時間をえらぼう', W/2, 130);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  const totalW = TS_CARD_W * 3 + TS_CARD_GAP * 2;
+  const startX = W/2 - totalW/2;
+  TIME_LABELS.forEach((label, i) => {
+    const x = startX + i * (TS_CARD_W + TS_CARD_GAP);
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,201,74,0.14)';
+    ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, TS_CARD_Y, TS_CARD_W, TS_CARD_H, 20); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#FFC94A';
+    ctx.font = '36px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('⏱', x + TS_CARD_W/2, TS_CARD_Y + 56);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px Arial';
+    ctx.fillText(label, x + TS_CARD_W/2, TS_CARD_Y + 100);
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '13px Arial';
+  ctx.fillText('CPU レベル', W/2, TS_LVL_Y - 12);
+  ctx.restore();
+
+  const lvlTotalW = TS_LVL_W * 3 + TS_LVL_GAP * 2;
+  const lvlStartX = W/2 - lvlTotalW/2;
+  CPU_LEVELS.forEach((lvl, i) => {
+    const x = lvlStartX + i * (TS_LVL_W + TS_LVL_GAP);
+    const selected = i === cpuLevel;
+    ctx.save();
+    ctx.fillStyle = selected ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = selected ? 'rgba(255,201,74,0.9)' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, TS_LVL_Y, TS_LVL_W, TS_LVL_H, 23); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = selected ? '#201200' : 'rgba(255,255,255,0.85)';
+    ctx.font = (selected ? 'bold ' : '') + '15px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(lvl.label, x + TS_LVL_W/2, TS_LVL_Y + TS_LVL_H/2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '13px Arial';
+  ctx.fillText('◀ タイトルにもどる', 70, H - 26);
+  ctx.restore();
+}
+
+// ─── PAUSE / GAME OVER (canvas) ────────────────────────────────
+const PAUSE_TITLE_Y  = PITCH_CY - 141;
+const PAUSE_RESUME_Y = PITCH_CY - 61;
+const PAUSE_QUIT_Y   = PAUSE_RESUME_Y + 64;
+function drawPausedOverlay() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(5,10,25,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EFFFEA';
+  ctx.font = 'bold 28px Arial';
+  ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 18;
+  ctx.fillText('⏸ 一時停止中', W/2, PAUSE_TITLE_Y);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#FFC94A';
+  ctx.beginPath(); ctx.roundRect(W/2 - 90, PAUSE_RESUME_Y - 24, 180, 48, 24); ctx.fill();
+  ctx.fillStyle = '#201200';
+  ctx.font = 'bold 18px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.roundRect(W/2 - 90, PAUSE_QUIT_Y - 22, 180, 44, 22); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(W/2 - 90, PAUSE_QUIT_Y - 22, 180, 44, 22); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '15px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
+// ─── DRAW ─────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (state === 'TITLE') { drawTitleScreen(); return; }
+  if (state === 'TIMESELECT') { drawTimeSelect(); return; }
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+  shakeX *= 0.7; shakeY *= 0.7;
+  if (Math.abs(shakeX) < 0.1) shakeX = 0;
+  if (Math.abs(shakeY) < 0.1) shakeY = 0;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  drawPitch();
+  drawMokumoku(player.x, player.y, PLAYER_R, 0);
+  drawMokuFace(cpu.x, cpu.y, CPU_R, '#3D7DD8', '#F0DFBC', 0);
+  drawBall();
+  drawParticles();
+
+  if (state === 'GOAL_PAUSE' && goalMessage) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 40px Arial';
+    ctx.shadowColor = '#FFC94A'; ctx.shadowBlur = 26;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(goalMessage, W/2, PITCH_CY);
+    ctx.restore();
+  }
+
+  if (shotMessageTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, shotMessageTimer / 12);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 24px Arial';
+    ctx.shadowColor = '#FF6A3D'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#FFE0A0';
+    const msgX = Math.max(90, Math.min(W - 90, player.x));
+    ctx.fillText(shotMessage, msgX, player.y - PLAYER_R - 16);
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  if (flashAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = flashAlpha;
+    ctx.fillStyle = '#FFE9A0';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    flashAlpha *= 0.85;
+  }
+
+  if (state === 'PAUSED') drawPausedOverlay();
+}
+
+// ─── UPDATE ───────────────────────────────────────────────────
+function update() {
+  updateParticles();
+  if (shotMessageTimer > 0) shotMessageTimer--;
+  if (state === 'PLAYING') {
+    frameCount++;
+    updatePlayer();
+    updateCPU();
+    updateBall();
+    matchFramesLeft--;
+    if (matchFramesLeft % 15 === 0) updateTimeDisplay();
+    if (matchFramesLeft <= 0) { matchFramesLeft = 0; updateTimeDisplay(); endMatch(); }
+  } else if (state === 'GOAL_PAUSE') {
+    if (--goalPauseTimer <= 0) {
+      centerBall(scoreHome > scoreAway ? -1 : 1);
+      homePositions();
+      state = 'PLAYING';
+    }
+  }
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─── GAME FLOW ────────────────────────────────────────────────
+function startMatch(durationSeconds) {
+  state = 'PLAYING';
+  scoreHome = 0; scoreAway = 0;
+  matchFramesTotal = durationSeconds * 60;
+  matchFramesLeft = matchFramesTotal;
+  particles = [];
+  shakeX = 0; shakeY = 0; flashAlpha = 0;
+  frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
+  shotMessage = ''; shotMessageTimer = 0;
+  player.touching = false; cpu.touching = false;
+  homePositions();
+  centerBall(Math.random() < 0.5 ? -1 : 1);
+  updateHUD();
+  updateTimeDisplay();
+  document.getElementById('hud').style.visibility = 'visible';
+  document.getElementById('joystick').style.visibility = 'visible';
+  document.getElementById('shoot-btn').style.visibility = 'visible';
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('title-frame').style.display = 'none';
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+
+function endMatch() {
+  state = 'GAMEOVER';
+  document.getElementById('joystick').style.visibility = 'hidden';
+  document.getElementById('shoot-btn').style.visibility = 'hidden';
+  resetStick();
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  let title;
+  if (scoreHome > scoreAway) title = '🏆 勝利！';
+  else if (scoreHome < scoreAway) title = '😢 敗北...';
+  else title = '🤝 引き分け';
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-sub').textContent = `${scoreHome} - ${scoreAway}`;
+}
+
+function pauseGame() {
+  if (state !== 'PLAYING') return;
+  state = 'PAUSED';
+  document.getElementById('pause-btn').textContent = '▶';
+}
+function resumeGame() {
+  if (state !== 'PAUSED') return;
+  state = 'PLAYING';
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+function quitToTitle() {
+  state = 'TITLE';
+  titleFrame = 0;
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('joystick').style.visibility = 'hidden';
+  document.getElementById('shoot-btn').style.visibility = 'hidden';
+  resetStick();
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+
+// ─── INPUT ────────────────────────────────────────────────────
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+}
+
+function onDown(e) {
+  e.preventDefault();
+  const p = getPos(e);
+  if (state === 'TITLE') {
+    if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) { state = 'TIMESELECT'; return; }
+    // Pushed down from the very top edge (was y:18) so they clear the
+    // frame border with a comfortable tap margin instead of sitting
+    // flush against it.
+    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 45 && p.y <= 89) { window.location.href = 'angry-mokumoku.html'; return; }
+    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 89 && p.y <= 129) { window.location.href = 'moyomoyo.html'; return; }
+    if (p.x >= W - 340 && p.x <= W - 10 && p.y >= 129 && p.y <= 169) { window.location.href = 'angry-moku-battle-royal.html'; return; }
+    return;
+  }
+  if (state === 'TIMESELECT') {
+    const totalW = TS_CARD_W * 3 + TS_CARD_GAP * 2;
+    const startX = W/2 - totalW/2;
+    for (let i = 0; i < 3; i++) {
+      const x = startX + i * (TS_CARD_W + TS_CARD_GAP);
+      if (p.x >= x && p.x <= x + TS_CARD_W && p.y >= TS_CARD_Y && p.y <= TS_CARD_Y + TS_CARD_H) { startMatch(MATCH_DURATIONS[i]); return; }
+    }
+    const lvlTotalW = TS_LVL_W * 3 + TS_LVL_GAP * 2;
+    const lvlStartX = W/2 - lvlTotalW/2;
+    for (let i = 0; i < 3; i++) {
+      const x = lvlStartX + i * (TS_LVL_W + TS_LVL_GAP);
+      if (p.x >= x && p.x <= x + TS_LVL_W && p.y >= TS_LVL_Y && p.y <= TS_LVL_Y + TS_LVL_H) { cpuLevel = i; return; }
+    }
+    if (p.x < 140 && p.y > H - 46) { state = 'TITLE'; return; }
+    return;
+  }
+  if (state === 'PAUSED') {
+    if (p.x >= W/2-90 && p.x <= W/2+90 && p.y >= PAUSE_RESUME_Y-24 && p.y <= PAUSE_RESUME_Y+24) { resumeGame(); return; }
+    if (p.x >= W/2-90 && p.x <= W/2+90 && p.y >= PAUSE_QUIT_Y-22 && p.y <= PAUSE_QUIT_Y+22) { quitToTitle(); return; }
+    return;
+  }
+}
+canvas.addEventListener('mousedown', onDown, { passive: false });
+canvas.addEventListener('touchstart', onDown, { passive: false });
+
+// ─── JOYSTICK (analog, replaces the old 4-way D-pad) ───────────
+const joystick = document.getElementById('joystick');
+const joystickKnob = document.getElementById('joystick-knob');
+let joyPointerId = null;
+
+function resetStick() {
+  stickX = 0; stickY = 0;
+  joystickKnob.style.transform = 'translate(-50%, -50%)';
+}
+function setStickFromClient(clientX, clientY) {
+  const rect = joystick.getBoundingClientRect();
+  const maxR = rect.width / 2;
+  const dx = clientX - (rect.left + maxR);
+  const dy = clientY - (rect.top + maxR);
+  const dist = Math.min(Math.hypot(dx, dy), maxR);
+  const angle = Math.atan2(dy, dx);
+  const kx = Math.cos(angle) * dist, ky = Math.sin(angle) * dist;
+  joystickKnob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+  stickX = maxR > 0 ? kx / maxR : 0;
+  stickY = maxR > 0 ? ky / maxR : 0;
+}
+joystick.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  joyPointerId = e.pointerId;
+  joystick.setPointerCapture(e.pointerId);
+  setStickFromClient(e.clientX, e.clientY);
+});
+joystick.addEventListener('pointermove', e => {
+  if (e.pointerId !== joyPointerId) return;
+  setStickFromClient(e.clientX, e.clientY);
+});
+function endJoyPointer(e) {
+  if (e.pointerId !== joyPointerId) return;
+  joyPointerId = null;
+  resetStick();
+}
+joystick.addEventListener('pointerup', endJoyPointer);
+joystick.addEventListener('pointercancel', endJoyPointer);
+
+// ─── SHOOT BUTTON (timed press primes the next paddle contact) ─
+const shootBtn = document.getElementById('shoot-btn');
+shootBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state !== 'PLAYING') return;
+  if (frameCount < shootReadyFrame) return; // still on cooldown from the last press
+  shootPressFrame = frameCount;
+  shootReadyFrame = frameCount + SHOOT_COOLDOWN_FRAMES;
+});
+
+document.addEventListener('keydown', e => {
+  if (state === 'TITLE') {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state = 'TIMESELECT'; }
+    return;
+  }
+  if (e.key === 'Escape' && (state === 'PLAYING' || state === 'PAUSED')) {
+    if (state === 'PLAYING') pauseGame(); else resumeGame();
+    return;
+  }
+  if (state !== 'PLAYING') return;
+  if (e.key === 'ArrowUp' || e.key === 'w') held.up = true;
+  else if (e.key === 'ArrowDown' || e.key === 's') held.down = true;
+  else if (e.key === 'ArrowLeft' || e.key === 'a') held.left = true;
+  else if (e.key === 'ArrowRight' || e.key === 'd') held.right = true;
+  else if (e.key === ' ') {
+    e.preventDefault();
+    if (frameCount >= shootReadyFrame) {
+      shootPressFrame = frameCount;
+      shootReadyFrame = frameCount + SHOOT_COOLDOWN_FRAMES;
+    }
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowUp' || e.key === 'w') held.up = false;
+  else if (e.key === 'ArrowDown' || e.key === 's') held.down = false;
+  else if (e.key === 'ArrowLeft' || e.key === 'a') held.left = false;
+  else if (e.key === 'ArrowRight' || e.key === 'd') held.right = false;
+});
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+  if (state === 'PLAYING') pauseGame();
+  else if (state === 'PAUSED') resumeGame();
+});
+document.getElementById('ov-btn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  quitToTitle();
+});
+
+homePositions();
+centerBall(1);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
