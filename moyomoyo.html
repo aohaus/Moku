@@ -1677,11 +1677,14 @@ function newVsBoard(x0, isCpu) {
   };
 }
 
-// VS mode has no level-up (no board-wiping reset mid-match), so both
-// boards always draw from the fixed Lv1-2 spawn pool for fairness.
+// VS mode has no level-up, but always spawns from the full 5-color pool
+// (not just the Lv1-2 subset) — with only 3 colors, a cell that merged
+// up into 赤 (stage 3) or 青 (stage 4) could never see another matching
+// piece spawn to merge it further, so it just sat stuck on the board
+// forever once the game got cluttered with お邪魔.
 function vbRollStage() {
   if (Math.random() < MAGIC_CHANCE) return RAINBOW;
-  const pool = getSpawnPool(1);
+  const pool = getSpawnPool(5);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 function vbRollPair() { return { s1: vbRollStage(), s2: vbRollStage() }; }
@@ -1848,10 +1851,17 @@ function vbResolveStep(b) {
 function vbDropGarbage(b) {
   if (b.pendingGarbage <= 0) return;
   const n = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
+  // A random SUBSET of columns (via shuffle), not a contiguous run from a
+  // random start — a partial-row attack (e.g. a 1-chain's 5 cells) used
+  // to always land as one predictable block of neighboring columns.
+  const cols = Array.from({ length: GRID_COLS }, (_, i) => i);
+  for (let i = cols.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cols[i], cols[j]] = [cols[j], cols[i]];
+  }
   let placed = 0;
-  const startCol = Math.floor(Math.random() * GRID_COLS);
-  for (let i = 0; i < GRID_COLS && placed < n; i++) {
-    const c = (startCol + i) % GRID_COLS;
+  for (let i = 0; i < n; i++) {
+    const c = cols[i];
     for (let r = GRID_ROWS - 1; r >= 0; r--) {
       if (b.grid[c][r] === null) { b.grid[c][r] = GARBAGE; placed++; break; }
     }
