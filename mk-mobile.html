@@ -41,6 +41,7 @@ body {
 canvas {
   display: block;
   cursor: pointer;
+  touch-action: none;
   aspect-ratio: 1260 / 574;
   height: 100vh;
   height: 100dvh;
@@ -386,6 +387,7 @@ let shootPressFrame = -Infinity; // frameCount when the shoot button was last ac
 let shootReadyFrame = -Infinity; // frameCount after which a new press is accepted (cooldown)
 let shotMessage = '';
 let shotMessageTimer = 0;
+let ballStuckFrames = 0; // consecutive low-speed frames while pinned against a paddle (corner-jam safety valve)
 
 const player = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
 const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
@@ -701,6 +703,31 @@ function updateBall() {
   if (ball.x + BALL_R > PITCH_X1) {
     if (inGoalMouth && ball.x > PITCH_X1 + BALL_R * 0.6) { scoreGoal('home'); return; }
     if (!inGoalMouth) { ball.x = PITCH_X1 - BALL_R; ball.vx = -ball.vx * WALL_BOUNCE; }
+  }
+
+  // Safety valve: a paddle (especially the CPU, which actively chases the
+  // ball) can keep pinning the ball against a corner — every frame it
+  // re-separates them positionally, the wall clamp snaps the ball right
+  // back, and since contact never breaks no fresh kick ever fires. Rather
+  // than chase every geometric case that causes this, detect the resulting
+  // near-zero speed while pinned and force an escape after a short grace
+  // period, well before it reads as the game having stalled.
+  const ballSpeed = Math.hypot(ball.vx, ball.vy);
+  if (ballSpeed < 0.6 && (player.touching || cpu.touching)) {
+    ballStuckFrames++;
+    if (ballStuckFrames > 24) {
+      // Escapes at full BALL_MAX_SPEED, well above any CPU_LEVELS maxSpeed —
+      // a weaker nudge lets the CPU (which re-evaluates its target every
+      // frame) simply run the ball straight back down within a frame or
+      // two, recreating the same jam instead of breaking it.
+      const cx = HALF_X - ball.x, cy = PITCH_CY - ball.y;
+      const cd = Math.hypot(cx, cy) || 1;
+      ball.vx = (cx / cd) * BALL_MAX_SPEED;
+      ball.vy = (cy / cd) * BALL_MAX_SPEED;
+      ballStuckFrames = 0;
+    }
+  } else {
+    ballStuckFrames = 0;
   }
 }
 
@@ -1522,7 +1549,7 @@ function startMatch() {
   particles = [];
   shakeX = 0; shakeY = 0; flashAlpha = 0;
   frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
-  shotMessage = ''; shotMessageTimer = 0;
+  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0;
   player.touching = false; cpu.touching = false;
   homePositions();
   centerBall(Math.random() < 0.5 ? -1 : 1);
@@ -1842,6 +1869,23 @@ document.getElementById('ov-btn').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
   returnToProfile();
 });
+
+// ─── VIEWPORT ZOOM GUARDS ───────────────────────────────────────
+// iOS Safari ignores the viewport meta's user-scalable=no for its own
+// pinch/double-tap zoom gestures, and those aren't stopped by touch-action
+// CSS either. A rapid double-tap on the SHOOT button — a normal, encouraged
+// input here — could otherwise trigger Safari's native double-tap-zoom and
+// leave the whole page zoomed into that button. Swallow both gesture paths
+// at the document level.
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+let lastTouchEndAt = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEndAt < 350) e.preventDefault();
+  lastTouchEndAt = now;
+}, { passive: false });
 
 homePositions();
 centerBall(1);
