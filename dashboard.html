@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Moku Series — Dashboard</title>
+<link rel="apple-touch-icon" href="icons/moyomoyo-apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/moyomoyo-icon-192.png">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  min-height: 100%;
+  background: #0A0B12;
+  color: #EDEEF6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(42,122,48,0.08), transparent 40%),
+    radial-gradient(circle at 82% 20%, rgba(217,111,176,0.07), transparent 42%),
+    radial-gradient(circle at 55% 85%, rgba(255,201,74,0.06), transparent 45%),
+    linear-gradient(180deg, #0A0B12 0%, #121320 55%, #0A0B12 100%);
+}
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.h-left { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FFC94A;
+}
+.eyebrow .beta-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #FFC94A;
+  box-shadow: 0 0 0 3px rgba(255,201,74,0.2);
+}
+h1 {
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+header p.sub {
+  color: rgba(237,238,246,0.55);
+  font-size: 13.5px;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #EDEEF6;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  padding: 8px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.back-link:hover, .back-link:focus-visible { background: rgba(255,255,255,0.1); }
+
+.beta-note {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgba(237,238,246,0.5);
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.14);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.row {
+  --hi: #888;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+  border: 1px solid rgba(255,255,255,0.1);
+  border-left: 3px solid var(--hi);
+}
+.row .emoji {
+  font-size: 22px;
+  width: 34px;
+  text-align: center;
+  flex: none;
+}
+.row .info { flex: 1; min-width: 0; }
+.row h2 {
+  font-size: 15px;
+  font-weight: 800;
+}
+.row .played {
+  font-size: 11.5px;
+  color: rgba(237,238,246,0.45);
+  margin-top: 2px;
+}
+.row .stats {
+  display: flex;
+  gap: 18px;
+  flex: none;
+}
+.stat { text-align: right; }
+.stat .num {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--hi);
+  font-variant-numeric: tabular-nums;
+}
+.stat .lbl {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(237,238,246,0.4);
+  margin-top: 1px;
+}
+.row.unplayed { opacity: 0.55; }
+.row.unplayed .stats { display: none; }
+.row.unplayed .played { font-style: italic; }
+
+.row.am { --hi: #4CBE55; }
+.row.mm { --hi: #E98FC7; }
+.row.mk { --hi: #FFC94A; }
+.row.br { --hi: #6E7BFF; }
+.row.so { --hi: #FF6B4A; }
+
+footer {
+  margin-top: auto;
+  padding-top: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(237,238,246,0.25);
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="h-left">
+      <span class="eyebrow"><span class="beta-dot"></span>Dashboard (beta)</span>
+      <h1>Your Moku Stats</h1>
+      <p class="sub">Level, coins, and scores across the series — read from this device's saved data.</p>
+    </div>
+    <a class="back-link" href="index.html">← Hub</a>
+  </header>
+
+  <p class="beta-note">
+    Beta: stats are read directly from this browser's local storage, so they only reflect what you've played
+    on this device. There's no account or cross-device sync yet.
+  </p>
+
+  <div class="rows" id="rows"></div>
+
+  <footer>aohaus/Moku</footer>
+</div>
+
+<script>
+(function () {
+  function readJSON(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function readInt(key) {
+    var raw = localStorage.getItem(key);
+    var n = parseInt(raw, 10);
+    return isNaN(n) ? null : n;
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  var GAMES = [
+    {
+      cls: 'am', emoji: '🦉', name: 'Angry Mokumoku',
+      read: function () {
+        var lvl = readInt('amoku-level');
+        if (lvl === null || lvl <= 0) return null;
+        return { stats: [{ num: Math.min(lvl, 30), lbl: 'Level / 30' }] };
+      }
+    },
+    {
+      cls: 'mm', emoji: '🍬', name: 'Moyomoyo',
+      read: function () {
+        var best = readInt('moyomoyo-best');
+        if (best === null || best <= 0) return null;
+        return { stats: [{ num: best.toLocaleString(), lbl: 'Best Score' }] };
+      }
+    },
+    {
+      cls: 'mk', emoji: '⚽', name: 'MK Mobile',
+      read: function () {
+        var p = readJSON('moku:mk-mobile:profile');
+        if (!p || !p.updatedAt) return null;
+        var stats = [{ num: p.points || 0, lbl: 'Points' }];
+        if (p.winStreak) stats.push({ num: p.winStreak, lbl: 'Win Streak' });
+        return { stats: stats, updatedAt: p.updatedAt };
+      }
+    },
+    {
+      cls: 'br', emoji: '🏆', name: 'Angry Moku Battle Royal',
+      read: function () {
+        var s = readJSON('moku:save');
+        if (!s) return null;
+        return { stats: [
+          { num: s.level || 1, lbl: 'Level' },
+          { num: s.coins || 0, lbl: 'Coins' }
+        ] };
+      }
+    },
+    {
+      cls: 'so', emoji: '💬', name: 'Shiri of Moku',
+      read: function () {
+        var p = readJSON('moku:shiri-of-moku:progress');
+        if (!p || !p.updatedAt) return null;
+        var stars = 0;
+        if (p.stageStars) {
+          for (var k in p.stageStars) { stars += p.stageStars[k] || 0; }
+        }
+        var stats = [{ num: (p.unlockedStage || 1) + ' / 20', lbl: 'Stage' }];
+        if (stars) stats.push({ num: stars, lbl: 'Stars' });
+        return { stats: stats, updatedAt: p.updatedAt };
+      }
+    }
+  ];
+
+  var rowsEl = document.getElementById('rows');
+  GAMES.forEach(function (g) {
+    var result = null;
+    try { result = g.read(); } catch (e) { result = null; }
+
+    var row = document.createElement('div');
+    row.className = 'row ' + g.cls + (result ? '' : ' unplayed');
+
+    var emoji = document.createElement('div');
+    emoji.className = 'emoji';
+    emoji.textContent = g.emoji;
+    row.appendChild(emoji);
+
+    var info = document.createElement('div');
+    info.className = 'info';
+    var h2 = document.createElement('h2');
+    h2.textContent = g.name;
+    info.appendChild(h2);
+    var played = document.createElement('div');
+    played.className = 'played';
+    played.textContent = result
+      ? (result.updatedAt ? 'Last played ' + fmtDate(result.updatedAt) : 'Played on this device')
+      : 'Not played yet';
+    info.appendChild(played);
+    row.appendChild(info);
+
+    var stats = document.createElement('div');
+    stats.className = 'stats';
+    if (result) {
+      result.stats.forEach(function (s) {
+        var stat = document.createElement('div');
+        stat.className = 'stat';
+        var num = document.createElement('div');
+        num.className = 'num';
+        num.textContent = s.num;
+        var lbl = document.createElement('div');
+        lbl.className = 'lbl';
+        lbl.textContent = s.lbl;
+        stat.appendChild(num);
+        stat.appendChild(lbl);
+        stats.appendChild(stat);
+      });
+    }
+    row.appendChild(stats);
+
+    rowsEl.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>
