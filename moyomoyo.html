@@ -435,12 +435,14 @@ const CPU_ENEMIES = [
 ];
 function currentCpuEnemy() { return CPU_ENEMIES[cpuLevel - 1]; }
 
-// お邪魔 tiers: only a chain of 2+ that includes a real (max-stage) clear
-// sends anything at all — a single un-chained clear sends nothing.
-function garbageRowsForChain(chainCount) {
-  if (chainCount >= 4) return 5;
-  if (chainCount === 3) return 2;
-  if (chainCount === 2) return 1;
+// お邪魔 tiers, in cells — any resolved chain sends something (previously
+// gated on reaching a real max-stage clear, which was rare enough in
+// practice that attacks barely ever landed).
+function garbageCellsForChain(chainCount) {
+  if (chainCount >= 4) return 50; // 5 rows
+  if (chainCount === 3) return 20; // 2 rows
+  if (chainCount === 2) return 10; // 1 row
+  if (chainCount === 1) return 5;
   return 0;
 }
 
@@ -1638,7 +1640,6 @@ function newVsBoard(x0, isCpu) {
     fallTimer: 0,
     aiTimer: 0,
     chainCount: 0,
-    topClearsThisChain: 0,
     score: 0,
     nextPair: null,
     lockedCols: [],
@@ -1772,7 +1773,6 @@ function vbResolveStep(b) {
       addParticles(mx, my, STAGES[newStage].color, 16, 5);
     } else {
       b.score += Math.round(150 * mult);
-      b.topClearsThisChain++;
       addParticles(mx, my, STAGES[g.stage].color, 22, 6);
     }
     addParticles(mx, my, STAGES[g.stage].color, 8 + g.cells.length, 3);
@@ -1832,12 +1832,10 @@ function vbUpdateBoard(b, opponent) {
       if (vbResolveStep(b)) {
         b.pauseTimer = 16;
       } else {
-        if (b.topClearsThisChain > 0) {
-          const rows = garbageRowsForChain(b.chainCount);
-          if (rows > 0) opponent.pendingGarbage += rows * GRID_COLS;
+        if (b.chainCount > 0) {
+          opponent.pendingGarbage += garbageCellsForChain(b.chainCount);
         }
         b.chainCount = 0;
-        b.topClearsThisChain = 0;
         b.phase = 'SPAWN_PAUSE';
         b.pauseTimer = 10;
       }
@@ -2234,7 +2232,6 @@ function advanceVsCampaign() {
   vsP.pauseTimer = 0;
   vsP.fallTimer = 0;
   vsP.chainCount = 0;
-  vsP.topClearsThisChain = 0;
   vsP.pendingGarbage = 0;
   vsP.lockedCols = [];
   state = 'PLAYING';
