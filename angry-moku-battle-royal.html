@@ -290,6 +290,16 @@
   }
   body.on-title #hub-link{ display:block; }
   @keyframes hubLinkPulse{ 0%,100%{opacity:.7;} 50%{opacity:1;} }
+  #buildInfo{
+    display:none;
+    position:fixed; bottom:16px; left:22px;
+    z-index:6;
+    font-family: ui-rounded, "Segoe UI Rounded", "Baloo 2", system-ui, sans-serif;
+    font-size:10.5px; letter-spacing:.02em;
+    color:rgba(255,255,255,.28);
+    pointer-events:none;
+  }
+  body.on-title #buildInfo{ display:block; }
   #titleScreen{
     align-items:center; justify-content:center; text-align:center;
     min-height:100vh; gap:18px; padding:24px 20px;
@@ -329,6 +339,7 @@
 <body class="on-title">
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="buildInfo">v1.0.0 · Updated Aug 10, 2026</div>
 <div id="app">
 
   <!-- TITLE SCREEN -->

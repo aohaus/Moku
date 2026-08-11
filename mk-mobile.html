@@ -196,17 +196,29 @@ canvas {
   animation: hubLinkPulse 2.2s ease-in-out infinite;
 }
 @keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+#buildInfo {
+  display: block;
+  position: fixed; bottom: 16px; left: 22px;
+  z-index: 6;
+  font-family: Arial, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.28);
+  pointer-events: none;
+}
 @media (max-width: 600px) and (orientation: portrait) {
   #rotate-hint { display: flex; }
   #game-layout { display: none; }
   #title-frame { display: none; }
   #hub-link { display: none !important; }
+  #buildInfo { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
 <div id="game-layout">
   <div id="wrapper">
     <canvas id="c"></canvas>
@@ -1522,6 +1534,7 @@ function startMatch() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
+  document.getElementById('buildInfo').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 
@@ -1586,6 +1599,7 @@ function quitToTitle() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('buildInfo').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 function quitToHome() {
@@ -1598,6 +1612,7 @@ function quitToHome() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('buildInfo').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 function returnToProfile() {
@@ -1606,6 +1621,7 @@ function returnToProfile() {
   document.getElementById('hud').style.visibility = 'hidden';
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('buildInfo').style.display = 'block';
 }
 
 // ─── INPUT ────────────────────────────────────────────────────

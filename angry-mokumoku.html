@@ -136,16 +136,28 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
   animation: hubLinkPulse 2.2s ease-in-out infinite;
 }
 @keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+#buildInfo {
+  display: block;
+  position: fixed; bottom: 16px; left: 22px;
+  z-index: 6;
+  font-family: "Courier New", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.28);
+  pointer-events: none;
+}
 @media (max-width: 600px) and (orientation: portrait) {
   #rotate-hint { display: flex; }
   #title-frame { display: none; }
   #hub-link { display: none !important; }
+  #buildInfo { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="buildInfo">v1.0.0 · Updated Aug 10, 2026</div>
 <div id="wrapper">
   <canvas id="c"></canvas>
   <div id="hud" style="visibility:hidden">
@@ -3617,6 +3629,7 @@ function startFromTitle() {
   document.getElementById('hud').style.visibility = 'visible';
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
+  document.getElementById('buildInfo').style.display = 'none';
   setupLevel(currentLevel);
   resetBird();
   updateHUD();
@@ -3643,6 +3656,7 @@ function onDown(e) {
     document.getElementById('hud').style.visibility = 'hidden';
     document.getElementById('title-frame').style.display = 'block';
     document.getElementById('hub-link').style.display = 'block';
+    document.getElementById('buildInfo').style.display = 'block';
     return;
   }
   if (state === 'TITLE') {
