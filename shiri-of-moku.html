@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Shiri of Moku</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  background:
+    radial-gradient(circle at 22% 16%, rgba(255,107,74,0.16), transparent 46%),
+    linear-gradient(165deg, #170D0A 0%, #2E1610 55%, #180D09 100%);
+  color: #F5EDE7;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+:root {
+  --hi: #FF6B4A;
+  --lo: #7A2E1A;
+}
+
+/* ---------- shared frame / hub link (Moku series design system) ---------- */
+#title-frame {
+  display: none;
+  position: fixed; inset: 14px;
+  border: 3px solid var(--hi);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#title-frame::after {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid var(--lo);
+  border-radius: 8px;
+}
+body.on-title #title-frame { display: block; }
+#hub-link {
+  display: none;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  z-index: 6;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--hi);
+  text-decoration: none;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
+body.on-title #hub-link { display: block; }
+@keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+
+#app {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 20px)
+    18px
+    calc(env(safe-area-inset-bottom, 0px) + 20px);
+  display: flex;
+  flex-direction: column;
+}
+
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* ---------- title screen ---------- */
+#titleScreen { align-items: center; justify-content: center; text-align: center; gap: 16px; }
+#titleFace { width: clamp(120px, 34vw, 160px); height: clamp(120px, 34vw, 160px); }
+#titleLogo {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: clamp(26px, 8vw, 38px);
+  line-height: 1.2;
+  text-shadow: 0 0 24px rgba(255,107,74,0.35);
+}
+#titleLogo span { color: var(--hi); }
+#titleSub {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(245,237,231,0.6);
+}
+#titleMenu { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.titleMenuItem {
+  appearance: none; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 19px;
+  color: var(--hi); padding: 8px 18px;
+  text-shadow: 0 0 14px rgba(255,107,74,0.5);
+}
+.titleMenuItem:active { transform: translateY(1px); }
+#titleFooterTag {
+  margin-top: 30px; padding-top: 14px; width: min(320px, 82%);
+  border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 11px; letter-spacing: 0.05em; color: rgba(245,237,231,0.4);
+}
+
+/* ---------- generic screen header / text-list nav ---------- */
+.screenTitle {
+  font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
+  margin-bottom: 4px; text-align: center;
+}
+.screenSub {
+  font-size: 12.5px; color: rgba(245,237,231,0.55); text-align: center; margin-bottom: 18px;
+}
+.textLink {
+  appearance: none; border: none; background: none; cursor: pointer;
+  font-family: inherit; color: var(--hi); font-weight: 800; font-size: 15px;
+  padding: 12px 4px; text-align: center;
+}
+.textLink:active { transform: translateY(1px); }
+.textLink.dim { color: rgba(245,237,231,0.55); font-weight: 700; }
+
+/* ---------- stage select ---------- */
+#stageSelectScreen { padding-top: 8px; }
+#stageList {
+  display: flex; flex-direction: column;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 8px;
+  overflow-y: auto;
+}
+.stageRow {
+  appearance: none; border: none; background: none; cursor: pointer;
+  font-family: inherit; color: #F5EDE7;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 15px; font-weight: 700;
+  text-align: left;
+}
+.stageRow:active { background: rgba(255,107,74,0.08); }
+.stageRow.locked { color: rgba(245,237,231,0.28); cursor: default; }
+.stageRowStars { color: var(--hi); font-size: 13px; letter-spacing: 0.06em; }
+.stageRow.locked .stageRowStars { color: rgba(245,237,231,0.2); }
+
+/* ---------- game screen ---------- */
+#gameScreen { gap: 10px; }
+#gameHud {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: rgba(245,237,231,0.7);
+}
+#gameHud span { color: var(--hi); }
+#angerWrap { display: flex; flex-direction: column; gap: 4px; }
+#angerLabel { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: rgba(245,237,231,0.5); }
+#angerBar {
+  height: 10px; border-radius: 6px; background: rgba(255,255,255,0.08);
+  overflow: hidden; border: 1px solid rgba(255,255,255,0.12);
+}
+#angerFill {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, #FFC94A, var(--hi));
+  transition: width 0.35s ease, background 0.35s ease;
+}
+
+#faceWrap {
+  align-self: center;
+  width: clamp(140px, 40vw, 190px); height: clamp(140px, 40vw, 190px);
+  margin: 4px 0 2px;
+}
+#mokuFace { width: 100%; height: 100%; }
+@keyframes faceShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-2deg); }
+  40% { transform: translateX(5px) rotate(2deg); }
+  60% { transform: translateX(-4px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+@keyframes faceHeal {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(120,220,160,0)); }
+  50% { filter: drop-shadow(0 0 16px rgba(120,220,160,0.65)); }
+}
+#faceWrap.flash-hit { animation: faceShake 0.4s ease; }
+#faceWrap.flash-heal { animation: faceHeal 0.6s ease; }
+
+#chatLog {
+  max-height: 15vh;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 2px;
+  font-size: 12px;
+  color: rgba(245,237,231,0.45);
+}
+#chatLog .logRow { display: flex; gap: 6px; }
+#chatLog .logRow.you { justify-content: flex-end; text-align: right; }
+#chatLog .logRow .bubble {
+  max-width: 78%;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+}
+#chatLog .logRow.you .bubble { background: rgba(255,107,74,0.12); color: rgba(245,237,231,0.7); }
+
+#mokuBubble {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px 16px;
+  min-height: 52px;
+  display: flex; align-items: center;
+}
+#mokuLine { font-size: 15.5px; font-weight: 700; line-height: 1.5; }
+
+#choiceList { display: flex; flex-direction: column; margin-top: 4px; }
+.choiceItem {
+  appearance: none; border: none; background: none; cursor: pointer;
+  font-family: inherit; color: #F5EDE7; font-size: 14.5px; font-weight: 600;
+  text-align: left; line-height: 1.4;
+  padding: 13px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.choiceItem::before { content: '▸ '; color: var(--hi); font-weight: 800; }
+.choiceItem:active { background: rgba(255,107,74,0.1); }
+.choiceItem:disabled { opacity: 0.4; }
+
+/* ---------- result screen ---------- */
+#resultScreen { align-items: center; justify-content: center; text-align: center; gap: 12px; }
+#resultTitle { font-size: 24px; font-weight: 800; }
+#resultDesc { font-size: 13.5px; color: rgba(245,237,231,0.6); line-height: 1.6; max-width: 320px; }
+#resultStars { font-size: 26px; letter-spacing: 0.1em; color: var(--hi); margin: 4px 0; }
+#resultButtons { display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+</style>
+</head>
+<body class="on-title">
+<div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="app">
+
+  <!-- TITLE SCREEN -->
+  <section class="screen active" id="titleScreen">
+    <canvas id="titleFace" width="200" height="200"></canvas>
+    <h1 id="titleLogo">SHIRI <span>OF MOKU</span></h1>
+    <p id="titleSub">モヨを怒らせずに話しきれ</p>
+    <nav id="titleMenu">
+      <button class="titleMenuItem" id="btnGoStageSelect">▶ はじめる</button>
+    </nav>
+    <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬&nbsp; M O K U M O K U &nbsp;S E R I E S</div>
+  </section>
+
+  <!-- STAGE SELECT -->
+  <section class="screen" id="stageSelectScreen">
+    <h2 class="screenTitle">ステージ選択</h2>
+    <p class="screenSub">機嫌ゲージを満タンにさせずに乗り切ろう</p>
+    <div id="stageList"></div>
+    <button class="textLink dim" id="btnBackToTitle">◀ タイトルへ</button>
+  </section>
+
+  <!-- GAME SCREEN -->
+  <section class="screen" id="gameScreen">
+    <div id="gameHud">
+      <div>STAGE <span id="stageNum">1</span></div>
+      <div><span id="turnNow">1</span> / <span id="turnTotal">5</span></div>
+    </div>
+    <div id="angerWrap">
+      <div id="angerLabel">モヨの機嫌ゲージ</div>
+      <div id="angerBar"><i id="angerFill"></i></div>
+    </div>
+    <div id="faceWrap"><canvas id="mokuFace" width="200" height="200"></canvas></div>
+    <div id="chatLog"></div>
+    <div id="mokuBubble"><p id="mokuLine"></p></div>
+    <div id="choiceList"></div>
+  </section>
+
+  <!-- RESULT SCREEN -->
+  <section class="screen" id="resultScreen">
+    <h2 id="resultTitle"></h2>
+    <p id="resultDesc"></p>
+    <div id="resultStars"></div>
+    <div id="resultButtons">
+      <button class="textLink" id="btnResultPrimary"></button>
+      <button class="textLink dim" id="btnResultToSelect">ステージ選択に戻る</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var GAME_ID = 'shiri-of-moku';
+  var TOTAL_STAGES = 20;
+  var SAVE_KEY = 'moku:' + GAME_ID + ':progress';
+
+  // ---------- content ----------
+  // 1 mine / 2 safe replies (one big heal, one small heal).
+  var EASY_TOPICS = [
+    { id: 'dinner', line: '夜ご飯は唐揚げモヨか?', choices: [
+      { text: '唐揚げしかないの?', type: 'mine', reply: 'なんだその言い方モヨ!' },
+      { text: '唐揚げ食べたい!', type: 'heal_small', reply: 'よし唐揚げにするモヨ' },
+      { text: 'モヨの手作りが一番だよ', type: 'heal_big', reply: '…そ、そうモヨか' }
+    ]},
+    { id: 'early_home', line: '早く帰ってきたモヨね', choices: [
+      { text: '早く会いたかったから', type: 'heal_big', reply: 'そそそんなの照れるモヨ' },
+      { text: '暇だっただけ', type: 'mine', reply: 'なによそれモヨ!' },
+      { text: 'ちゃんと時間通りだよ', type: 'heal_small', reply: 'ならいいモヨ' }
+    ]},
+    { id: 'weather_fluffy', line: '今日寒いから羽根膨らませてるモヨ', choices: [
+      { text: 'もふもふだね', type: 'heal_big', reply: 'でしょモヨ!もっと撫でていいモヨ' },
+      { text: '太った?', type: 'mine', reply: 'は?太ってないモヨ!!' },
+      { text: 'あったかそう', type: 'heal_small', reply: 'そうモヨ、寒がりなだけモヨ' }
+    ]},
+    { id: 'room_mess', line: '部屋散らかってるモヨ、片付けないと巣に帰れなくなるモヨ', choices: [
+      { text: '一緒に片付けよう', type: 'heal_big', reply: 'それでいいモヨ' },
+      { text: 'モヨの巣の方が汚いじゃん', type: 'mine', reply: 'よけいなお世話モヨ!' },
+      { text: '今やるよ', type: 'heal_small', reply: 'ならよしモヨ' }
+    ]},
+    { id: 'snack_eaten', line: 'モヨのお菓子勝手に食べたモヨね', choices: [
+      { text: 'ごめん、買い直すよ', type: 'heal_big', reply: 'わかればいいモヨ' },
+      { text: '気のせいじゃない?', type: 'mine', reply: '袋あるのになにが気のせいモヨ!' },
+      { text: '半分こしよ', type: 'heal_small', reply: '…まあいいモヨ' }
+    ]},
+    { id: 'oversleep', line: 'モヨが起こしたのに二度寝したモヨ', choices: [
+      { text: '明日は一緒に早起きしよう', type: 'heal_big', reply: '約束モヨよ' },
+      { text: 'モヨの声小さいからだよ', type: 'mine', reply: '聞こえてたくせにモヨ!' },
+      { text: 'ごめんごめん', type: 'heal_small', reply: '次は気をつけるモヨ' }
+    ]},
+    { id: 'anniversary', line: '今日が何の日か覚えてるモヨ?', choices: [
+      { text: 'もちろん、モヨの日でしょ', type: 'heal_big', reply: 'えへへ正解モヨ' },
+      { text: 'うーん、わからない', type: 'mine', reply: '…そうモヨか' },
+      { text: '特別な日だよね', type: 'heal_small', reply: 'まあ及第点モヨ' }
+    ]}
+  ];
+
+  // 2 mines / 1 safe reply.
+  var HARD_TOPICS = [
+    { id: 'chicken_call', line: 'さっきチキンって言ったモヨ?', choices: [
+      { text: '言ってないよ', type: 'heal_small', reply: 'ならいいモヨ' },
+      { text: '言ったけど何か?', type: 'mine', reply: 'よくもチキンって呼んだモヨね!' },
+      { text: 'なんとなく雰囲気で', type: 'mine', reply: '雰囲気で人をチキン呼ばわりするなモヨ!' }
+    ]},
+    { id: 'game_loss_blame', line: 'さっきの試合、素人でも勝てたモヨ', choices: [
+      { text: 'うるさいな', type: 'mine', reply: 'うるさいとはなんだモヨ!' },
+      { text: '次は本気出すよ', type: 'heal_small', reply: 'その意気モヨ' },
+      { text: 'モヨの解説のせいだよ', type: 'mine', reply: 'モヨのせいにするなモヨ!' }
+    ]},
+    { id: 'attitude', line: '今日口調が生意気モヨ', choices: [
+      { text: 'そんなことないよ', type: 'heal_small', reply: 'ならいいモヨ' },
+      { text: 'モヨこそ生意気じゃん', type: 'mine', reply: '誰に向かって言ってるモヨ!' },
+      { text: '気のせいだよ、多分', type: 'mine', reply: '多分ってなんだモヨ!' }
+    ]},
+    { id: 'jealousy_other_apps', line: '最近他のアプリばっかり触ってるモヨね', choices: [
+      { text: 'モヨが一番好きだよ', type: 'heal_big', reply: '当然モヨ' },
+      { text: 'ちょっと飽きてきたかも', type: 'mine', reply: '飽きたって言ったモヨね!?' },
+      { text: 'モヨより面白いのあるし', type: 'mine', reply: 'は!?聞き捨てならないモヨ!' }
+    ]},
+    { id: 'praise_fishing', line: '今日のモヨかっこよかったモヨ?', choices: [
+      { text: 'うん、かっこよかったよ', type: 'heal_big', reply: 'でしょでしょモヨ!' },
+      { text: 'まあまあかな', type: 'mine', reply: 'まあまあってなんだモヨ!' },
+      { text: 'フクロウにしては', type: 'mine', reply: 'フクロウにしてはとはなんだモヨ!!' }
+    ]}
+  ];
+
+  // Fully made-up "next game" running joke — no gameplay effect.
+  var IDEA_JOKES = [
+    '次は「土下座オブモク」はどうモヨ?謝る速さを競うゲームモヨ',
+    'フクロウがひたすら寝るだけの放置ゲーム「寝る前のモク」を作るモヨ',
+    'モヨの声だけで音ゲー作ったら売れるモヨかね',
+    '次回作は「モヨ味噌汁」、具材を当てるだけのゲームでどうモヨ',
+    'いっそ全部のゲームにモヨが乱入する説あるモヨ',
+    '「片付けろよモヨ」っていう説教シミュレーターも需要あるモヨかもしれん'
+  ];
+
+  // ---------- save data ----------
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && data.gameId === GAME_ID) return data;
+      }
+    } catch (e) {}
+    return { version: 1, gameId: GAME_ID, unlockedStage: 1, stageStars: {}, updatedAt: '' };
+  }
+  function saveProgress() {
+    progress.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) {}
+  }
+  var progress = loadProgress();
+
+  // ---------- helpers ----------
+  function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  function turnsForStage(n) { return Math.min(12, 5 + Math.floor((n - 1) / 2)); }
+  function deltaFor(type) {
+    if (type === 'mine') return randInt(25, 35);
+    if (type === 'heal_big') return -randInt(15, 20);
+    return -randInt(8, 12); // heal_small
+  }
+
+  function showScreen(id) {
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
+    document.getElementById(id).classList.add('active');
+    document.body.classList.toggle('on-title', id === 'titleScreen');
+  }
+
+  // ---------- face rendering ----------
+  function drawFace(canvas, anger) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    var cx = w / 2, cy = h / 2 + 6;
+    var r = w * 0.36;
+    var t = clamp(anger, 0, 100) / 100;
+
+    var strokeColor = 'rgb(' +
+      Math.round(245 + (255 - 245) * t) + ',' +
+      Math.round(237 - 165 * t) + ',' +
+      Math.round(231 - 157 * t) + ')';
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = strokeColor;
+
+    // ear tufts
+    ctx.lineWidth = w * 0.02;
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.75, cy - r * 0.85);
+    ctx.lineTo(cx - r * 0.95, cy - r * 1.5);
+    ctx.lineTo(cx - r * 0.35, cy - r * 1.05);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.75, cy - r * 0.85);
+    ctx.lineTo(cx + r * 0.95, cy - r * 1.5);
+    ctx.lineTo(cx + r * 0.35, cy - r * 1.05);
+    ctx.stroke();
+
+    // head outline
+    ctx.lineWidth = w * 0.025;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // eyebrows: flat at calm, angled down-inward as anger rises
+    var browTilt = t * 0.5;
+    ctx.lineWidth = w * 0.02;
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.55, cy - r * 0.32 - r * browTilt * 0.5);
+    ctx.lineTo(cx - r * 0.18, cy - r * 0.32 + r * browTilt * 0.6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.55, cy - r * 0.32 - r * browTilt * 0.5);
+    ctx.lineTo(cx + r * 0.18, cy - r * 0.32 + r * browTilt * 0.6);
+    ctx.stroke();
+
+    // eyes
+    var eyeR = r * 0.24;
+    var eyeY = cy - r * 0.02;
+    [cx - r * 0.36, cx + r * 0.36].forEach(function (ex) {
+      ctx.lineWidth = w * 0.018;
+      ctx.beginPath();
+      ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(ex, eyeY + eyeR * t * 0.15, eyeR * (0.4 - t * 0.12), 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // beak
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + r * 0.28);
+    ctx.lineTo(cx - r * 0.14, cy + r * 0.46);
+    ctx.lineTo(cx, cy + r * 0.62);
+    ctx.lineTo(cx + r * 0.14, cy + r * 0.46);
+    ctx.closePath();
+    ctx.fill();
+
+    // mouth line: flat -> zigzag as anger rises
+    ctx.lineWidth = w * 0.016;
+    ctx.beginPath();
+    if (t < 0.6) {
+      ctx.moveTo(cx - r * 0.22, cy + r * 0.78);
+      ctx.lineTo(cx + r * 0.22, cy + r * 0.78);
+    } else {
+      ctx.moveTo(cx - r * 0.26, cy + r * 0.76);
+      ctx.lineTo(cx - r * 0.1, cy + r * 0.86);
+      ctx.lineTo(cx + r * 0.06, cy + r * 0.74);
+      ctx.lineTo(cx + r * 0.26, cy + r * 0.86);
+    }
+    ctx.stroke();
+  }
+
+  var titleFace = document.getElementById('titleFace');
+  var mokuFace = document.getElementById('mokuFace');
+  drawFace(titleFace, 0);
+
+  function flashFace(kind) {
+    var wrap = document.getElementById('faceWrap');
+    wrap.classList.remove('flash-hit', 'flash-heal');
+    void wrap.offsetWidth;
+    wrap.classList.add(kind === 'mine' ? 'flash-hit' : 'flash-heal');
+  }
+
+  // ---------- stage select ----------
+  function renderStageList() {
+    var wrap = document.getElementById('stageList');
+    wrap.innerHTML = '';
+    for (var n = 1; n <= TOTAL_STAGES; n++) {
+      (function (n) {
+        var unlocked = n <= progress.unlockedStage;
+        var stars = progress.stageStars[n] || 0;
+        var row = document.createElement('button');
+        row.className = 'stageRow' + (unlocked ? '' : ' locked');
+        row.disabled = !unlocked;
+        var left = document.createElement('span');
+        left.textContent = unlocked ? ('STAGE ' + n) : ('🔒 STAGE ' + n);
+        var right = document.createElement('span');
+        right.className = 'stageRowStars';
+        right.textContent = unlocked ? ('★'.repeat(stars) + '☆'.repeat(3 - stars)) : '';
+        row.appendChild(left);
+        row.appendChild(right);
+        if (unlocked) row.addEventListener('click', function () { startStage(n); });
+        wrap.appendChild(row);
+      })(n);
+    }
+  }
+
+  // ---------- gameplay ----------
+  var state = {};
+
+  function startStage(n) {
+    state.stage = n;
+    state.turnIndex = 0;
+    state.turnsTotal = turnsForStage(n);
+    state.anger = 0;
+    state.lastTopicId = null;
+    document.getElementById('stageNum').textContent = n;
+    document.getElementById('turnTotal').textContent = state.turnsTotal;
+    document.getElementById('chatLog').innerHTML = '';
+    updateAnger();
+    showScreen('gameScreen');
+    nextTurn();
+  }
+
+  function updateAnger() {
+    document.getElementById('angerFill').style.width = state.anger + '%';
+    drawFace(mokuFace, state.anger);
+  }
+
+  function appendLog(who, text) {
+    var log = document.getElementById('chatLog');
+    var row = document.createElement('div');
+    row.className = 'logRow' + (who === 'you' ? ' you' : '');
+    var bubble = document.createElement('span');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function renderBubble(text) {
+    document.getElementById('mokuLine').textContent = text;
+  }
+
+  function renderChoices(items, onSelect) {
+    var wrap = document.getElementById('choiceList');
+    wrap.innerHTML = '';
+    items.forEach(function (item, idx) {
+      var btn = document.createElement('button');
+      btn.className = 'choiceItem';
+      btn.textContent = item.text;
+      btn.addEventListener('click', function () {
+        var all = wrap.querySelectorAll('.choiceItem');
+        for (var i = 0; i < all.length; i++) all[i].disabled = true;
+        onSelect(idx);
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function pickTopic(stage) {
+    var hardChance = stage <= 7 ? 0 : stage <= 14 ? 0.4 : 0.7;
+    var pool = Math.random() < hardChance ? HARD_TOPICS : EASY_TOPICS;
+    var available = pool.filter(function (t) { return t.id !== state.lastTopicId; });
+    if (available.length === 0) available = pool;
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
+  function nextTurn() {
+    state.turnIndex++;
+    document.getElementById('turnNow').textContent = state.turnIndex;
+    var asideChance = state.stage >= 2 ? 0.15 : 0;
+    if (Math.random() < asideChance) {
+      renderBubble(IDEA_JOKES[Math.floor(Math.random() * IDEA_JOKES.length)]);
+      renderChoices([{ text: 'そうモヨね' }], function () { presentTopic(); });
+    } else {
+      presentTopic();
+    }
+  }
+
+  function presentTopic() {
+    var topic = pickTopic(state.stage);
+    state.lastTopicId = topic.id;
+    renderBubble(topic.line);
+    appendLog('moku', topic.line);
+    var shuffled = shuffle(topic.choices.slice());
+    renderChoices(shuffled, function (idx) { handleChoice(shuffled[idx]); });
+  }
+
+  function handleChoice(choice) {
+    var delta = deltaFor(choice.type);
+    state.anger = clamp(state.anger + delta, 0, 100);
+    updateAnger();
+    appendLog('you', choice.text);
+    appendLog('moku', choice.reply);
+    flashFace(choice.type);
+    renderBubble(choice.reply);
+    renderChoices([{ text: 'つづける ▶' }], function () {
+      if (state.anger >= 100) return endStage(false);
+      if (state.turnIndex >= state.turnsTotal) return endStage(true);
+      nextTurn();
+    });
+  }
+
+  function endStage(cleared) {
+    var title = document.getElementById('resultTitle');
+    var desc = document.getElementById('resultDesc');
+    var stars = document.getElementById('resultStars');
+    var primary = document.getElementById('btnResultPrimary');
+    primary.onclick = null;
+
+    if (cleared) {
+      var earned = state.anger <= 33 ? 3 : state.anger <= 66 ? 2 : 1;
+      progress.stageStars[state.stage] = Math.max(progress.stageStars[state.stage] || 0, earned);
+      if (state.stage === progress.unlockedStage && state.stage < TOTAL_STAGES) {
+        progress.unlockedStage = state.stage + 1;
+      }
+      saveProgress();
+      title.textContent = 'ステージクリア!';
+      desc.textContent = 'モヨをうまくなだめきったモヨ。';
+      stars.textContent = '★'.repeat(earned) + '☆'.repeat(3 - earned);
+      var hasNext = state.stage < TOTAL_STAGES;
+      primary.textContent = hasNext ? 'つぎのステージへ ▶' : 'ステージ選択に戻る';
+      primary.onclick = function () {
+        if (hasNext) startStage(state.stage + 1);
+        else { renderStageList(); showScreen('stageSelectScreen'); }
+      };
+    } else {
+      title.textContent = 'んーーーーモヨー!';
+      desc.textContent = 'モヨを怒らせてしまったモヨ。もう一度話しかけてみよう。';
+      stars.textContent = '';
+      primary.textContent = 'もう一度';
+      primary.onclick = function () { startStage(state.stage); };
+    }
+    showScreen('resultScreen');
+  }
+
+  // ---------- wiring ----------
+  document.getElementById('btnGoStageSelect').addEventListener('click', function () {
+    renderStageList();
+    showScreen('stageSelectScreen');
+  });
+  document.getElementById('btnBackToTitle').addEventListener('click', function () {
+    showScreen('titleScreen');
+  });
+  document.getElementById('btnResultToSelect').addEventListener('click', function () {
+    renderStageList();
+    showScreen('stageSelectScreen');
+  });
+})();
+</script>
+</body>
+</html>
