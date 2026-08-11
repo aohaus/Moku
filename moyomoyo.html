@@ -403,16 +403,20 @@ const LEADERBOARD_MAX = 10;
 // VS_CANVAS_W x VS_CANVAS_H (via resizeCanvasTo, see startVsGame /
 // startGame / quitToTitle) instead of reusing marathon's W x H.
 const GARBAGE = -2; // sentinel grid value — colorless, inert: never joins a match, never clears, just falls
-const VS_CELL = 53;
+const VS_CELL = 58;
 const VS_GRID_W = VS_CELL * GRID_COLS;
 const VS_GRID_H = VS_CELL * GRID_ROWS;
 const VS_MARGIN_X = 24;
 const VS_GAP = 32;
-const VS_GRID_Y0 = 130;
+// The モヨクエスト title/level moved out to its own top-left block (see
+// drawVs) instead of a full-width banner above the boards, and the
+// per-board header (enemy icon/score/incoming-お邪魔 row) is tighter, so
+// the board can start much closer to the top edge than before.
+const VS_GRID_Y0 = 80;
 const VS_P_X0 = VS_MARGIN_X;
 const VS_C_X0 = VS_MARGIN_X + VS_GRID_W + VS_GAP;
 const VS_CANVAS_W = VS_C_X0 + VS_GRID_W + VS_MARGIN_X;
-const VS_CANVAS_H = 760;
+const VS_CANVAS_H = VS_GRID_Y0 + VS_GRID_H + 118;
 const VS_SPAWN_COL = 5;
 // Big attacks rain down over a couple of spawn cycles instead of landing
 // all at once — closer to how a real ojama tray drops in bursts, and it
@@ -2074,25 +2078,64 @@ function vbDrawHud(b, label, enemyType) {
   ctx.save();
   ctx.textAlign = 'center';
   if (enemyType) {
-    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 30, 15, enemyType);
+    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 46, 14, enemyType);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = 'bold 15px Arial';
-    ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 44);
   }
   // Score sits right under the name/icon — small, same counting/scoring
   // as marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
   // formula) — instead of only at the bottom, so it reads immediately
   // alongside "YOU" / the boss's icon rather than needing a second look.
-  ctx.font = 'bold 14px Arial';
+  ctx.font = 'bold 13px Arial';
   ctx.fillStyle = '#FFE066';
-  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 10);
-  if (b.pendingGarbage > 0) {
-    ctx.fillStyle = '#FF6F6F';
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`⚠ ${b.pendingGarbage}`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 + VS_GRID_H + 24);
-  }
+  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
   ctx.restore();
+}
+
+// "Next piece" preview, tucked inside each board's own top-right corner —
+// mirrors marathon's drawNextPreview placement/style at VS board scale.
+function vbDrawNextPreview(b) {
+  if (!b.nextPair) return;
+  const boxW = 60, boxH = 82;
+  const bx = b.x0 + VS_GRID_W - boxW - 8;
+  const by = VS_GRID_Y0 + 8;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 12); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '11px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('つぎ', bx + boxW / 2, by + 14);
+  ctx.restore();
+  const r = 14;
+  const v1 = stageVisual(b.nextPair.s1), v2 = stageVisual(b.nextPair.s2);
+  drawGummyShape(bx + boxW / 2, by + 34, r, v1.color, v1.face, 0, 1, false, v1.magic);
+  drawGummyShape(bx + boxW / 2, by + 66, r, v2.color, v2.face, 0, 1, false, v2.magic);
+}
+
+// Incoming お邪魔, shown as a row of small blocks hovering just above the
+// board's own frame (before it actually lands) — same idea as Puyo
+// Puyo's VS-mode ojama tray, so an attack is visible before it drops
+// instead of only a number appearing after the fact.
+function vbDrawIncomingGarbage(b) {
+  if (b.pendingGarbage <= 0) return;
+  const shown = Math.min(b.pendingGarbage, GRID_COLS);
+  const sz = 13, gap = 3;
+  const totalW = shown * sz + (shown - 1) * gap;
+  const startX = b.x0 + VS_GRID_W / 2 - totalW / 2;
+  const y = VS_GRID_Y0 - 12;
+  for (let i = 0; i < shown; i++) {
+    drawGarbageBlock(startX + i * (sz + gap) + sz / 2, y, sz / 0.82);
+  }
+  if (b.pendingGarbage > shown) {
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#FF8888';
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText(`+${b.pendingGarbage - shown}`, startX + totalW + 5, y + 4);
+    ctx.restore();
+  }
 }
 
 function drawVs() {
@@ -2100,16 +2143,22 @@ function drawVs() {
   bg.addColorStop(0, '#2A1840'); bg.addColorStop(0.55, '#4A2560'); bg.addColorStop(1, '#331A48');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, VS_CANVAS_W, VS_CANVAS_H);
 
+  // モヨクエストのタイトル/Lv/説明は、盤面の真上を占める全幅バナーではなく
+  // 左上に寄せた小さいブロックにして、その分プレイエリアを広く取れるように
+  // している(左の操作ボタン — top:55%のさらに上 — と同じ左端に揃う位置)。
   ctx.save();
-  ctx.textAlign = 'center';
-  ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
+  ctx.textAlign = 'left';
+  ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 12;
   ctx.fillStyle = '#FFE9F5';
-  ctx.font = 'bold 40px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
-  ctx.fillText('⚔️ モヨクエスト', VS_CANVAS_W / 2, 56);
+  ctx.font = 'bold 22px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
+  ctx.fillText('⚔️ モヨクエスト', VS_MARGIN_X, 28);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '16px Arial';
-  ctx.fillText(`Lv.${cpuLevel}/${CPU_ENEMIES.length}　最高段階「デカモク」を消して連鎖で相手にお邪魔を送ろう！`, VS_CANVAS_W / 2, 86);
+  ctx.fillStyle = 'rgba(255,224,102,0.85)';
+  ctx.font = 'bold 13px Arial';
+  ctx.fillText(`Lv.${cpuLevel}/${CPU_ENEMIES.length}`, VS_MARGIN_X, 48);
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '11px Arial';
+  ctx.fillText('デカモクを消して連鎖で攻撃！', VS_MARGIN_X, 65);
   ctx.restore();
 
   ctx.save();
@@ -2125,6 +2174,8 @@ function drawVs() {
   drawParticles();
   vbDrawHud(vsP, 'YOU');
   vbDrawHud(vsC, null, currentCpuEnemy().type);
+  vbDrawNextPreview(vsP); vbDrawNextPreview(vsC);
+  vbDrawIncomingGarbage(vsP); vbDrawIncomingGarbage(vsC);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
@@ -2137,7 +2188,7 @@ function drawVs() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '18px Arial';
-  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', VS_CANVAS_W / 2, VS_CANVAS_H - 24);
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', VS_CANVAS_W / 2, VS_CANVAS_H - 20);
   ctx.restore();
 
   if (flashAlpha > 0.01) {
