@@ -1696,14 +1696,13 @@ function refreshGarbageCols(b) {
   b.garbageCols = shuffledCols().slice(0, n);
 }
 
-// VS mode has no level-up, but always spawns from the full 5-color pool
-// (not just the Lv1-2 subset) — with only 3 colors, a cell that merged
-// up into 赤 (stage 3) or 青 (stage 4) could never see another matching
-// piece spawn to merge it further, so it just sat stuck on the board
-// forever once the game got cluttered with お邪魔.
+// VS mode has no level-up mid-match, but the spawn pool still widens
+// with cpuLevel exactly like marathon's does with its own level — 赤
+// (stage 3) from Lv3, 青 (stage 4) from Lv5 — instead of every color
+// being available from Lv1.
 function vbRollStage() {
   if (Math.random() < MAGIC_CHANCE) return RAINBOW;
-  const pool = getSpawnPool(5);
+  const pool = getSpawnPool(cpuLevel);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 function vbRollPair() { return { s1: vbRollStage(), s2: vbRollStage() }; }
@@ -2640,6 +2639,14 @@ document.getElementById('pause-btn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', e => {
+  // Space/arrows are exclusively game controls here — never anything the
+  // page itself should do with them (scroll, or — the actual bug this
+  // fixes — re-triggering whichever <button> (e.g. #pause-btn) happens to
+  // still have focus, since Space's native default action is to click
+  // the focused button).
+  if (e.key === ' ' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+  }
   if (state === 'TITLE') {
     if (e.key === 'ArrowUp') {
       titleMenuSel = (titleMenuSel + TITLE_MENU_ITEMS.length - 1) % TITLE_MENU_ITEMS.length;
