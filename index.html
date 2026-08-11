@@ -37,7 +37,40 @@ html, body {
   background:
     radial-gradient(circle at 24% 18%, var(--place-glow), transparent 46%),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bottom) 100%);
-  transition: background 1.4s ease;
+  background-size: 140% 140%;
+  transition: background-color 1.4s ease;
+  animation: skyDrift 26s ease-in-out infinite;
+}
+@keyframes skyDrift {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 8% 6%; }
+}
+/* Sun/moon: arcs left-to-right across the sky over the ~24h cycle and
+   is repositioned every tick from JS via --sun-x/--sun-y, so the hub
+   visibly keeps moving instead of just swapping flat colors. */
+#celestialLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+#celestialBody {
+  position: absolute;
+  left: var(--sun-x, 50%);
+  top: var(--sun-y, 20%);
+  width: var(--sun-size, 46px);
+  height: var(--sun-size, 46px);
+  margin-left: calc(var(--sun-size, 46px) / -2);
+  margin-top: calc(var(--sun-size, 46px) / -2);
+  border-radius: 50%;
+  background: var(--sun-color, #FFE9A8);
+  box-shadow: 0 0 60px 18px var(--sun-glow, rgba(255,233,168,0.35));
+  transition: left 4s linear, top 4s linear, background 1.4s ease, box-shadow 1.4s ease, width 1.4s ease, height 1.4s ease;
+  animation: celestialPulse 5s ease-in-out infinite;
+}
+@keyframes celestialPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
 }
 #starsLayer {
   position: fixed;
@@ -56,11 +89,15 @@ html, body {
     radial-gradient(1.4px 1.4px at 6% 34%, #fff, transparent),
     radial-gradient(1.2px 1.2px at 95% 33%, #fff, transparent);
   background-repeat: no-repeat;
+  animation: starTwinkle 3.6s ease-in-out infinite;
 }
-body[data-band="night"] #starsLayer,
-body[data-band="evening"] #starsLayer {
-  opacity: 0.7;
+@keyframes starTwinkle {
+  0%, 100% { opacity: var(--star-opacity, 0); }
+  50% { opacity: calc(var(--star-opacity, 0) * 0.55); }
 }
+body[data-band="night"] #starsLayer { --star-opacity: 0.85; }
+body[data-band="evening"] #starsLayer { --star-opacity: 0.4; }
+body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
 #skylineLayer {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -362,6 +399,7 @@ footer {
 <body>
 <div id="skyLayer"></div>
 <div id="starsLayer"></div>
+<div id="celestialLayer"><div id="celestialBody"></div></div>
 <div id="skylineLayer"></div>
 <div class="wrap">
   <header>
@@ -464,11 +502,15 @@ footer {
   // Kept deliberately dark and low-saturation across all four bands, in
   // line with the series design system (SPEC.md §03): this is a mood
   // shift, not a bright-daytime website.
+  // Each band is noticeably brighter/warmer than the last so "Day" no
+  // longer reads as a second Night — still moody/dark per the series
+  // design system, but clearly distinct at a glance. sun* fields drive
+  // the celestial body's look (see updateCelestial below).
   var BANDS = {
-    morning: { label: 'Morning', sky: ['#181026', '#2c2032', '#3f2a26'] },
-    day:     { label: 'Day',     sky: ['#0d1420', '#152134', '#1f3040'] },
-    evening: { label: 'Evening', sky: ['#150e1e', '#291828', '#392016'] },
-    night:   { label: 'Night',   sky: ['#05060f', '#0d1024', '#141a33'] }
+    morning: { label: 'Morning', sky: ['#241c3a', '#4a3350', '#c97b52'], sunColor: '#FFC9A0', sunGlow: 'rgba(255,170,120,0.4)', sunSize: '42px' },
+    day:     { label: 'Day',     sky: ['#26364a', '#3a5570', '#7099b4'], sunColor: '#FFEFC2', sunGlow: 'rgba(255,225,160,0.45)', sunSize: '54px' },
+    evening: { label: 'Evening', sky: ['#241531', '#5a2f45', '#d97b3f'], sunColor: '#FF9A52', sunGlow: 'rgba(255,120,60,0.45)', sunSize: '46px' },
+    night:   { label: 'Night',   sky: ['#05060f', '#0d1024', '#141a33'], sunColor: '#DCE6FF', sunGlow: 'rgba(200,210,255,0.28)', sunSize: '32px' }
   };
   var SKYLINE_SHAPES = {
     city:   'polygon(0% 100%,0% 55%,4% 55%,4% 35%,9% 35%,9% 60%,15% 60%,15% 20%,19% 20%,19% 60%,26% 60%,26% 45%,32% 45%,32% 70%,38% 70%,38% 30%,44% 30%,44% 65%,50% 65%,50% 10%,54% 10%,54% 65%,60% 65%,60% 40%,66% 40%,66% 60%,72% 60%,72% 25%,78% 25%,78% 60%,85% 60%,85% 45%,90% 45%,90% 65%,96% 65%,96% 50%,100% 50%,100% 100%)',
@@ -485,6 +527,30 @@ footer {
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
+  // Sweeps the sun (05:00-20:00) or moon (20:00-05:00) across the sky in
+  // a low arc, left horizon to right horizon, so there's always visible
+  // motion tying the celestial body to the actual clock instead of a
+  // static decoration.
+  function updateCelestial(hour, minute, band) {
+    var isNight = hour >= 20 || hour < 5;
+    var frac;
+    if (isNight) {
+      var h = hour >= 20 ? (hour - 20) : (hour + 4);
+      frac = (h + minute / 60) / 9;
+    } else {
+      var h2 = hour - 5;
+      frac = (h2 + minute / 60) / 15;
+    }
+    frac = Math.max(0, Math.min(1, frac));
+    var arc = Math.sin(frac * Math.PI);
+    var root = document.documentElement.style;
+    root.setProperty('--sun-x', (10 + frac * 80) + '%');
+    root.setProperty('--sun-y', (60 - arc * 42) + '%');
+    root.setProperty('--sun-color', band.sunColor);
+    root.setProperty('--sun-glow', band.sunGlow);
+    root.setProperty('--sun-size', band.sunSize);
+  }
+
   function updateSky() {
     var now = new Date();
     var place = PLACES[now.getDay()];
@@ -499,6 +565,7 @@ footer {
     root.setProperty('--place-accent', place.accent);
     root.setProperty('--skyline-shape', SKYLINE_SHAPES[place.skyline]);
     document.body.dataset.band = bandKey;
+    updateCelestial(now.getHours(), now.getMinutes(), band);
 
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
