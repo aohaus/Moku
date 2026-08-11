@@ -403,20 +403,26 @@ const LEADERBOARD_MAX = 10;
 // VS_CANVAS_W x VS_CANVAS_H (via resizeCanvasTo, see startVsGame /
 // startGame / quitToTitle) instead of reusing marathon's W x H.
 const GARBAGE = -2; // sentinel grid value — colorless, inert: never joins a match, never clears, just falls
-const VS_CELL = 58;
+const VS_CELL = 62;
 const VS_GRID_W = VS_CELL * GRID_COLS;
 const VS_GRID_H = VS_CELL * GRID_ROWS;
 const VS_MARGIN_X = 24;
 const VS_GAP = 32;
 // The モヨクエスト title/level moved out to its own top-left block (see
-// drawVs) instead of a full-width banner above the boards, and the
-// per-board header (enemy icon/score/incoming-お邪魔 row) is tighter, so
-// the board can start much closer to the top edge than before.
-const VS_GRID_Y0 = 80;
+// drawVs) instead of a full-width banner above the boards. VS_GRID_Y0 is
+// tall enough for the CPU-side header's big enemy portrait (see
+// vbDrawHud) — the player side only needs a small label, so it just
+// leaves extra breathing room above "YOU" rather than needing the space.
+const VS_GRID_Y0 = 145;
 const VS_P_X0 = VS_MARGIN_X;
 const VS_C_X0 = VS_MARGIN_X + VS_GRID_W + VS_GAP;
 const VS_CANVAS_W = VS_C_X0 + VS_GRID_W + VS_MARGIN_X;
-const VS_CANVAS_H = VS_GRID_Y0 + VS_GRID_H + 118;
+// Gap from the board's bottom edge to the footer control-hint line, and
+// from there to the canvas's own bottom edge — kept small on purpose so
+// the board itself gets as much of the canvas as possible.
+const VS_FOOTER_GAP = 40;
+const VS_BOTTOM_MARGIN = 16;
+const VS_CANVAS_H = VS_GRID_Y0 + VS_GRID_H + VS_FOOTER_GAP + VS_BOTTOM_MARGIN;
 const VS_SPAWN_COL = 5;
 // Big attacks rain down over a couple of spawn cycles instead of landing
 // all at once — closer to how a real ojama tray drops in bursts, and it
@@ -2072,22 +2078,26 @@ function vbDrawPiece(b) {
 }
 
 // label is plain text (used for "YOU"); pass enemyType instead to draw a
-// small portrait icon in that slot (used for the CPU side) — a name
-// alone didn't read as fast as an icon during actual play.
+// big portrait icon in that slot (used for the CPU side) — VS_GRID_Y0
+// leaves enough headroom specifically for this large a portrait.
 function vbDrawHud(b, label, enemyType) {
   ctx.save();
   ctx.textAlign = 'center';
   if (enemyType) {
-    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 46, 14, enemyType);
-  } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 70, 42, enemyType);
     ctx.font = 'bold 14px Arial';
-    ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 44);
+    ctx.fillStyle = '#FFE066';
+    ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 20);
+    ctx.restore();
+    return;
   }
-  // Score sits right under the name/icon — small, same counting/scoring
-  // as marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 44);
+  // Score sits right under the name — small, same counting/scoring as
+  // marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
   // formula) — instead of only at the bottom, so it reads immediately
-  // alongside "YOU" / the boss's icon rather than needing a second look.
+  // alongside "YOU" rather than needing a second look.
   ctx.font = 'bold 13px Arial';
   ctx.fillStyle = '#FFE066';
   ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
@@ -2188,7 +2198,7 @@ function drawVs() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '18px Arial';
-  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', VS_CANVAS_W / 2, VS_CANVAS_H - 20);
+  ctx.fillText('◀▶で移動・🔄で回転・▼で下に落とす', VS_CANVAS_W / 2, VS_CANVAS_H - VS_BOTTOM_MARGIN);
   ctx.restore();
 
   if (flashAlpha > 0.01) {
