@@ -251,7 +251,7 @@ body.on-title #buildInfo { display: block; }
   <section class="screen active" id="titleScreen">
     <canvas id="titleFace" width="200" height="200"></canvas>
     <h1 id="titleLogo">SHIRI <span>OF MOKU</span></h1>
-    <p id="titleSub">モヨを怒らせずに話しきれ</p>
+    <p id="titleSub">モヨを怒(おこ)らせずに話(はな)しきれ</p>
     <nav id="titleMenu">
       <button class="titleMenuItem" id="btnGoStageSelect">▶ はじめる</button>
     </nav>
@@ -260,8 +260,8 @@ body.on-title #buildInfo { display: block; }
 
   <!-- STAGE SELECT -->
   <section class="screen" id="stageSelectScreen">
-    <h2 class="screenTitle">ステージ選択</h2>
-    <p class="screenSub">機嫌ゲージを満タンにさせずに乗り切ろう</p>
+    <h2 class="screenTitle">ステージ選択(せんたく)</h2>
+    <p class="screenSub">機嫌(きげん)ゲージを満(まん)タンにさせずに乗(の)り切(き)ろう</p>
     <div id="stageList"></div>
     <button class="textLink dim" id="btnBackToTitle">◀ タイトルへ</button>
   </section>
@@ -273,7 +273,7 @@ body.on-title #buildInfo { display: block; }
       <div><span id="turnNow">1</span> / <span id="turnTotal">5</span></div>
     </div>
     <div id="angerWrap">
-      <div id="angerLabel">モヨの機嫌ゲージ</div>
+      <div id="angerLabel">モヨの機嫌(きげん)ゲージ</div>
       <div id="angerBar"><i id="angerFill"></i></div>
     </div>
     <div id="faceWrap"><canvas id="mokuFace" width="200" height="200"></canvas></div>
@@ -289,7 +289,7 @@ body.on-title #buildInfo { display: block; }
     <div id="resultStars"></div>
     <div id="resultButtons">
       <button class="textLink" id="btnResultPrimary"></button>
-      <button class="textLink dim" id="btnResultToSelect">ステージ選択に戻る</button>
+      <button class="textLink dim" id="btnResultToSelect">ステージ選択(せんたく)に戻(もど)る</button>
     </div>
   </section>
 
@@ -304,66 +304,66 @@ body.on-title #buildInfo { display: block; }
   // ---------- content ----------
   // 1 mine / 2 safe replies (one big heal, one small heal).
   var EASY_TOPICS = [
-    { id: 'dinner', line: '夜ご飯は唐揚げモヨか?', choices: [
-      { text: '唐揚げしかないの?', type: 'mine', reply: 'なんだその言い方モヨ!' },
-      { text: '唐揚げ食べたい!', type: 'heal_small', reply: 'よし唐揚げにするモヨ' },
-      { text: 'モヨの手作りが一番だよ', type: 'heal_big', reply: '…そ、そうモヨか' }
+    { id: 'dinner', line: '夜(よる)ご飯(はん)は唐揚(からあ)げモヨか?', choices: [
+      { text: '唐揚(からあ)げしかないの?', type: 'mine', reply: 'なんだその言(い)い方(かた)モヨ!' },
+      { text: '唐揚(からあ)げ食(た)べたい!', type: 'heal_small', reply: 'よし唐揚(からあ)げにするモヨ' },
+      { text: 'モヨの手作(づく)りが一番(ばん)だよ', type: 'heal_big', reply: '…そ、そうモヨか' }
     ]},
-    { id: 'early_home', line: '早く帰ってきたモヨね', choices: [
-      { text: '早く会いたかったから', type: 'heal_big', reply: 'そそそんなの照れるモヨ' },
-      { text: '暇だっただけ', type: 'mine', reply: 'なによそれモヨ!' },
-      { text: 'ちゃんと時間通りだよ', type: 'heal_small', reply: 'ならいいモヨ' }
+    { id: 'early_home', line: '早く帰(かえ)ってきたモヨね', choices: [
+      { text: '早く会(あ)いたかったから', type: 'heal_big', reply: 'そそそんなの照(て)れるモヨ' },
+      { text: '暇(ひま)だっただけ', type: 'mine', reply: 'なによそれモヨ!' },
+      { text: 'ちゃんと時間(じかん)通(どお)りだよ', type: 'heal_small', reply: 'ならいいモヨ' }
     ]},
-    { id: 'weather_fluffy', line: '今日寒いから羽根膨らませてるモヨ', choices: [
-      { text: 'もふもふだね', type: 'heal_big', reply: 'でしょモヨ!もっと撫でていいモヨ' },
-      { text: '太った?', type: 'mine', reply: 'は?太ってないモヨ!!' },
-      { text: 'あったかそう', type: 'heal_small', reply: 'そうモヨ、寒がりなだけモヨ' }
+    { id: 'weather_fluffy', line: '今日(きょう)寒(さむ)いから羽根(はね)膨(ふくら)ませてるモヨ', choices: [
+      { text: 'もふもふだね', type: 'heal_big', reply: 'でしょモヨ!もっと撫(な)でていいモヨ' },
+      { text: '太(ふと)った?', type: 'mine', reply: 'は?太(ふと)ってないモヨ!!' },
+      { text: 'あったかそう', type: 'heal_small', reply: 'そうモヨ、寒(さむ)がりなだけモヨ' }
     ]},
-    { id: 'room_mess', line: '部屋散らかってるモヨ、片付けないと巣に帰れなくなるモヨ', choices: [
-      { text: '一緒に片付けよう', type: 'heal_big', reply: 'それでいいモヨ' },
-      { text: 'モヨの巣の方が汚いじゃん', type: 'mine', reply: 'よけいなお世話モヨ!' },
-      { text: '今やるよ', type: 'heal_small', reply: 'ならよしモヨ' }
+    { id: 'room_mess', line: '部屋(へや)散(ち)らかってるモヨ、片付(かたづ)けないと巣(す)に帰(かえ)れなくなるモヨ', choices: [
+      { text: '一緒(いっしょ)に片付(かたづ)けよう', type: 'heal_big', reply: 'それでいいモヨ' },
+      { text: 'モヨの巣(す)の方(ほう)が汚(きたな)いじゃん', type: 'mine', reply: 'よけいなお世話(せわ)モヨ!' },
+      { text: '今(いま)やるよ', type: 'heal_small', reply: 'ならよしモヨ' }
     ]},
-    { id: 'snack_eaten', line: 'モヨのお菓子勝手に食べたモヨね', choices: [
-      { text: 'ごめん、買い直すよ', type: 'heal_big', reply: 'わかればいいモヨ' },
-      { text: '気のせいじゃない?', type: 'mine', reply: '袋あるのになにが気のせいモヨ!' },
-      { text: '半分こしよ', type: 'heal_small', reply: '…まあいいモヨ' }
+    { id: 'snack_eaten', line: 'モヨのお菓(か)子勝(かっ)手に食(た)べたモヨね', choices: [
+      { text: 'ごめん、買(か)い直(なお)すよ', type: 'heal_big', reply: 'わかればいいモヨ' },
+      { text: '気のせいじゃない?', type: 'mine', reply: '袋(ふくろ)あるのになにが気のせいモヨ!' },
+      { text: '半分(はんぶん)こしよ', type: 'heal_small', reply: '…まあいいモヨ' }
     ]},
-    { id: 'oversleep', line: 'モヨが起こしたのに二度寝したモヨ', choices: [
-      { text: '明日は一緒に早起きしよう', type: 'heal_big', reply: '約束モヨよ' },
-      { text: 'モヨの声小さいからだよ', type: 'mine', reply: '聞こえてたくせにモヨ!' },
-      { text: 'ごめんごめん', type: 'heal_small', reply: '次は気をつけるモヨ' }
+    { id: 'oversleep', line: 'モヨが起(お)こしたのに二度(ど)寝(ね)したモヨ', choices: [
+      { text: '明日(あした)は一緒(いっしょ)に早起(お)きしよう', type: 'heal_big', reply: '約束(やくそく)モヨよ' },
+      { text: 'モヨの声(こえ)小さいからだよ', type: 'mine', reply: '聞(き)こえてたくせにモヨ!' },
+      { text: 'ごめんごめん', type: 'heal_small', reply: '次(つぎ)は気をつけるモヨ' }
     ]},
-    { id: 'anniversary', line: '今日が何の日か覚えてるモヨ?', choices: [
-      { text: 'もちろん、モヨの日でしょ', type: 'heal_big', reply: 'えへへ正解モヨ' },
+    { id: 'anniversary', line: '今日(きょう)が何(なん)の日か覚(おぼ)えてるモヨ?', choices: [
+      { text: 'もちろん、モヨの日でしょ', type: 'heal_big', reply: 'えへへ正解(かい)モヨ' },
       { text: 'うーん、わからない', type: 'mine', reply: '…そうモヨか' },
-      { text: '特別な日だよね', type: 'heal_small', reply: 'まあ及第点モヨ' }
+      { text: '特別(とくべつ)な日だよね', type: 'heal_small', reply: 'まあ及第点(きゅうだいてん)モヨ' }
     ]}
   ];
 
   // 2 mines / 1 safe reply.
   var HARD_TOPICS = [
-    { id: 'chicken_call', line: 'さっきチキンって言ったモヨ?', choices: [
-      { text: '言ってないよ', type: 'heal_small', reply: 'ならいいモヨ' },
-      { text: '言ったけど何か?', type: 'mine', reply: 'よくもチキンって呼んだモヨね!' },
-      { text: 'なんとなく雰囲気で', type: 'mine', reply: '雰囲気で人をチキン呼ばわりするなモヨ!' }
+    { id: 'chicken_call', line: 'さっきチキンって言(い)ったモヨ?', choices: [
+      { text: '言(い)ってないよ', type: 'heal_small', reply: 'ならいいモヨ' },
+      { text: '言(い)ったけど何(なに)か?', type: 'mine', reply: 'よくもチキンって呼(よ)んだモヨね!' },
+      { text: 'なんとなく雰囲気(ふんいき)で', type: 'mine', reply: '雰囲気(ふんいき)で人をチキン呼(よ)ばわりするなモヨ!' }
     ]},
-    { id: 'game_loss_blame', line: 'さっきの試合、素人でも勝てたモヨ', choices: [
+    { id: 'game_loss_blame', line: 'さっきの試合(しあい)、素人(しろうと)でも勝(か)てたモヨ', choices: [
       { text: 'うるさいな', type: 'mine', reply: 'うるさいとはなんだモヨ!' },
-      { text: '次は本気出すよ', type: 'heal_small', reply: 'その意気モヨ' },
-      { text: 'モヨの解説のせいだよ', type: 'mine', reply: 'モヨのせいにするなモヨ!' }
+      { text: '次(つぎ)は本気出すよ', type: 'heal_small', reply: 'その意(い)気モヨ' },
+      { text: 'モヨの解説(かいせつ)のせいだよ', type: 'mine', reply: 'モヨのせいにするなモヨ!' }
     ]},
-    { id: 'attitude', line: '今日口調が生意気モヨ', choices: [
+    { id: 'attitude', line: '今日(きょう)口調(くちょう)が生意(い)気モヨ', choices: [
       { text: 'そんなことないよ', type: 'heal_small', reply: 'ならいいモヨ' },
-      { text: 'モヨこそ生意気じゃん', type: 'mine', reply: '誰に向かって言ってるモヨ!' },
-      { text: '気のせいだよ、多分', type: 'mine', reply: '多分ってなんだモヨ!' }
+      { text: 'モヨこそ生意(い)気じゃん', type: 'mine', reply: '誰(だれ)に向(む)かって言(い)ってるモヨ!' },
+      { text: '気のせいだよ、多分(たぶん)', type: 'mine', reply: '多分(たぶん)ってなんだモヨ!' }
     ]},
-    { id: 'jealousy_other_apps', line: '最近他のアプリばっかり触ってるモヨね', choices: [
-      { text: 'モヨが一番好きだよ', type: 'heal_big', reply: '当然モヨ' },
-      { text: 'ちょっと飽きてきたかも', type: 'mine', reply: '飽きたって言ったモヨね!?' },
-      { text: 'モヨより面白いのあるし', type: 'mine', reply: 'は!?聞き捨てならないモヨ!' }
+    { id: 'jealousy_other_apps', line: '最近(さいきん)他(ほか)のアプリばっかり触(さわ)ってるモヨね', choices: [
+      { text: 'モヨが一番(ばん)好(す)きだよ', type: 'heal_big', reply: '当然(とうぜん)モヨ' },
+      { text: 'ちょっと飽(あ)きてきたかも', type: 'mine', reply: '飽(あ)きたって言(い)ったモヨね!?' },
+      { text: 'モヨより面(おも)白いのあるし', type: 'mine', reply: 'は!?聞(き)き捨(す)てならないモヨ!' }
     ]},
-    { id: 'praise_fishing', line: '今日のモヨかっこよかったモヨ?', choices: [
+    { id: 'praise_fishing', line: '今日(きょう)のモヨかっこよかったモヨ?', choices: [
       { text: 'うん、かっこよかったよ', type: 'heal_big', reply: 'でしょでしょモヨ!' },
       { text: 'まあまあかな', type: 'mine', reply: 'まあまあってなんだモヨ!' },
       { text: 'フクロウにしては', type: 'mine', reply: 'フクロウにしてはとはなんだモヨ!!' }
@@ -372,12 +372,12 @@ body.on-title #buildInfo { display: block; }
 
   // Fully made-up "next game" running joke — no gameplay effect.
   var IDEA_JOKES = [
-    '次は「土下座オブモク」はどうモヨ?謝る速さを競うゲームモヨ',
-    'フクロウがひたすら寝るだけの放置ゲーム「寝る前のモク」を作るモヨ',
-    'モヨの声だけで音ゲー作ったら売れるモヨかね',
-    '次回作は「モヨ味噌汁」、具材を当てるだけのゲームでどうモヨ',
-    'いっそ全部のゲームにモヨが乱入する説あるモヨ',
-    '「片付けろよモヨ」っていう説教シミュレーターも需要あるモヨかもしれん'
+    '次(つぎ)は「土下座(ざ)オブモク」はどうモヨ?謝(あやま)る速(はや)さを競(きそ)うゲームモヨ',
+    'フクロウがひたすら寝(ね)るだけの放置(ほうち)ゲーム「寝(ね)る前(まえ)のモク」を作(つく)るモヨ',
+    'モヨの声(こえ)だけで音ゲー作(つく)ったら売(う)れるモヨかね',
+    '次回作(じかいさく)は「モヨ味噌汁(みそしる)」、具材(ぐざい)を当(あ)てるだけのゲームでどうモヨ',
+    'いっそ全部(ぜんぶ)のゲームにモヨが乱(らん)入する説(せつ)あるモヨ',
+    '「片付(かたづ)けろよモヨ」っていう説教(せっきょう)シミュレーターも需要(じゅよう)あるモヨかもしれん'
   ];
 
   // ---------- save data ----------
@@ -422,90 +422,110 @@ body.on-title #buildInfo { display: block; }
   }
 
   // ---------- face rendering ----------
+  // Ported from angry-mokumoku.html's drawMokumoku() so Moku looks like the
+  // same character across the series instead of a one-off face just for
+  // this game (moods: 'neutral' / 'angry' / 'super-angry').
+  function drawMokumoku(ctx, x, y, r, angle, mood) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle || 0);
+    mood = mood || 'neutral';
+
+    // Body — slightly redder when super-angry
+    ctx.fillStyle = mood === 'super-angry' ? '#D48060' : '#C8956A';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    var bodyShade = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+    bodyShade.addColorStop(0, 'rgba(255,255,255,0.15)');
+    bodyShade.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = bodyShade;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+    // Face patch
+    ctx.fillStyle = '#E8D5B0';
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.66, r * 0.76, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Eye height based on mood
+    var eyeH = mood === 'super-angry' ? r * 0.145 : mood === 'angry' ? r * 0.175 : r * 0.235;
+    var eyeW = r * 0.19;
+
+    // Eyes
+    ctx.fillStyle = '#151515';
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.stroke();
+
+    // Angry eyebrows
+    if (mood === 'angry' || mood === 'super-angry') {
+      var slope = mood === 'super-angry' ? r * 0.16 : r * 0.10;
+      ctx.strokeStyle = '#4A1800';
+      ctx.lineWidth = mood === 'super-angry' ? r * 0.09 : r * 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.52, -r * 0.36 - slope); ctx.lineTo(-r * 0.14, -r * 0.36 + slope * 0.3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.14, -r * 0.36 + slope * 0.3); ctx.lineTo(r * 0.52, -r * 0.36 - slope); ctx.stroke();
+    }
+
+    // Eye highlights
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(-r * 0.27, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.37, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+
+    // Forehead stripe
+    ctx.fillStyle = mood === 'super-angry' ? '#C87818' : '#E89230';
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.02, r * 0.24, r * 0.115, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Beak — open when angry
+    if (mood === 'super-angry') {
+      ctx.fillStyle = '#2A1000';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.15, r * 0.115, r * 0.10, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.10, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.17, r * 0.115, r * 0.06, 0, 0, Math.PI); ctx.fill();
+    } else if (mood === 'angry') {
+      ctx.fillStyle = '#5A2800';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.14, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.09, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.155, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+    } else {
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.115, r * 0.135, 0, 0, Math.PI); ctx.fill();
+    }
+
+    // Teal leaf bowtie
+    ctx.fillStyle = '#3DA890';
+    ctx.beginPath(); ctx.ellipse(-r * 0.28, r * 0.47, r * 0.24, r * 0.13, -0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.28, r * 0.47, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2A7868';
+    ctx.beginPath(); ctx.arc(0, r * 0.47, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2A7868'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-r * 0.04, r * 0.47); ctx.lineTo(-r * 0.48, r * 0.45); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.04, r * 0.47); ctx.lineTo(r * 0.48, r * 0.45); ctx.stroke();
+
+    // Orange feet
+    ctx.fillStyle = '#E89230';
+    ctx.beginPath(); ctx.ellipse(-r * 0.26, r * 0.88, r * 0.13, r * 0.08, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.26, r * 0.88, r * 0.13, r * 0.08, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#C06810'; ctx.lineWidth = 1.2;
+    [-r * 0.26, r * 0.26].forEach(function (fx) {
+      ctx.beginPath(); ctx.moveTo(fx - r * 0.07, r * 0.9); ctx.lineTo(fx - r * 0.15, r * 0.96); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx, r * 0.92); ctx.lineTo(fx, r * 1.0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx + r * 0.07, r * 0.9); ctx.lineTo(fx + r * 0.15, r * 0.96); ctx.stroke();
+    });
+
+    ctx.restore();
+  }
+
+  function moodFor(anger) {
+    return anger >= 70 ? 'super-angry' : anger >= 30 ? 'angry' : 'neutral';
+  }
+
   function drawFace(canvas, anger) {
     var ctx = canvas.getContext('2d');
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    var cx = w / 2, cy = h / 2 + 6;
-    var r = w * 0.36;
-    var t = clamp(anger, 0, 100) / 100;
-
-    var strokeColor = 'rgb(' +
-      Math.round(245 + (255 - 245) * t) + ',' +
-      Math.round(237 - 165 * t) + ',' +
-      Math.round(231 - 157 * t) + ')';
-
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = strokeColor;
-    ctx.fillStyle = strokeColor;
-
-    // ear tufts
-    ctx.lineWidth = w * 0.02;
-    ctx.beginPath();
-    ctx.moveTo(cx - r * 0.75, cy - r * 0.85);
-    ctx.lineTo(cx - r * 0.95, cy - r * 1.5);
-    ctx.lineTo(cx - r * 0.35, cy - r * 1.05);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + r * 0.75, cy - r * 0.85);
-    ctx.lineTo(cx + r * 0.95, cy - r * 1.5);
-    ctx.lineTo(cx + r * 0.35, cy - r * 1.05);
-    ctx.stroke();
-
-    // head outline
-    ctx.lineWidth = w * 0.025;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // eyebrows: flat at calm, angled down-inward as anger rises
-    var browTilt = t * 0.5;
-    ctx.lineWidth = w * 0.02;
-    ctx.beginPath();
-    ctx.moveTo(cx - r * 0.55, cy - r * 0.32 - r * browTilt * 0.5);
-    ctx.lineTo(cx - r * 0.18, cy - r * 0.32 + r * browTilt * 0.6);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + r * 0.55, cy - r * 0.32 - r * browTilt * 0.5);
-    ctx.lineTo(cx + r * 0.18, cy - r * 0.32 + r * browTilt * 0.6);
-    ctx.stroke();
-
-    // eyes
-    var eyeR = r * 0.24;
-    var eyeY = cy - r * 0.02;
-    [cx - r * 0.36, cx + r * 0.36].forEach(function (ex) {
-      ctx.lineWidth = w * 0.018;
-      ctx.beginPath();
-      ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(ex, eyeY + eyeR * t * 0.15, eyeR * (0.4 - t * 0.12), 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // beak
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + r * 0.28);
-    ctx.lineTo(cx - r * 0.14, cy + r * 0.46);
-    ctx.lineTo(cx, cy + r * 0.62);
-    ctx.lineTo(cx + r * 0.14, cy + r * 0.46);
-    ctx.closePath();
-    ctx.fill();
-
-    // mouth line: flat -> zigzag as anger rises
-    ctx.lineWidth = w * 0.016;
-    ctx.beginPath();
-    if (t < 0.6) {
-      ctx.moveTo(cx - r * 0.22, cy + r * 0.78);
-      ctx.lineTo(cx + r * 0.22, cy + r * 0.78);
-    } else {
-      ctx.moveTo(cx - r * 0.26, cy + r * 0.76);
-      ctx.lineTo(cx - r * 0.1, cy + r * 0.86);
-      ctx.lineTo(cx + r * 0.06, cy + r * 0.74);
-      ctx.lineTo(cx + r * 0.26, cy + r * 0.86);
-    }
-    ctx.stroke();
+    drawMokumoku(ctx, w / 2, h / 2 + 6, w * 0.36, 0, moodFor(anger));
   }
 
   var titleFace = document.getElementById('titleFace');
@@ -659,16 +679,16 @@ body.on-title #buildInfo { display: block; }
       desc.textContent = 'モヨをうまくなだめきったモヨ。';
       stars.textContent = '★'.repeat(earned) + '☆'.repeat(3 - earned);
       var hasNext = state.stage < TOTAL_STAGES;
-      primary.textContent = hasNext ? 'つぎのステージへ ▶' : 'ステージ選択に戻る';
+      primary.textContent = hasNext ? 'つぎのステージへ ▶' : 'ステージ選択(せんたく)に戻(もど)る';
       primary.onclick = function () {
         if (hasNext) startStage(state.stage + 1);
         else { renderStageList(); showScreen('stageSelectScreen'); }
       };
     } else {
       title.textContent = 'んーーーーモヨー!';
-      desc.textContent = 'モヨを怒らせてしまったモヨ。もう一度話しかけてみよう。';
+      desc.textContent = 'モヨを怒(おこ)らせてしまったモヨ。もう一度(ど)話(はな)しかけてみよう。';
       stars.textContent = '';
-      primary.textContent = 'もう一度';
+      primary.textContent = 'もう一度(ど)';
       primary.onclick = function () { startStage(state.stage); };
     }
     showScreen('resultScreen');
