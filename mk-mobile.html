@@ -333,7 +333,29 @@ function saveProfile() {
   profile.updatedAt = new Date().toISOString();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch (e) {}
 }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() {
+  // Local calendar day, not UTC — toISOString() would flip the "day"
+  // boundary at UTC midnight (e.g. 9am in Japan), silently breaking the
+  // streak's "resets on a new day" rule relative to the player's own clock.
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+// A win streak's boost is only valid through the calendar day it was last
+// extended on (see endMatch()). Without this, a player who quits after a
+// 2+ streak and comes back on a later day — before playing again — would
+// see a stale "🔥 boost x2" on Home/Profile that the next win won't
+// actually honor, since endMatch() zeroes the streak the moment it sees
+// lastWinDate isn't today. Called on load and defensively before each
+// render that shows the streak, so the saved state and the UI can never
+// disagree.
+function normalizeWinStreak() {
+  if (profile.winStreak > 0 && profile.lastWinDate !== todayStr()) {
+    profile.winStreak = 0;
+    saveProfile();
+  }
+}
 function activePlayer() { return profile.players[profile.activePlayerId] || null; }
 function ownedIds() { return STARTER_PLAYERS.map(p => p.id).filter(id => profile.players[id] && profile.players[id].owned); }
 function currentBallColors() { return (BALL_SKINS.find(s => s.id === profile.ballSkin) || BALL_SKINS[0]).colors; }
@@ -364,6 +386,7 @@ const BALL_ITEM_Y0 = PANEL_Y + 110, BALL_ITEM_W = 190, BALL_ITEM_H = 190;
 let state = 'TITLE'; // TITLE | HOME | ROSTER | PROFILE | VS | PLAYING | PAUSED | GOAL_PAUSE | GAMEOVER
 let titleFrame = 0;
 let profile = loadProfile();
+normalizeWinStreak();
 let profilePanel = null; // null | 'manage' | 'upgrade' | 'shop' | 'ball' — open panel within PROFILE
 let cpuLevel = profile.cpuLevel;                 // index into CPU_LEVELS
 let matchDurationIdx = profile.matchDurationIdx; // index into MATCH_DURATIONS
@@ -864,6 +887,7 @@ function drawTitleScreen() {
 // first-time players into ROSTER (pick a starter) and returning players
 // straight into PROFILE, per the onboarding-flow design discussion.
 function drawHome() {
+  normalizeWinStreak();
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
@@ -1014,6 +1038,7 @@ function drawStatBar(x, y, w, h, level, color) {
   ctx.restore();
 }
 function drawProfile() {
+  normalizeWinStreak();
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
@@ -1898,11 +1923,17 @@ document.getElementById('ov-btn').addEventListener('click', () => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('gesturechange', e => e.preventDefault());
 document.addEventListener('gestureend', e => e.preventDefault());
-let lastTouchEndAt = 0;
+// Scoped to repeat taps on the SAME element within the window — that's the
+// actual double-tap-zoom trigger pattern. A document-wide timer regardless
+// of target would also cancel unrelated quick sequences (e.g. releasing the
+// joystick, then immediately tapping Pause), which suppresses the second
+// control's synthetic click along with the zoom, leaving click-driven
+// buttons (Pause, game-over, the hub link) intermittently unresponsive.
+let lastTouchEnd = { target: null, at: 0 };
 document.addEventListener('touchend', e => {
   const now = Date.now();
-  if (now - lastTouchEndAt < 350) e.preventDefault();
-  lastTouchEndAt = now;
+  if (e.target === lastTouchEnd.target && now - lastTouchEnd.at < 350) e.preventDefault();
+  lastTouchEnd = { target: e.target, at: now };
 }, { passive: false });
 
 homePositions();
