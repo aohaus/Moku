@@ -298,7 +298,7 @@ canvas {
   <div id="wrapper">
     <canvas id="c"></canvas>
     <div id="hud" style="visibility:hidden">
-      <div>
+      <div id="hud-marathon-info">
         <div id="score-display">Lv.1  スコア: 0</div>
         <div id="best-display">ベスト: 0</div>
         <div id="next-lv-display">つぎのLvまで: 0pt</div>
@@ -718,7 +718,7 @@ function resolveStep() {
   const groups = findGroups();
   if (groups.length === 0) return false;
   chainCount++;
-  const mult = 1 + (chainCount - 1) * 0.5;
+  const mult = chainCount; // 2連鎖=2倍, 3連鎖=3倍, ...
   let topStageThisStep = 0;
   // Columns actually touched by a clear this step — gravity below only
   // resettles these, so an untouched preset column elsewhere on the
@@ -1080,7 +1080,7 @@ const TITLE_MENU_Y = 566, TITLE_MENU_GAP = 56, TITLE_MENU_GAP_EXTRA_AFTER_FIRST 
 // title screen is a deliberate, explicitly-approved carve-out on top of
 // that rule. Everything past the title screen (gameplay, HUD, VS battle
 // screen, overlays) is intentionally still Japanese.
-const TITLE_MENU_ITEMS = ['Start', '⚔️ VS CPU', '🏆 Ranking'];
+const TITLE_MENU_ITEMS = ['Start', '⚔️ Moyo Quest', '🏆 Ranking'];
 
 function titleMenuItemY(i) {
   return TITLE_MENU_Y + i * TITLE_MENU_GAP + (i >= 1 ? TITLE_MENU_GAP_EXTRA_AFTER_FIRST : 0);
@@ -1498,10 +1498,7 @@ function startGame() {
   document.getElementById('pause-btn').textContent = '⏸';
   nextPair = rollPair();
   document.getElementById('hud').style.visibility = 'visible';
-  document.getElementById('score-display').style.visibility = 'visible';
-  document.getElementById('best-display').style.visibility = 'visible';
-  document.getElementById('next-lv-display').style.visibility = 'visible';
-  document.getElementById('time-display').style.visibility = 'visible';
+  document.getElementById('hud-marathon-info').style.visibility = 'visible';
   document.getElementById('left-col').style.visibility = 'visible';
   document.getElementById('right-col').style.visibility = 'visible';
   document.getElementById('overlay').classList.add('hidden');
@@ -1745,7 +1742,7 @@ function vbResolveStep(b) {
   const groups = vbFindGroups(b.grid);
   if (groups.length === 0) return false;
   b.chainCount++;
-  const mult = 1 + (b.chainCount - 1) * 0.5;
+  const mult = b.chainCount; // 2連鎖=2倍, 3連鎖=3倍, ... — same scaling as marathon
   const affectedCols = new Set();
   const clearedCells = [];
 
@@ -2098,7 +2095,7 @@ function drawVs() {
   ctx.shadowColor = '#FF7FC0'; ctx.shadowBlur = 20;
   ctx.fillStyle = '#FFE9F5';
   ctx.font = 'bold 40px "Hiragino Sans", "Yu Gothic", Meiryo, Arial, sans-serif';
-  ctx.fillText('⚔️ CPU対戦', VS_CANVAS_W / 2, 56);
+  ctx.fillText('⚔️ モヨクエスト', VS_CANVAS_W / 2, 56);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '16px Arial';
@@ -2250,10 +2247,7 @@ function startVsGame() {
   // hide the marathon-only score/best/time readout inside it — VS mode
   // draws its own per-board score directly on the canvas instead.
   document.getElementById('hud').style.visibility = 'visible';
-  document.getElementById('score-display').style.visibility = 'hidden';
-  document.getElementById('best-display').style.visibility = 'hidden';
-  document.getElementById('next-lv-display').style.visibility = 'hidden';
-  document.getElementById('time-display').style.visibility = 'hidden';
+  document.getElementById('hud-marathon-info').style.visibility = 'hidden';
   document.getElementById('left-col').style.visibility = 'visible';
   document.getElementById('right-col').style.visibility = 'visible';
   document.getElementById('overlay').classList.add('hidden');
@@ -2355,6 +2349,10 @@ function quitToTitle() {
   titleMenuSel = 0;
   document.getElementById('pause-btn').textContent = '⏸';
   document.getElementById('hud').style.visibility = 'hidden';
+  // #hud-marathon-info carries its own explicit visibility (set by
+  // startGame/startVsGame) that would otherwise keep overriding an
+  // ancestor's 'hidden' — has to be reset here too, not just on #hud.
+  document.getElementById('hud-marathon-info').style.visibility = 'hidden';
   document.getElementById('left-col').style.visibility = 'hidden';
   document.getElementById('right-col').style.visibility = 'hidden';
   document.getElementById('title-frame').style.display = 'block';
