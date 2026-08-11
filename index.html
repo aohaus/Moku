@@ -106,7 +106,11 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
   z-index: 0;
   display: block;
   fill: var(--place-accent);
-  filter: brightness(0.16) saturate(1.2);
+  /* Fill stays dark for a true silhouette, but a colored rim-light glow
+     (independent of the brightness/saturate filters above it) traces the
+     roofline so the shape reads clearly even against a near-black night
+     sky where the darkened fill alone would blend into the background. */
+  filter: brightness(0.16) saturate(1.2) drop-shadow(0 0 10px var(--place-accent)) drop-shadow(0 -1px 0 var(--place-accent));
   transition: fill 1.4s ease;
 }
 .skyline-shape { display: none; }
