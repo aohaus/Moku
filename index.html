@@ -17,7 +17,6 @@
   --sky-bottom: #141a33;
   --place-glow: rgba(147,160,255,0.25);
   --place-accent: #93A0FF;
-  --skyline-shape: polygon(0% 100%,0% 100%,100% 100%,100% 100%);
 }
 html, body {
   min-height: 100%;
@@ -101,14 +100,17 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
 #skylineLayer {
   position: fixed;
   left: 0; right: 0; bottom: 0;
+  width: 100%;
   height: 15vh;
   min-height: 100px;
   z-index: 0;
-  background: var(--place-accent);
-  filter: brightness(0.14) saturate(1.2);
-  clip-path: var(--skyline-shape);
-  transition: clip-path 1.4s ease, background 1.4s ease;
+  display: block;
+  fill: var(--place-accent);
+  filter: brightness(0.16) saturate(1.2);
+  transition: fill 1.4s ease;
 }
+.skyline-shape { display: none; }
+.skyline-shape.active { display: block; }
 .wrap {
   position: relative;
   z-index: 1;
@@ -401,7 +403,22 @@ footer {
 <div id="skyLayer"></div>
 <div id="starsLayer"></div>
 <div id="celestialLayer"><div id="celestialBody"></div></div>
-<div id="skylineLayer"></div>
+<svg id="skylineLayer" viewBox="0 0 400 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <!-- Wat Arun-style stepped prang with flanking stupas -->
+  <polygon class="skyline-shape" data-place="bangkok" points="0,100 0,90 25,90 25,80 55,80 55,92 85,92 85,68 105,68 105,50 125,50 125,58 150,58 150,72 168,72 168,55 183,55 183,38 195,38 195,15 205,15 205,38 217,38 217,55 232,55 232,72 250,72 250,58 275,58 275,50 295,50 295,68 315,68 315,90 345,90 345,80 375,80 375,92 400,92 400,100" />
+  <!-- Marina Bay Sands: three towers + sky-deck -->
+  <polygon class="skyline-shape" data-place="singapore" points="0,100 0,88 30,88 30,95 60,95 60,80 95,80 95,45 112,45 112,30 122,30 122,22 178,22 178,30 188,30 188,45 205,45 205,80 240,80 240,90 270,90 270,78 305,78 305,92 345,92 345,85 400,85 400,100" />
+  <!-- Petronas twin towers with a sky-bridge notch -->
+  <polygon class="skyline-shape" data-place="kualalumpur" points="0,100 0,92 30,92 30,82 60,82 60,95 95,95 95,60 118,60 118,40 132,40 132,20 142,20 142,5 150,5 150,20 158,20 158,40 168,40 168,58 205,58 205,40 215,40 215,20 225,20 225,5 233,5 233,20 243,20 243,40 258,40 258,60 282,60 282,95 315,95 315,82 350,82 350,92 400,92 400,100" />
+  <!-- Rizal Monument obelisk -->
+  <polygon class="skyline-shape" data-place="manila" points="0,100 0,88 30,88 30,95 65,95 65,78 95,78 95,90 130,90 130,60 150,60 150,45 165,45 165,20 172,20 172,8 178,8 178,20 185,20 185,45 200,45 200,60 220,60 220,90 255,90 255,80 285,80 285,92 320,92 320,82 355,82 355,95 400,95 400,100" />
+  <!-- Bitexco Financial Tower with its cantilevered helipad -->
+  <polygon class="skyline-shape" data-place="hcmc" points="0,100 0,90 30,90 30,80 60,80 60,92 95,92 95,55 115,55 115,35 135,35 135,20 150,20 150,32 170,32 170,15 180,15 180,55 195,55 195,90 225,90 225,78 255,78 255,92 290,92 290,82 320,82 320,95 355,95 355,88 400,88 400,100" />
+  <!-- Monas: National Monument spire with its flame tip -->
+  <polygon class="skyline-shape" data-place="jakarta" points="0,100 0,90 30,90 30,80 60,80 60,92 95,92 95,70 150,70 150,55 175,55 175,45 190,45 190,10 196,10 196,3 200,3 200,10 206,10 206,45 220,45 220,55 245,55 245,70 300,70 300,92 335,92 335,80 365,80 365,90 400,90 400,100" />
+  <!-- Otherworld: jagged floating peaks -->
+  <polygon class="skyline-shape" data-place="otherworld" points="0,100 0,70 20,60 35,72 50,52 68,66 82,45 100,62 118,40 138,58 158,36 180,55 200,32 222,52 245,38 268,58 288,42 310,60 332,44 355,62 378,48 400,58 400,100" />
+</svg>
 <div class="wrap">
   <header>
     <img class="owl" src="icons/icon-512.png" alt="Mokumoku">
@@ -498,13 +515,13 @@ footer {
   // rather than randomized, so the hub reliably cycles through all 7
   // places across a week and all 4 lighting moods across a day.
   var PLACES = [
-    { name: 'Bangkok',       emoji: '🛕', accent: '#FFC94A', skyline: 'city'   }, // Sun
-    { name: 'Singapore',     emoji: '🌆', accent: '#45E0D9', skyline: 'modern' }, // Mon
-    { name: 'Kuala Lumpur',  emoji: '🏙️', accent: '#8C7BFF', skyline: 'modern' }, // Tue
-    { name: 'Manila',        emoji: '🌇', accent: '#FF6F91', skyline: 'city'   }, // Wed
-    { name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B', skyline: 'city'   }, // Thu
-    { name: 'Jakarta',       emoji: '🕌', accent: '#FF9F45', skyline: 'modern' }, // Fri
-    { name: 'Otherworld',    emoji: '✨', accent: '#C77DFF', skyline: 'other'  }  // Sat
+    { key: 'bangkok',      name: 'Bangkok',          emoji: '🛕', accent: '#FFC94A' }, // Sun
+    { key: 'singapore',    name: 'Singapore',        emoji: '🌆', accent: '#45E0D9' }, // Mon
+    { key: 'kualalumpur',  name: 'Kuala Lumpur',     emoji: '🏙️', accent: '#8C7BFF' }, // Tue
+    { key: 'manila',       name: 'Manila',           emoji: '🌇', accent: '#FF6F91' }, // Wed
+    { key: 'hcmc',         name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B' }, // Thu
+    { key: 'jakarta',      name: 'Jakarta',          emoji: '🕌', accent: '#FF9F45' }, // Fri
+    { key: 'otherworld',   name: 'Otherworld',       emoji: '✨', accent: '#C77DFF' }  // Sat
   ];
   // Kept deliberately dark and low-saturation across all four bands, in
   // line with the series design system (SPEC.md §03): this is a mood
@@ -519,11 +536,7 @@ footer {
     evening: { label: 'Evening', sky: ['#241531', '#5a2f45', '#d97b3f'], sunColor: '#FF9A52', sunGlow: 'rgba(255,120,60,0.45)', sunSize: '46px' },
     night:   { label: 'Night',   sky: ['#05060f', '#0d1024', '#141a33'], sunColor: '#DCE6FF', sunGlow: 'rgba(200,210,255,0.28)', sunSize: '32px' }
   };
-  var SKYLINE_SHAPES = {
-    city:   'polygon(0% 100%,0% 55%,4% 55%,4% 35%,9% 35%,9% 60%,15% 60%,15% 20%,19% 20%,19% 60%,26% 60%,26% 45%,32% 45%,32% 70%,38% 70%,38% 30%,44% 30%,44% 65%,50% 65%,50% 10%,54% 10%,54% 65%,60% 65%,60% 40%,66% 40%,66% 60%,72% 60%,72% 25%,78% 25%,78% 60%,85% 60%,85% 45%,90% 45%,90% 65%,96% 65%,96% 50%,100% 50%,100% 100%)',
-    modern: 'polygon(0% 100%,0% 60%,5% 60%,5% 25%,10% 25%,10% 60%,16% 60%,16% 15%,21% 15%,21% 60%,28% 60%,28% 40%,34% 40%,34% 5%,38% 5%,38% 40%,44% 40%,44% 55%,50% 55%,50% 20%,56% 20%,56% 55%,63% 55%,63% 35%,69% 35%,69% 5%,73% 5%,73% 35%,80% 35%,80% 50%,86% 50%,86% 20%,92% 20%,92% 50%,100% 50%,100% 100%)',
-    other:  'polygon(0% 100%,0% 70%,8% 60%,14% 72%,20% 55%,28% 68%,35% 50%,44% 66%,52% 48%,60% 64%,68% 52%,76% 66%,84% 56%,92% 68%,100% 58%,100% 100%)'
-  };
+  var skylineShapeEls = null; // lazily queried once the DOM is ready
 
   function bandKeyFor(hour) {
     if (hour >= 5 && hour < 10) return 'morning';
@@ -570,7 +583,10 @@ footer {
     root.setProperty('--sky-bottom', band.sky[2]);
     root.setProperty('--place-glow', place.accent + '1f');
     root.setProperty('--place-accent', place.accent);
-    root.setProperty('--skyline-shape', SKYLINE_SHAPES[place.skyline]);
+    if (!skylineShapeEls) skylineShapeEls = document.querySelectorAll('.skyline-shape');
+    skylineShapeEls.forEach(function (el) {
+      el.classList.toggle('active', el.dataset.place === place.key);
+    });
     document.body.dataset.band = bandKey;
     updateCelestial(now.getHours(), now.getMinutes(), band);
 
