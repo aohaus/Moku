@@ -409,11 +409,13 @@ const VS_GRID_H = VS_CELL * GRID_ROWS;
 const VS_MARGIN_X = 24;
 const VS_GAP = 32;
 // The モヨクエスト title/level moved out to its own top-left block (see
-// drawVs) instead of a full-width banner above the boards. VS_GRID_Y0 is
-// tall enough for the CPU-side header's big enemy portrait (see
-// vbDrawHud) — the player side only needs a small label, so it just
-// leaves extra breathing room above "YOU" rather than needing the space.
-const VS_GRID_Y0 = 145;
+// drawVs) instead of a full-width banner above the boards. VS_GRID_Y0
+// leaves room, top to bottom, for: the CPU-side header's enemy portrait,
+// its score, and a full-cell-size incoming-お邪魔 standby row sitting
+// right on top of the board frame (see vbDrawHud / vbDrawIncomingGarbage)
+// — the player side only needs a small label, so it just leaves extra
+// breathing room above "YOU" rather than needing all of that space.
+const VS_GRID_Y0 = 180;
 const VS_P_X0 = VS_MARGIN_X;
 const VS_C_X0 = VS_MARGIN_X + VS_GRID_W + VS_GAP;
 const VS_CANVAS_W = VS_C_X0 + VS_GRID_W + VS_MARGIN_X;
@@ -2084,10 +2086,10 @@ function vbDrawHud(b, label, enemyType) {
   ctx.save();
   ctx.textAlign = 'center';
   if (enemyType) {
-    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 70, 42, enemyType);
+    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 125, 26, enemyType);
     ctx.font = 'bold 14px Arial';
     ctx.fillStyle = '#FFE066';
-    ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 20);
+    ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 72);
     ctx.restore();
     return;
   }
@@ -2124,26 +2126,25 @@ function vbDrawNextPreview(b) {
   drawGummyShape(bx + boxW / 2, by + 66, r, v2.color, v2.face, 0, 1, false, v2.magic);
 }
 
-// Incoming お邪魔, shown as a row of small blocks hovering just above the
-// board's own frame (before it actually lands) — same idea as Puyo
-// Puyo's VS-mode ojama tray, so an attack is visible before it drops
-// instead of only a number appearing after the fact.
+// Incoming お邪魔, shown as a full-size standby row hovering directly
+// above the board's own frame, one block per column at the same size as
+// the board's own cells — so it reads as "this row is about to drop
+// in," lined up with the columns it'll land in. Same idea as Puyo Puyo's
+// VS-mode ojama tray. Only the next drop's worth (VS_GARBAGE_PER_DROP)
+// shows as blocks; anything queued beyond that shows as a "+N" count.
 function vbDrawIncomingGarbage(b) {
   if (b.pendingGarbage <= 0) return;
-  const shown = Math.min(b.pendingGarbage, GRID_COLS);
-  const sz = 13, gap = 3;
-  const totalW = shown * sz + (shown - 1) * gap;
-  const startX = b.x0 + VS_GRID_W / 2 - totalW / 2;
-  const y = VS_GRID_Y0 - 12;
-  for (let i = 0; i < shown; i++) {
-    drawGarbageBlock(startX + i * (sz + gap) + sz / 2, y, sz / 0.82);
+  const shown = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
+  const y = VS_GRID_Y0 - VS_CELL / 2 - 8;
+  for (let c = 0; c < shown; c++) {
+    drawGarbageBlock(b.x0 + c * VS_CELL + VS_CELL / 2, y, VS_CELL);
   }
   if (b.pendingGarbage > shown) {
     ctx.save();
     ctx.textAlign = 'left';
     ctx.fillStyle = '#FF8888';
-    ctx.font = 'bold 11px Arial';
-    ctx.fillText(`+${b.pendingGarbage - shown}`, startX + totalW + 5, y + 4);
+    ctx.font = 'bold 15px Arial';
+    ctx.fillText(`+${b.pendingGarbage - shown}`, b.x0 + shown * VS_CELL + 6, y + 5);
     ctx.restore();
   }
 }
