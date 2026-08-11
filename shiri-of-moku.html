@@ -598,6 +598,15 @@ body.on-title #buildInfo { display: block; }
   var chillCount = 0;
   try { chillCount = parseInt(localStorage.getItem(CHILL_KEY), 10) || 0; } catch (e) {}
 
+  // Wordless "growing up" reward: bowtie recolors and a small accessory
+  // appear as the pet count climbs. No unlock text, no menu — just notice it.
+  function chillTierFor(count) {
+    if (count >= 30) return 3;
+    if (count >= 15) return 2;
+    if (count >= 5) return 1;
+    return 0;
+  }
+
   function updateChillCount() {
     document.getElementById('chillCountNum').textContent = chillCount;
   }
@@ -612,12 +621,199 @@ body.on-title #buildInfo { display: block; }
     heart.addEventListener('animationend', function () { heart.remove(); });
   }
 
+  // ---- cosmetic overlays, drawn on top of the canonical drawMokumoku ----
+  function drawChillBowtie(ctx, cx, cy, r, color, colorDark) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(-r * 0.28, r * 0.47, r * 0.24, r * 0.13, -0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.28, r * 0.47, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = colorDark;
+    ctx.beginPath(); ctx.arc(0, r * 0.47, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawChillAccessory(ctx, cx, cy, r) {
+    ctx.save();
+    ctx.translate(cx - r * 0.05, cy - r * 0.95);
+    ctx.fillStyle = '#FFD35C';
+    for (var i = 0; i < 5; i++) {
+      var ang = (Math.PI * 2 / 5) * i;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ang) * r * 0.09, Math.sin(ang) * r * 0.09, r * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#C87818';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.06, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStar(ctx, size) {
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.28, -size * 0.28);
+    ctx.lineTo(size, 0);
+    ctx.lineTo(size * 0.28, size * 0.28);
+    ctx.lineTo(0, size);
+    ctx.lineTo(-size * 0.28, size * 0.28);
+    ctx.lineTo(-size, 0);
+    ctx.lineTo(-size * 0.28, -size * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawChillSparkles(ctx, cx, cy, r, now) {
+    var pts = [
+      { dx: -0.95, dy: -0.55, ph: 0 },
+      { dx: 0.92, dy: -0.65, ph: 1.3 },
+      { dx: -0.75, dy: 0.15, ph: 2.4 },
+      { dx: 0.85, dy: 0.05, ph: 3.6 }
+    ];
+    pts.forEach(function (p) {
+      var tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(now * 0.003 + p.ph));
+      ctx.save();
+      ctx.globalAlpha = tw;
+      ctx.translate(cx + r * p.dx, cy + r * p.dy);
+      ctx.fillStyle = '#FFE9A8';
+      drawStar(ctx, r * 0.09);
+      ctx.restore();
+    });
+  }
+
+  var CHILL_TIER_COLORS = {
+    1: ['#FF8FB0', '#B9527A'],
+    2: ['#FFD35C', '#C8961E'],
+    3: ['#C77DFF', '#7A3D9C']
+  };
+
+  function drawChillCosmetics(ctx, cx, cy, r, tier, now) {
+    if (tier >= 1) {
+      var c = CHILL_TIER_COLORS[tier];
+      drawChillBowtie(ctx, cx, cy, r, c[0], c[1]);
+    }
+    if (tier >= 2) drawChillAccessory(ctx, cx, cy, r);
+    if (tier >= 3) drawChillSparkles(ctx, cx, cy, r, now);
+  }
+
+  // ---- idle-only overlays: wings, blink, doze Zzz ----
+  function drawChillWings(ctx, cx, cy, r, amt) {
+    var angle = amt * 0.6;
+    [-1, 1].forEach(function (side) {
+      ctx.save();
+      ctx.translate(cx + side * r * 0.78, cy + r * 0.05);
+      ctx.rotate(side * (0.3 + angle));
+      ctx.fillStyle = '#B9835C';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.42, r * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function drawChillBlink(ctx, cx, cy, r, amt) {
+    var eyeY = cy - r * 0.14;
+    var eyeW = r * 0.19 * 1.3;
+    var eyeH = r * 0.235 * 1.3 * amt;
+    ctx.fillStyle = '#E8D5B0';
+    [cx - r * 0.32, cx + r * 0.32].forEach(function (ex) {
+      ctx.beginPath();
+      ctx.ellipse(ex, eyeY, eyeW, eyeH, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function drawChillZzz(ctx, cx, cy, r, amt) {
+    ctx.save();
+    ctx.globalAlpha = amt;
+    ctx.fillStyle = 'rgba(245,237,231,0.85)';
+    ctx.font = 'bold ' + Math.round(r * 0.22) + 'px sans-serif';
+    ctx.fillText('z', cx + r * 0.55, cy - r * 0.95);
+    ctx.font = 'bold ' + Math.round(r * 0.16) + 'px sans-serif';
+    ctx.fillText('z', cx + r * 0.78, cy - r * 1.15);
+    ctx.restore();
+  }
+
+  // ---- idle scheduler: fires a random small motion after a few quiet seconds ----
+  var chillIdleTimer = null;
+  var chillIdleAction = null;
+  var chillAnimFrame = null;
+
+  function scheduleChillIdle() {
+    clearTimeout(chillIdleTimer);
+    chillIdleTimer = setTimeout(triggerChillIdle, randInt(3500, 7000));
+  }
+
+  function triggerChillIdle() {
+    var types = ['blink', 'blink', 'blink', 'stretch', 'doze', 'flap'];
+    var type = types[Math.floor(Math.random() * types.length)];
+    var duration = type === 'doze' ? 2200 : type === 'stretch' ? 900 : type === 'flap' ? 700 : 260;
+    chillIdleAction = { type: type, start: performance.now(), duration: duration };
+    scheduleChillIdle();
+  }
+
+  function renderChillFrame(now) {
+    var ctx = chillFace.getContext('2d');
+    var w = chillFace.width, h = chillFace.height;
+    ctx.clearRect(0, 0, w, h);
+
+    var cx = w / 2, cy = h / 2 + 6, r = w * 0.36;
+    var scaleY = 1, blinkAmt = 0, wingAmt = 0, dozeAmt = 0;
+
+    if (chillIdleAction) {
+      var elapsed = now - chillIdleAction.start;
+      var p = clamp(elapsed / chillIdleAction.duration, 0, 1);
+      if (chillIdleAction.type === 'blink') {
+        blinkAmt = Math.sin(p * Math.PI);
+      } else if (chillIdleAction.type === 'stretch') {
+        scaleY = 1 + Math.sin(p * Math.PI) * 0.08;
+      } else if (chillIdleAction.type === 'flap') {
+        wingAmt = Math.sin(p * Math.PI * 3) * 0.5 + 0.5;
+      } else if (chillIdleAction.type === 'doze') {
+        blinkAmt = Math.sin(p * Math.PI);
+        dozeAmt = Math.sin(p * Math.PI);
+      }
+      if (elapsed >= chillIdleAction.duration) chillIdleAction = null;
+    }
+
+    var tier = chillTierFor(chillCount);
+
+    if (wingAmt > 0.02) drawChillWings(ctx, cx, cy, r, wingAmt);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, scaleY);
+    ctx.translate(-cx, -cy);
+    drawMokumoku(ctx, cx, cy, r, 0, 'neutral');
+    drawChillCosmetics(ctx, cx, cy, r, tier, now);
+    if (blinkAmt > 0.04) drawChillBlink(ctx, cx, cy, r, blinkAmt);
+    ctx.restore();
+
+    if (dozeAmt > 0.1) drawChillZzz(ctx, cx, cy, r, dozeAmt);
+
+    chillAnimFrame = requestAnimationFrame(renderChillFrame);
+  }
+
+  function startChillLoop() {
+    chillIdleAction = null;
+    scheduleChillIdle();
+    if (chillAnimFrame) cancelAnimationFrame(chillAnimFrame);
+    chillAnimFrame = requestAnimationFrame(renderChillFrame);
+  }
+
+  function stopChillLoop() {
+    if (chillAnimFrame) cancelAnimationFrame(chillAnimFrame);
+    chillAnimFrame = null;
+    clearTimeout(chillIdleTimer);
+  }
+
   function petMoku() {
+    var prevTier = chillTierFor(chillCount);
     chillCount++;
     updateChillCount();
     try { localStorage.setItem(CHILL_KEY, String(chillCount)); } catch (e) {}
+    var leveledUp = chillTierFor(chillCount) > prevTier;
 
-    var special = Math.random() < 0.08;
+    var special = leveledUp || Math.random() < 0.08;
     var pool = special ? CHILL_SPECIAL_LINES : CHILL_LINES;
     document.getElementById('chillLine').textContent = pool[Math.floor(Math.random() * pool.length)];
 
@@ -626,6 +822,13 @@ body.on-title #buildInfo { display: block; }
     void inner.offsetWidth;
     inner.classList.add(special ? 'chill-bounce-big' : 'chill-bounce');
     popChillHeart();
+    if (leveledUp) {
+      setTimeout(popChillHeart, 120);
+      setTimeout(popChillHeart, 240);
+    }
+
+    chillIdleAction = null;
+    scheduleChillIdle();
   }
 
   // ---------- stage select ----------
@@ -798,11 +1001,12 @@ body.on-title #buildInfo { display: block; }
   document.getElementById('btnGoChill').addEventListener('click', function () {
     updateChillCount();
     document.getElementById('chillLine').innerHTML = '&nbsp;';
-    drawFace(chillFace, 0);
     showScreen('chillScreen');
+    startChillLoop();
   });
   document.getElementById('chillFaceInner').addEventListener('click', petMoku);
   document.getElementById('btnBackToTitleFromChill').addEventListener('click', function () {
+    stopChillLoop();
     showScreen('titleScreen');
   });
 })();
