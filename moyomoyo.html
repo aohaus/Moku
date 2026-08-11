@@ -1906,7 +1906,12 @@ function vbAiStep(b) {
   if (b.piece.rot !== b.aiTarget.rot) { vbRotate(b); return; }
   if (b.piece.col < b.aiTarget.col) { vbMoveRight(b); return; }
   if (b.piece.col > b.aiTarget.col) { vbMoveLeft(b); return; }
-  vbSoftDrop(b);
+  // Aligned — stop here and let the level-tuned passive fall timer (see
+  // vbUpdateBoard's `interval`) carry the piece down instead of
+  // soft-dropping it. Soft-dropping every aiTimer tick used to slam the
+  // piece down in ~5 frames flat regardless of level, completely
+  // overriding fallInterval — a Lv1 CPU looked just as fast as Lv5 the
+  // moment it lined up.
 }
 
 // ─── VS ENEMY PORTRAITS ───────────────────────────────────────
@@ -2055,16 +2060,23 @@ function vbDrawPiece(b) {
   drawGummyShape(c2.x, c2.y, VS_CELL * 0.42, v2.color, v2.face, 0, 1, v2.legendary, v2.magic);
 }
 
-function vbDrawHud(b, label) {
+// label is plain text (used for "YOU"); pass enemyType instead to draw a
+// small portrait icon in that slot (used for the CPU side) — a name
+// alone didn't read as fast as an icon during actual play.
+function vbDrawHud(b, label, enemyType) {
   ctx.save();
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = 'bold 15px Arial';
-  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
-  // Score sits right under the name — small, same counting/scoring as
-  // marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
+  if (enemyType) {
+    drawEnemyRat(b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 30, 15, enemyType);
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold 15px Arial';
+    ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
+  }
+  // Score sits right under the name/icon — small, same counting/scoring
+  // as marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
   // formula) — instead of only at the bottom, so it reads immediately
-  // alongside "YOU" / the boss's name rather than needing a second look.
+  // alongside "YOU" / the boss's icon rather than needing a second look.
   ctx.font = 'bold 14px Arial';
   ctx.fillStyle = '#FFE066';
   ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 10);
@@ -2105,7 +2117,7 @@ function drawVs() {
   if (vsC.phase === 'FALL') vbDrawPiece(vsC);
   drawParticles();
   vbDrawHud(vsP, 'YOU');
-  vbDrawHud(vsC, currentCpuEnemy().name);
+  vbDrawHud(vsC, null, currentCpuEnemy().type);
 
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
