@@ -268,23 +268,101 @@ const SHOOT_COOLDOWN_FRAMES = 18; // min frames between accepted presses, discou
 const POWER_SHOT_SPEED = 12.5;
 
 const MATCH_DURATIONS = [60, 180, 300]; // 1 / 3 / 5 minutes, in seconds
+const TIME_LABELS = ['1 分', '3 分', '5 分'];
 const CPU_LEVELS = [
   { label: 'かんたん',   accel: 0.55, maxSpeed: 4.4, wanderAmp: 0.9, wanderMax: 46 },
   { label: 'ふつう',     accel: 0.8,  maxSpeed: 5.6, wanderAmp: 0.6, wanderMax: 30 },
   { label: 'むずかしい', accel: 1.05, maxSpeed: 6.8, wanderAmp: 0.3, wanderMax: 14 },
 ];
 
-// Time-select screen layout (shared between draw & hit-testing)
-const TS_CARD_W = 170, TS_CARD_H = 140, TS_CARD_GAP = 30, TS_CARD_Y = 178;
-const TS_LVL_W = 140, TS_LVL_H = 46, TS_LVL_GAP = 16;
-const TS_LVL_Y = TS_CARD_Y + TS_CARD_H + 46;
+// ─── PLAYER ROSTER / PROGRESSION ───────────────────────────────
+const STARTER_PLAYERS = [
+  { id: 'jpn', flag: '🇯🇵', code: 'JPN', name: 'Moto Junya' },
+  { id: 'bra', flag: '🇧🇷', code: 'BRA', name: 'Mozemiro' },
+  { id: 'esp', flag: '🇪🇸', code: 'ESP', name: 'Momin Yamal' },
+];
+const BALL_SKINS = [
+  { id: 'trionda', label: 'トライカラー', colors: ['#2FAE66', '#2C93D6', '#F0632F'] },
+  { id: 'classic',  label: 'クラシック',   colors: ['#3A3A3A', '#3A3A3A', '#3A3A3A'] },
+  { id: 'sunset',   label: 'サンセット',   colors: ['#F0632F', '#FFC94A', '#E4483A'] },
+];
+const MAX_STAT_LEVEL = 20;
+const SHOP_PRICE = 50;      // points to unlock a non-starting country's player
+const WIN_BASE_POINTS = 10; // points awarded for a Ready! win, before streak boost
+function upgradeCost(level) { return level; } // Lv1→2 costs 1pt, Lv2→3 costs 2pt, ...
+function statMult(level) { return 1 + (level - 1) * 0.04; } // Lv20 ≈ +76%
+
+const SAVE_KEY = 'moku:mk-mobile:profile';
+function defaultProfile() {
+  return {
+    version: 1,
+    gameId: 'mk-mobile',
+    players: {},        // id -> { owned, name, sp, sh, def }
+    activePlayerId: null,
+    ballSkin: BALL_SKINS[0].id,
+    points: 0,
+    winStreak: 0,
+    lastWinDate: null,  // yyyy-mm-dd of the streak's most recent win
+    matchDurationIdx: 0,
+    cpuLevel: 1,
+    updatedAt: null,
+  };
+}
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return defaultProfile();
+    return Object.assign(defaultProfile(), JSON.parse(raw));
+  } catch (e) { return defaultProfile(); }
+}
+function saveProfile() {
+  profile.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch (e) {}
+}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function activePlayer() { return profile.players[profile.activePlayerId] || null; }
+function ownedIds() { return STARTER_PLAYERS.map(p => p.id).filter(id => profile.players[id] && profile.players[id].owned); }
+function currentBallColors() { return (BALL_SKINS.find(s => s.id === profile.ballSkin) || BALL_SKINS[0]).colors; }
+
+// ─── HOME / ROSTER / PROFILE screen layout (shared between draw & hit-testing) ──
+const PF_AVATAR_X = 210, PF_AVATAR_Y = 168, PF_AVATAR_R = 62;
+const PF_BAR_X = 70, PF_BAR_W = 280, PF_BAR_Y0 = 340, PF_BAR_GAP = 38, PF_BAR_H = 14;
+const PF_ICON_X = 1160, PF_ICON_Y0 = 130, PF_ICON_GAP = 82, PF_ICON_SIZE = 60;
+const PF_TIME_W = 84, PF_TIME_H = 60, PF_TIME_GAP = 14, PF_TIME_Y = 222;
+const PF_LVL_W = 104, PF_LVL_H = 34, PF_LVL_GAP = 12, PF_LVL_Y = PF_TIME_Y + PF_TIME_H + 42;
+const PF_READY_Y = 400, PF_FREEPLAY_Y = 468;
+const PROFILE_ICONS = [
+  { key: 'manage',  icon: '👤', label: 'Profile' },
+  { key: 'upgrade', icon: '⬆️', label: 'Upgrade' },
+  { key: 'shop',    icon: '🛒', label: 'Shop' },
+  { key: 'ball',    icon: '⚽', label: 'Ball' },
+];
+const ROSTER_CARD_W = 170, ROSTER_CARD_H = 190, ROSTER_CARD_GAP = 30, ROSTER_CARD_Y = 190;
+
+// Modal panel (opened from the Profile icon rail / avatar tap)
+const PANEL_X = 200, PANEL_Y = 60, PANEL_W = 860, PANEL_H = 456;
+const MANAGE_ROW_Y0 = PANEL_Y + 90, MANAGE_ROW_H = 74;
+const UPG_ROW_Y0 = PANEL_Y + 100, UPG_ROW_H = 110;
+const SHOP_ROW_Y0 = PANEL_Y + 90, SHOP_ROW_H = 96;
+const BALL_ITEM_Y0 = PANEL_Y + 110, BALL_ITEM_W = 190, BALL_ITEM_H = 190;
 
 // ─── STATE ────────────────────────────────────────────────────
-let state = 'TITLE'; // TITLE | TIMESELECT | PLAYING | PAUSED | GOAL_PAUSE | GAMEOVER
+let state = 'TITLE'; // TITLE | HOME | ROSTER | PROFILE | VS | PLAYING | PAUSED | GOAL_PAUSE | GAMEOVER
 let titleFrame = 0;
-let matchFramesTotal = MATCH_DURATIONS[0] * 60;
+let profile = loadProfile();
+let profilePanel = null; // null | 'manage' | 'upgrade' | 'shop' | 'ball' — open panel within PROFILE
+let cpuLevel = profile.cpuLevel;                 // index into CPU_LEVELS
+let matchDurationIdx = profile.matchDurationIdx; // index into MATCH_DURATIONS
+let matchMode = 'ready'; // 'ready' (CPU, points-earning) | 'freeplay' (2P, not yet implemented)
+let vsTimer = 0;         // frames left in the VS-screen kickoff countdown
+let lastPointsEarned = 0, lastBoostX2 = false; // for the game-over summary
+// Player-stat-derived gameplay values, recomputed in applyPlayerStats() each match
+let fxPlayerMaxSpeed = PLAYER_MAX_SPEED;
+let fxPlayerR = PLAYER_R;
+let fxPaddleHitBase = PADDLE_HIT_BASE_SPEED;
+let fxPowerShotSpeed = POWER_SHOT_SPEED;
+let matchFramesTotal = MATCH_DURATIONS[matchDurationIdx] * 60;
 let matchFramesLeft = matchFramesTotal;
-let cpuLevel = 1; // index into CPU_LEVELS, chosen on the time-select screen
 let scoreHome = 0, scoreAway = 0;
 let goalPauseTimer = 0;
 let goalMessage = '';
@@ -420,7 +498,8 @@ function drawMokumoku(x, y, r, angle) {
 // ─── BALL ─────────────────────────────────────────────────────
 // Stylized Trionda-esque tri-color pinwheel panels on a white base,
 // rather than a classic black-and-white pentagon ball. Spins with speed.
-const BALL_PANEL_COLORS = ['#2FAE66', '#2C93D6', '#F0632F'];
+// Panel colors come from the equipped skin (profile.ballSkin, see the Ball
+// customization panel), swappable freely as a cosmetic-only choice.
 function drawBall() {
   ctx.save();
   ctx.translate(ball.x, ball.y);
@@ -431,7 +510,7 @@ function drawBall() {
   ctx.save();
   ctx.rotate(ball.spin);
   ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.clip();
-  BALL_PANEL_COLORS.forEach((col, i) => {
+  currentBallColors().forEach((col, i) => {
     ctx.save();
     ctx.rotate((i * Math.PI * 2) / 3);
     ctx.fillStyle = col;
@@ -520,8 +599,8 @@ function applyMovement(entity, dx, dy, maxSpeed, minX, maxX, minY, maxY) {
 function updatePlayer() {
   let dx = (held.right ? 1 : 0) - (held.left ? 1 : 0) + stickX;
   let dy = (held.down ? 1 : 0) - (held.up ? 1 : 0) + stickY;
-  applyMovement(player, dx, dy, PLAYER_MAX_SPEED,
-    PITCH_X0 + PLAYER_R, HALF_X - PLAYER_R, PITCH_Y0 + PLAYER_R, PITCH_Y1 - PLAYER_R);
+  applyMovement(player, dx, dy, fxPlayerMaxSpeed,
+    PITCH_X0 + fxPlayerR, HALF_X - fxPlayerR, PITCH_Y0 + fxPlayerR, PITCH_Y1 - fxPlayerR);
 }
 
 let cpuWander = 0;
@@ -559,10 +638,10 @@ function resolvePaddleHit(entity, radius) {
     // lets normal wall restitution/friction bleed the energy off.
     if (!entity.touching) {
       const curSpeed = Math.hypot(ball.vx, ball.vy);
-      let speed = Math.max(PADDLE_HIT_BASE_SPEED, curSpeed);
+      let speed = Math.max(entity === player ? fxPaddleHitBase : PADDLE_HIT_BASE_SPEED, curSpeed);
       let isPowerShot = false;
       if (entity === player && frameCount - shootPressFrame <= SHOOT_WINDOW_FRAMES) {
-        speed = Math.max(POWER_SHOT_SPEED, curSpeed * 1.4);
+        speed = Math.max(fxPowerShotSpeed, curSpeed * 1.4);
         isPowerShot = true;
         shootPressFrame = -Infinity; // consume the buffered press
       }
@@ -596,7 +675,7 @@ function updateBall() {
   // shove the ball back past the wall it had just bounced off, which made
   // the ball + paddle settle into an exact repeating position/velocity each
   // frame — a permanent freeze whenever the ball got trapped in a corner.)
-  resolvePaddleHit(player, PLAYER_R);
+  resolvePaddleHit(player, fxPlayerR);
   resolvePaddleHit(cpu, CPU_R);
 
   if (ball.y - BALL_R < PITCH_Y0) { ball.y = PITCH_Y0 + BALL_R; ball.vy = -ball.vy * WALL_BOUNCE; }
@@ -629,8 +708,11 @@ function updateHUD() {
   document.getElementById('score-display').textContent = `${scoreHome} - ${scoreAway}`;
 }
 function updateTimeDisplay() {
-  const secs = Math.max(0, Math.ceil(matchFramesLeft / 60));
-  const mm = Math.floor(secs / 60), ss = secs % 60;
+  // Counts UP from 0:00 to the selected match length (soccer-style clock),
+  // rather than counting down — the end condition itself is unchanged.
+  const totalSecs = MATCH_DURATIONS[matchDurationIdx];
+  const elapsed = Math.min(totalSecs, Math.floor((matchFramesTotal - matchFramesLeft) / 60));
+  const mm = Math.floor(elapsed / 60), ss = elapsed % 60;
   document.getElementById('time-display').textContent = `${mm}:${String(ss).padStart(2, '0')}`;
 }
 
@@ -726,66 +808,131 @@ function drawTitleScreen() {
   ctx.fillText('タップ / クリックで選択　・　Enterでスタート', W/2, H - 20);
 }
 
-// ─── TIME SELECT SCREEN ───────────────────────────────────────
-const TIME_LABELS = ['1 分', '3 分', '5 分'];
-function drawTimeSelect() {
+// ─── HOME (hub) ─────────────────────────────────────────────
+// New screen between the title splash and the roster/profile flow. Routes
+// first-time players into ROSTER (pick a starter) and returning players
+// straight into PROFILE, per the onboarding-flow design discussion.
+function drawHome() {
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,201,74,0.3)'; ctx.lineWidth = 3;
-  ctx.strokeRect(12, 12, W - 24, H - 24);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EFFFEA';
+  ctx.font = 'bold 32px Arial';
+  ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 18;
+  ctx.fillText('🏠 ホーム', W/2, 100);
+  ctx.shadowBlur = 0;
   ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFE9A8';
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText(`💰 ${profile.points} pt`, W/2, 150);
+  if (profile.winStreak >= 2) {
+    ctx.fillStyle = '#FF9A52';
+    ctx.font = '14px Arial';
+    ctx.fillText(`🔥 ${profile.winStreak} 連勝中！ブーストx2`, W/2, 174);
+  }
+  ctx.restore();
+
+  const ap = activePlayer();
+  if (ap) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,201,74,0.1)';
+    ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(W/2 - 160, 210, 320, 160, 20); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    drawMokumoku(W/2, 280, 46, 0);
+    const country = STARTER_PLAYERS.find(p => p.id === profile.activePlayerId);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(ap.name, W/2, 344);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '13px Arial';
+    ctx.fillText(country ? `${country.flag} ${country.code}` : '', W/2, 362);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = '16px Arial';
+    ctx.fillText('はじめての選手をえらぼう！', W/2, 280);
+    ctx.restore();
+  }
+
+  const btnY = 420;
+  ctx.save();
+  ctx.shadowColor = '#FFC94A'; ctx.shadowBlur = 10;
+  ctx.fillStyle = '#FFC94A';
+  ctx.beginPath(); ctx.roundRect(W/2 - 100, btnY - 26, 200, 52, 26); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#201200';
+  ctx.font = 'bold 19px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(ap ? '▶ すすむ' : '選手をえらぶ', W/2, btnY);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '13px Arial';
+  ctx.fillText('◀ タイトルにもどる', 70, H - 26);
+  ctx.restore();
+}
+
+// ─── ROSTER (Screen 1, first-time players only) ────────────────
+function drawRoster() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   ctx.save();
   ctx.textAlign = 'center';
   ctx.fillStyle = '#EFFFEA';
-  ctx.font = 'bold 28px Arial';
+  ctx.font = 'bold 26px Arial';
   ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 16;
-  ctx.fillText('試合時間をえらぼう', W/2, 130);
+  ctx.fillText('スターティング選手をえらぼう', W/2, 130);
   ctx.shadowBlur = 0;
   ctx.restore();
 
-  const totalW = TS_CARD_W * 3 + TS_CARD_GAP * 2;
+  const cards = [...STARTER_PLAYERS, null]; // null = "More" coming-soon slot
+  const totalW = ROSTER_CARD_W * 4 + ROSTER_CARD_GAP * 3;
   const startX = W/2 - totalW/2;
-  TIME_LABELS.forEach((label, i) => {
-    const x = startX + i * (TS_CARD_W + TS_CARD_GAP);
+  cards.forEach((pl, i) => {
+    const x = startX + i * (ROSTER_CARD_W + ROSTER_CARD_GAP);
     ctx.save();
-    ctx.fillStyle = 'rgba(255,201,74,0.14)';
-    ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(x, TS_CARD_Y, TS_CARD_W, TS_CARD_H, 20); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#FFC94A';
-    ctx.font = '36px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('⏱', x + TS_CARD_W/2, TS_CARD_Y + 56);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 22px Arial';
-    ctx.fillText(label, x + TS_CARD_W/2, TS_CARD_Y + 100);
-    ctx.restore();
-  });
-
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '13px Arial';
-  ctx.fillText('CPU レベル', W/2, TS_LVL_Y - 12);
-  ctx.restore();
-
-  const lvlTotalW = TS_LVL_W * 3 + TS_LVL_GAP * 2;
-  const lvlStartX = W/2 - lvlTotalW/2;
-  CPU_LEVELS.forEach((lvl, i) => {
-    const x = lvlStartX + i * (TS_LVL_W + TS_LVL_GAP);
-    const selected = i === cpuLevel;
-    ctx.save();
-    ctx.fillStyle = selected ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.08)';
-    ctx.strokeStyle = selected ? 'rgba(255,201,74,0.9)' : 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(x, TS_LVL_Y, TS_LVL_W, TS_LVL_H, 23); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = selected ? '#201200' : 'rgba(255,255,255,0.85)';
-    ctx.font = (selected ? 'bold ' : '') + '15px Arial';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(lvl.label, x + TS_LVL_W/2, TS_LVL_Y + TS_LVL_H/2);
-    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'center';
+    if (pl) {
+      ctx.fillStyle = 'rgba(255,201,74,0.14)';
+      ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(x, ROSTER_CARD_Y, ROSTER_CARD_W, ROSTER_CARD_H, 20); ctx.fill(); ctx.stroke();
+      ctx.font = '46px Arial';
+      ctx.fillText(pl.flag, x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 66);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText(pl.code, x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 108);
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.font = '13px Arial';
+      ctx.fillText(pl.name, x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 132);
+    } else {
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(x, ROSTER_CARD_Y, ROSTER_CARD_W, ROSTER_CARD_H, 20); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '34px Arial';
+      ctx.fillText('➕', x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 76);
+      ctx.font = 'bold 15px Arial';
+      ctx.fillText('More', x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 112);
+      ctx.font = '11px Arial';
+      ctx.fillText('Coming Soon', x + ROSTER_CARD_W/2, ROSTER_CARD_Y + 130);
+    }
     ctx.restore();
   });
 
@@ -793,7 +940,424 @@ function drawTimeSelect() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '13px Arial';
-  ctx.fillText('◀ タイトルにもどる', 70, H - 26);
+  ctx.fillText('◀ ホームへ', 70, H - 26);
+  ctx.restore();
+}
+function pickStarter(id) {
+  const meta = STARTER_PLAYERS.find(p => p.id === id);
+  if (!meta) return;
+  profile.players[id] = { owned: true, name: meta.name, sp: 1, sh: 1, def: 1 };
+  profile.activePlayerId = id;
+  saveProfile();
+  state = 'PROFILE';
+}
+
+// ─── PROFILE (Screens 2+3, merged: stats/edit + match settings) ───
+function drawStatBar(x, y, w, h, level, color) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
+  const pct = Math.min(1, level / MAX_STAT_LEVEL);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.roundRect(x, y, Math.max(h, w * pct), h, h / 2); ctx.fill();
+  ctx.restore();
+}
+function drawProfile() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const ap = activePlayer();
+  const country = STARTER_PLAYERS.find(p => p.id === profile.activePlayerId);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '13px Arial';
+  ctx.fillText('選手プロフィール', PF_AVATAR_X, 58);
+  ctx.restore();
+
+  drawMokumoku(PF_AVATAR_X, PF_AVATAR_Y, PF_AVATAR_R, 0);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '11px Arial';
+  ctx.fillText('タップして編集', PF_AVATAR_X, PF_AVATAR_Y + PF_AVATAR_R + 22);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px Arial';
+  ctx.fillText(ap ? ap.name : '---', PF_AVATAR_X, PF_AVATAR_Y + PF_AVATAR_R + 50);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '13px Arial';
+  ctx.fillText(country ? `${country.flag} ${country.code}` : '', PF_AVATAR_X, PF_AVATAR_Y + PF_AVATAR_R + 72);
+  ctx.restore();
+
+  [['sp', 'Sp', '#7FE87F'], ['sh', 'Sh', '#FF9A52'], ['def', 'Def', '#5CB8FF']].forEach(([key, label, color], i) => {
+    const y = PF_BAR_Y0 + i * PF_BAR_GAP;
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = 'bold 13px Arial';
+    ctx.fillText(label, PF_BAR_X, y - 6);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '11px Arial';
+    ctx.fillText(`Lv ${ap ? ap[key] : 0}/${MAX_STAT_LEVEL}`, PF_BAR_X + PF_BAR_W, y - 6);
+    ctx.restore();
+    drawStatBar(PF_BAR_X, y, PF_BAR_W, PF_BAR_H, ap ? ap[key] : 0, color);
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFE9A8';
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText(`💰 ${profile.points} pt`, W/2, 88);
+  if (profile.winStreak >= 2) {
+    ctx.fillStyle = '#FF9A52';
+    ctx.font = '12px Arial';
+    ctx.fillText(`🔥 ${profile.winStreak}連勝中！ブーストx2`, W/2, 106);
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '12px Arial';
+  ctx.fillText('試合時間', W/2, PF_TIME_Y - 12);
+  ctx.restore();
+  const timeTotalW = PF_TIME_W * 3 + PF_TIME_GAP * 2;
+  const timeStartX = W/2 - timeTotalW/2;
+  TIME_LABELS.forEach((label, i) => {
+    const x = timeStartX + i * (PF_TIME_W + PF_TIME_GAP);
+    const selected = i === matchDurationIdx;
+    ctx.save();
+    ctx.fillStyle = selected ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = selected ? 'rgba(255,201,74,0.9)' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, PF_TIME_Y, PF_TIME_W, PF_TIME_H, 16); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = selected ? '#201200' : '#fff';
+    ctx.font = (selected ? 'bold ' : '') + '16px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + PF_TIME_W/2, PF_TIME_Y + PF_TIME_H/2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '12px Arial';
+  ctx.fillText('CPU レベル', W/2, PF_LVL_Y - 10);
+  ctx.restore();
+  const lvlTotalW = PF_LVL_W * 3 + PF_LVL_GAP * 2;
+  const lvlStartX = W/2 - lvlTotalW/2;
+  CPU_LEVELS.forEach((lvl, i) => {
+    const x = lvlStartX + i * (PF_LVL_W + PF_LVL_GAP);
+    const selected = i === cpuLevel;
+    ctx.save();
+    ctx.fillStyle = selected ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = selected ? 'rgba(255,201,74,0.9)' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, PF_LVL_Y, PF_LVL_W, PF_LVL_H, 17); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = selected ? '#201200' : 'rgba(255,255,255,0.85)';
+    ctx.font = (selected ? 'bold ' : '') + '13px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(lvl.label, x + PF_LVL_W/2, PF_LVL_Y + PF_LVL_H/2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.shadowColor = '#FFC94A'; ctx.shadowBlur = 14;
+  ctx.fillStyle = '#FFC94A';
+  ctx.beginPath(); ctx.roundRect(W/2 - 120, PF_READY_Y - 28, 240, 56, 28); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#201200';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ READY!', W/2, PF_READY_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.roundRect(W/2 - 110, PF_FREEPLAY_Y - 22, 220, 44, 22); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(W/2 - 110, PF_FREEPLAY_Y - 22, 220, 44, 22); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '13px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🤝 フリープレイ（Coming Soon）', W/2, PF_FREEPLAY_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  PROFILE_ICONS.forEach((item, i) => {
+    const y = PF_ICON_Y0 + i * PF_ICON_GAP;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,201,74,0.14)';
+    ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(PF_ICON_X - PF_ICON_SIZE/2, y - PF_ICON_SIZE/2, PF_ICON_SIZE, PF_ICON_SIZE, 16); ctx.fill(); ctx.stroke();
+    ctx.font = '26px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(item.icon, PF_ICON_X, y - 4);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '10px Arial';
+    ctx.fillText(item.label, PF_ICON_X, y + PF_ICON_SIZE/2 + 14);
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '12px Arial';
+  ctx.fillText('◀ ホームへ', 70, H - 26);
+  ctx.restore();
+
+  if (profilePanel) drawProfilePanel();
+}
+
+function drawPanelFrame(title) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(5,10,25,0.78)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#101A3A';
+  ctx.strokeStyle = 'rgba(255,201,74,0.6)'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 20); ctx.fill(); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EFFFEA';
+  ctx.font = 'bold 20px Arial';
+  ctx.fillText(title, PANEL_X + PANEL_W/2, PANEL_Y + 40);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(PANEL_X + PANEL_W - 38, PANEL_Y + 18); ctx.lineTo(PANEL_X + PANEL_W - 18, PANEL_Y + 38); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PANEL_X + PANEL_W - 18, PANEL_Y + 18); ctx.lineTo(PANEL_X + PANEL_W - 38, PANEL_Y + 38); ctx.stroke();
+  ctx.restore();
+}
+function drawProfilePanel() {
+  if (profilePanel === 'manage') return drawManagePanel();
+  if (profilePanel === 'upgrade') return drawUpgradePanel();
+  if (profilePanel === 'shop') return drawShopPanel();
+  if (profilePanel === 'ball') return drawBallPanel();
+}
+function drawManagePanel() {
+  drawPanelFrame('👤 プロフィール');
+  const owned = ownedIds();
+  owned.forEach((id, i) => {
+    const pl = profile.players[id];
+    const meta = STARTER_PLAYERS.find(s => s.id === id);
+    const y = MANAGE_ROW_Y0 + i * MANAGE_ROW_H;
+    const active = id === profile.activePlayerId;
+    ctx.save();
+    ctx.fillStyle = active ? 'rgba(255,201,74,0.18)' : 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = active ? 'rgba(255,201,74,0.6)' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(PANEL_X + 40, y, PANEL_W - 80, MANAGE_ROW_H - 16, 14); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '28px Arial';
+    ctx.fillText(meta.flag, PANEL_X + 62, y + (MANAGE_ROW_H - 16) / 2);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(`${pl.name}  (${meta.code})`, PANEL_X + 110, y + (MANAGE_ROW_H - 16) / 2);
+    ctx.textBaseline = 'alphabetic';
+    if (active) {
+      ctx.fillStyle = '#FFC94A'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'right';
+      ctx.fillText('使用中', PANEL_X + PANEL_W - 100, y + (MANAGE_ROW_H - 16) / 2 + 4);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W - 220, y + 10, 130, 32, 16); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('えらぶ', PANEL_X + PANEL_W - 155, y + 10 + 16 + 4);
+    }
+    ctx.restore();
+  });
+
+  const renameY = MANAGE_ROW_Y0 + owned.length * MANAGE_ROW_H + 20;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W/2 - 110, renameY, 220, 42, 21); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W/2 - 110, renameY, 220, 42, 21); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = '14px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('✏️ 名前を変える', PANEL_X + PANEL_W/2, renameY + 21);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+function drawUpgradePanel() {
+  drawPanelFrame('⬆️ アップグレード');
+  const ap = activePlayer();
+  if (!ap) return;
+  [['sp', 'Sp', '#7FE87F'], ['sh', 'Sh', '#FF9A52'], ['def', 'Def', '#5CB8FF']].forEach(([key, label, color], i) => {
+    const y = UPG_ROW_Y0 + i * UPG_ROW_H;
+    const level = ap[key];
+    const cost = upgradeCost(level);
+    const maxed = level >= MAX_STAT_LEVEL;
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Arial';
+    ctx.fillText(`${label}  Lv ${level}/${MAX_STAT_LEVEL}`, PANEL_X + 50, y);
+    ctx.restore();
+    drawStatBar(PANEL_X + 50, y + 14, PANEL_W - 260, 16, level, color);
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '12px Arial';
+    ctx.fillText(maxed ? 'MAX' : `次のLvまで ${cost}pt`, PANEL_X + 50, y + 50);
+    ctx.restore();
+    const canAfford = !maxed && profile.points >= cost;
+    ctx.save();
+    ctx.fillStyle = maxed ? 'rgba(255,255,255,0.08)' : (canAfford ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.12)');
+    ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W - 190, y - 10, 130, 44, 22); ctx.fill();
+    ctx.fillStyle = maxed ? 'rgba(255,255,255,0.3)' : (canAfford ? '#201200' : 'rgba(255,255,255,0.35)');
+    ctx.font = 'bold 15px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(maxed ? 'MAX' : '+ 強化', PANEL_X + PANEL_W - 125, y + 12);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  });
+}
+function upgradeStat(key) {
+  const ap = activePlayer();
+  if (!ap) return;
+  const level = ap[key];
+  if (level >= MAX_STAT_LEVEL) return;
+  const cost = upgradeCost(level);
+  if (profile.points < cost) return;
+  profile.points -= cost;
+  ap[key] = level + 1;
+  saveProfile();
+}
+function drawShopPanel() {
+  drawPanelFrame('🛒 プレイヤーショップ');
+  const unowned = STARTER_PLAYERS.filter(p => !(profile.players[p.id] && profile.players[p.id].owned));
+  if (unowned.length === 0) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '16px Arial';
+    ctx.fillText('全選手をコンプリート！', PANEL_X + PANEL_W/2, PANEL_Y + 160);
+    ctx.restore();
+  } else {
+    unowned.forEach((meta, i) => {
+      const y = SHOP_ROW_Y0 + i * SHOP_ROW_H;
+      const canAfford = profile.points >= SHOP_PRICE;
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(PANEL_X + 40, y, PANEL_W - 80, SHOP_ROW_H - 16, 14); ctx.fill(); ctx.stroke();
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.font = '30px Arial';
+      ctx.fillText(meta.flag, PANEL_X + 62, y + (SHOP_ROW_H - 16) / 2);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Arial';
+      ctx.fillText(`${meta.name} (${meta.code})`, PANEL_X + 112, y + (SHOP_ROW_H - 16) / 2);
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = canAfford ? 'rgba(255,201,74,0.85)' : 'rgba(255,255,255,0.12)';
+      ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W - 220, y + 13, 150, 42, 21); ctx.fill();
+      ctx.fillStyle = canAfford ? '#201200' : 'rgba(255,255,255,0.35)';
+      ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`💰${SHOP_PRICE} こうにゅう`, PANEL_X + PANEL_W - 145, y + 34);
+      ctx.textBaseline = 'alphabetic';
+      ctx.restore();
+    });
+  }
+  const moreY = SHOP_ROW_Y0 + unowned.length * SHOP_ROW_H + 10;
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(PANEL_X + 40, moreY, PANEL_W - 80, SHOP_ROW_H - 16, 14); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '13px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('他の国の選手 - Coming Soon', PANEL_X + PANEL_W/2, moreY + (SHOP_ROW_H - 16) / 2 + 4);
+  ctx.restore();
+}
+function buyPlayer(id) {
+  if (profile.points < SHOP_PRICE) return;
+  const meta = STARTER_PLAYERS.find(p => p.id === id);
+  if (!meta || (profile.players[id] && profile.players[id].owned)) return;
+  profile.points -= SHOP_PRICE;
+  profile.players[id] = { owned: true, name: meta.name, sp: 1, sh: 1, def: 1 };
+  saveProfile();
+}
+function drawBallPanel() {
+  drawPanelFrame('⚽ ボール');
+  const totalW = BALL_SKINS.length * BALL_ITEM_W + (BALL_SKINS.length - 1) * 20;
+  const startX = PANEL_X + PANEL_W/2 - totalW/2;
+  BALL_SKINS.forEach((skin, i) => {
+    const x = startX + i * (BALL_ITEM_W + 20);
+    const y = BALL_ITEM_Y0;
+    const equipped = skin.id === profile.ballSkin;
+    ctx.save();
+    ctx.fillStyle = equipped ? 'rgba(255,201,74,0.18)' : 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = equipped ? 'rgba(255,201,74,0.7)' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x, y, BALL_ITEM_W, BALL_ITEM_H, 16); ctx.fill(); ctx.stroke();
+    const cx = x + BALL_ITEM_W/2, cy = y + 80, br = 46;
+    ctx.beginPath(); ctx.arc(cx, cy, br, 0, Math.PI * 2);
+    ctx.fillStyle = '#F8F8F2'; ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, br, 0, Math.PI * 2); ctx.clip();
+    skin.colors.forEach((col, j) => {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate((j * Math.PI * 2) / 3);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(br * 0.85, -br * 0.5, br * 1.3, br * 0.15);
+      ctx.quadraticCurveTo(br * 0.55, br * 0.25, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    });
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx, cy, br, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(skin.label, x + BALL_ITEM_W/2, y + 150);
+    if (equipped) { ctx.fillStyle = '#FFC94A'; ctx.font = '12px Arial'; ctx.fillText('装備中', x + BALL_ITEM_W/2, y + 170); }
+    ctx.restore();
+  });
+}
+
+// ─── VS (pre-match matchup + kickoff countdown) ────────────────
+function enterVS() {
+  state = 'VS';
+  profilePanel = null;
+  vsTimer = 5 * 60; // 5s countdown at 60fps
+}
+function drawVS() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0B1330'); bg.addColorStop(1, '#0A1228');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const ap = activePlayer();
+  drawMokumoku(W/2 - 220, PITCH_CY - 20, 56, 0);
+  drawMokuFace(W/2 + 220, PITCH_CY - 20, 48, '#3D7DD8', '#F0DFBC', 0);
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Arial';
+  ctx.fillText(ap ? ap.name : '', W/2 - 220, PITCH_CY + 70);
+  ctx.fillText(`CPU (${CPU_LEVELS[cpuLevel].label})`, W/2 + 220, PITCH_CY + 70);
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#FFC94A'; ctx.shadowBlur = 22;
+  ctx.fillStyle = '#FFC94A';
+  ctx.font = 'bold 46px Arial';
+  ctx.fillText('VS', W/2, PITCH_CY - 10);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  const secs = Math.max(1, Math.ceil(vsTimer / 60));
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EFFFEA'; ctx.font = 'bold 64px Arial';
+  ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 20;
+  ctx.fillText(String(secs), W/2, PITCH_CY + 160);
+  ctx.shadowBlur = 0;
   ctx.restore();
 }
 
@@ -831,7 +1395,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = '15px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.fillText('🏠 ホームへ', W/2, PAUSE_QUIT_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
@@ -840,7 +1404,10 @@ function drawPausedOverlay() {
 function draw() {
   ctx.clearRect(0, 0, W, H);
   if (state === 'TITLE') { drawTitleScreen(); return; }
-  if (state === 'TIMESELECT') { drawTimeSelect(); return; }
+  if (state === 'HOME') { drawHome(); return; }
+  if (state === 'ROSTER') { drawRoster(); return; }
+  if (state === 'PROFILE') { drawProfile(); return; }
+  if (state === 'VS') { drawVS(); return; }
 
   ctx.save();
   ctx.translate(shakeX, shakeY);
@@ -853,7 +1420,7 @@ function draw() {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   drawPitch();
-  drawMokumoku(player.x, player.y, PLAYER_R, 0);
+  drawMokumoku(player.x, player.y, fxPlayerR, 0);
   drawMokuFace(cpu.x, cpu.y, CPU_R, '#3D7DD8', '#F0DFBC', 0);
   drawBall();
   drawParticles();
@@ -876,7 +1443,7 @@ function draw() {
     ctx.shadowColor = '#FF6A3D'; ctx.shadowBlur = 20;
     ctx.fillStyle = '#FFE0A0';
     const msgX = Math.max(90, Math.min(W - 90, player.x));
-    ctx.fillText(shotMessage, msgX, player.y - PLAYER_R - 16);
+    ctx.fillText(shotMessage, msgX, player.y - fxPlayerR - 16);
     ctx.restore();
   }
 
@@ -912,6 +1479,8 @@ function update() {
       homePositions();
       state = 'PLAYING';
     }
+  } else if (state === 'VS') {
+    if (--vsTimer <= 0) startMatch();
   }
 }
 
@@ -922,11 +1491,22 @@ function loop() {
 }
 
 // ─── GAME FLOW ────────────────────────────────────────────────
-function startMatch(durationSeconds) {
+// Sp/Sh/Def levels (1-20) scale the active player's speed, shot power, and
+// blocking radius for the upcoming match. Called once per match start.
+function applyPlayerStats() {
+  const ap = activePlayer();
+  const sp = ap ? ap.sp : 1, sh = ap ? ap.sh : 1, def = ap ? ap.def : 1;
+  fxPlayerMaxSpeed = PLAYER_MAX_SPEED * statMult(sp);
+  fxPaddleHitBase = PADDLE_HIT_BASE_SPEED * (1 + (sh - 1) * 0.02);
+  fxPowerShotSpeed = POWER_SHOT_SPEED * statMult(sh);
+  fxPlayerR = PLAYER_R + (def - 1) * 0.5;
+}
+function startMatch() {
   state = 'PLAYING';
   scoreHome = 0; scoreAway = 0;
-  matchFramesTotal = durationSeconds * 60;
+  matchFramesTotal = MATCH_DURATIONS[matchDurationIdx] * 60;
   matchFramesLeft = matchFramesTotal;
+  applyPlayerStats();
   particles = [];
   shakeX = 0; shakeY = 0; flashAlpha = 0;
   frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
@@ -950,6 +1530,29 @@ function endMatch() {
   document.getElementById('joystick').style.visibility = 'hidden';
   document.getElementById('shoot-btn').style.visibility = 'hidden';
   resetStick();
+
+  // Points/streak only accrue in Ready! (vs CPU) mode. A win extends the
+  // streak and, from 2 wins in a row, doubles the payout; a loss — or a
+  // win on a new calendar day after the streak's last win — zeroes it, so
+  // the boost never carries over to the next day.
+  const won = scoreHome > scoreAway;
+  lastPointsEarned = 0; lastBoostX2 = false;
+  if (matchMode === 'ready') {
+    if (won) {
+      const today = todayStr();
+      if (profile.lastWinDate !== today) profile.winStreak = 0;
+      profile.winStreak++;
+      lastBoostX2 = profile.winStreak >= 2;
+      lastPointsEarned = WIN_BASE_POINTS * (lastBoostX2 ? 2 : 1);
+      profile.points += lastPointsEarned;
+      profile.lastWinDate = today;
+    } else {
+      profile.winStreak = 0;
+      profile.lastWinDate = null;
+    }
+    saveProfile();
+  }
+
   const ov = document.getElementById('overlay');
   ov.classList.remove('hidden');
   let title;
@@ -957,7 +1560,9 @@ function endMatch() {
   else if (scoreHome < scoreAway) title = '😢 敗北...';
   else title = '🤝 引き分け';
   document.getElementById('ov-title').textContent = title;
-  document.getElementById('ov-sub').textContent = `${scoreHome} - ${scoreAway}`;
+  let sub = `${scoreHome} - ${scoreAway}`;
+  if (matchMode === 'ready' && won) sub += `\n+${lastPointsEarned}pt${lastBoostX2 ? '（🔥ブーストx2）' : ''}`;
+  document.getElementById('ov-sub').textContent = sub;
 }
 
 function pauseGame() {
@@ -973,6 +1578,7 @@ function resumeGame() {
 function quitToTitle() {
   state = 'TITLE';
   titleFrame = 0;
+  profilePanel = null;
   document.getElementById('hud').style.visibility = 'hidden';
   document.getElementById('joystick').style.visibility = 'hidden';
   document.getElementById('shoot-btn').style.visibility = 'hidden';
@@ -981,6 +1587,25 @@ function quitToTitle() {
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
+}
+function quitToHome() {
+  state = 'HOME';
+  profilePanel = null;
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('joystick').style.visibility = 'hidden';
+  document.getElementById('shoot-btn').style.visibility = 'hidden';
+  resetStick();
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+function returnToProfile() {
+  state = 'PROFILE';
+  profilePanel = null;
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('hub-link').style.display = 'block';
 }
 
 // ─── INPUT ────────────────────────────────────────────────────
@@ -996,28 +1621,119 @@ function onDown(e) {
   e.preventDefault();
   const p = getPos(e);
   if (state === 'TITLE') {
-    if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) { state = 'TIMESELECT'; return; }
+    if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) { state = 'HOME'; return; }
     return;
   }
-  if (state === 'TIMESELECT') {
-    const totalW = TS_CARD_W * 3 + TS_CARD_GAP * 2;
+  if (state === 'HOME') {
+    if (p.x >= W/2-100 && p.x <= W/2+100 && p.y >= 394 && p.y <= 446) {
+      state = activePlayer() ? 'PROFILE' : 'ROSTER';
+      return;
+    }
+    if (p.x < 140 && p.y > H - 46) { quitToTitle(); return; }
+    return;
+  }
+  if (state === 'ROSTER') {
+    const totalW = ROSTER_CARD_W * 4 + ROSTER_CARD_GAP * 3;
     const startX = W/2 - totalW/2;
     for (let i = 0; i < 3; i++) {
-      const x = startX + i * (TS_CARD_W + TS_CARD_GAP);
-      if (p.x >= x && p.x <= x + TS_CARD_W && p.y >= TS_CARD_Y && p.y <= TS_CARD_Y + TS_CARD_H) { startMatch(MATCH_DURATIONS[i]); return; }
+      const x = startX + i * (ROSTER_CARD_W + ROSTER_CARD_GAP);
+      if (p.x >= x && p.x <= x + ROSTER_CARD_W && p.y >= ROSTER_CARD_Y && p.y <= ROSTER_CARD_Y + ROSTER_CARD_H) {
+        pickStarter(STARTER_PLAYERS[i].id); return;
+      }
     }
-    const lvlTotalW = TS_LVL_W * 3 + TS_LVL_GAP * 2;
-    const lvlStartX = W/2 - lvlTotalW/2;
-    for (let i = 0; i < 3; i++) {
-      const x = lvlStartX + i * (TS_LVL_W + TS_LVL_GAP);
-      if (p.x >= x && p.x <= x + TS_LVL_W && p.y >= TS_LVL_Y && p.y <= TS_LVL_Y + TS_LVL_H) { cpuLevel = i; return; }
-    }
-    if (p.x < 140 && p.y > H - 46) { state = 'TITLE'; return; }
+    if (p.x < 140 && p.y > H - 46) { state = 'HOME'; return; }
     return;
   }
+  if (state === 'PROFILE') {
+    if (profilePanel) {
+      if (p.x >= PANEL_X+PANEL_W-46 && p.x <= PANEL_X+PANEL_W-10 && p.y >= PANEL_Y+10 && p.y <= PANEL_Y+44) { profilePanel = null; return; }
+      if (profilePanel === 'manage') {
+        const owned = ownedIds();
+        for (let i = 0; i < owned.length; i++) {
+          const y = MANAGE_ROW_Y0 + i * MANAGE_ROW_H;
+          if (p.x >= PANEL_X+40 && p.x <= PANEL_X+PANEL_W-40 && p.y >= y && p.y <= y+MANAGE_ROW_H-16) {
+            profile.activePlayerId = owned[i]; saveProfile(); return;
+          }
+        }
+        const renameY = MANAGE_ROW_Y0 + owned.length * MANAGE_ROW_H + 20;
+        if (p.x >= PANEL_X+PANEL_W/2-110 && p.x <= PANEL_X+PANEL_W/2+110 && p.y >= renameY && p.y <= renameY+42) {
+          const ap = activePlayer();
+          if (ap) {
+            const nn = window.prompt('新しい名前を入力してください', ap.name);
+            if (nn && nn.trim()) { ap.name = nn.trim().slice(0, 20); saveProfile(); }
+          }
+        }
+        return;
+      }
+      if (profilePanel === 'upgrade') {
+        const ap = activePlayer();
+        if (ap) {
+          ['sp', 'sh', 'def'].forEach((key, i) => {
+            const y = UPG_ROW_Y0 + i * UPG_ROW_H;
+            if (p.x >= PANEL_X+PANEL_W-190 && p.x <= PANEL_X+PANEL_W-60 && p.y >= y-10 && p.y <= y+34) upgradeStat(key);
+          });
+        }
+        return;
+      }
+      if (profilePanel === 'shop') {
+        const unowned = STARTER_PLAYERS.filter(pl => !(profile.players[pl.id] && profile.players[pl.id].owned));
+        unowned.forEach((meta, i) => {
+          const y = SHOP_ROW_Y0 + i * SHOP_ROW_H;
+          if (p.x >= PANEL_X+PANEL_W-220 && p.x <= PANEL_X+PANEL_W-70 && p.y >= y+13 && p.y <= y+55) buyPlayer(meta.id);
+        });
+        return;
+      }
+      if (profilePanel === 'ball') {
+        const totalW = BALL_SKINS.length * BALL_ITEM_W + (BALL_SKINS.length - 1) * 20;
+        const startX = PANEL_X + PANEL_W/2 - totalW/2;
+        BALL_SKINS.forEach((skin, i) => {
+          const x = startX + i * (BALL_ITEM_W + 20);
+          if (p.x >= x && p.x <= x+BALL_ITEM_W && p.y >= BALL_ITEM_Y0 && p.y <= BALL_ITEM_Y0+BALL_ITEM_H) {
+            profile.ballSkin = skin.id; saveProfile();
+          }
+        });
+        return;
+      }
+      return;
+    }
+
+    if (Math.hypot(p.x - PF_AVATAR_X, p.y - PF_AVATAR_Y) <= PF_AVATAR_R + 10) { profilePanel = 'manage'; return; }
+
+    for (let i = 0; i < PROFILE_ICONS.length; i++) {
+      const y = PF_ICON_Y0 + i * PF_ICON_GAP;
+      if (p.x >= PF_ICON_X-PF_ICON_SIZE/2 && p.x <= PF_ICON_X+PF_ICON_SIZE/2 && p.y >= y-PF_ICON_SIZE/2 && p.y <= y+PF_ICON_SIZE/2) {
+        profilePanel = PROFILE_ICONS[i].key; return;
+      }
+    }
+
+    const timeTotalW = PF_TIME_W * 3 + PF_TIME_GAP * 2;
+    const timeStartX = W/2 - timeTotalW/2;
+    for (let i = 0; i < 3; i++) {
+      const x = timeStartX + i * (PF_TIME_W + PF_TIME_GAP);
+      if (p.x >= x && p.x <= x+PF_TIME_W && p.y >= PF_TIME_Y && p.y <= PF_TIME_Y+PF_TIME_H) {
+        matchDurationIdx = i; profile.matchDurationIdx = i; saveProfile(); return;
+      }
+    }
+    const lvlTotalW = PF_LVL_W * 3 + PF_LVL_GAP * 2;
+    const lvlStartX = W/2 - lvlTotalW/2;
+    for (let i = 0; i < 3; i++) {
+      const x = lvlStartX + i * (PF_LVL_W + PF_LVL_GAP);
+      if (p.x >= x && p.x <= x+PF_LVL_W && p.y >= PF_LVL_Y && p.y <= PF_LVL_Y+PF_LVL_H) {
+        cpuLevel = i; profile.cpuLevel = i; saveProfile(); return;
+      }
+    }
+    if (p.x >= W/2-120 && p.x <= W/2+120 && p.y >= PF_READY_Y-28 && p.y <= PF_READY_Y+28) {
+      if (activePlayer()) { matchMode = 'ready'; enterVS(); }
+      return;
+    }
+    if (p.x >= W/2-110 && p.x <= W/2+110 && p.y >= PF_FREEPLAY_Y-22 && p.y <= PF_FREEPLAY_Y+22) { return; } // Free Play: Coming Soon
+    if (p.x < 140 && p.y > H - 46) { state = 'HOME'; return; }
+    return;
+  }
+  if (state === 'VS') { startMatch(); return; }
   if (state === 'PAUSED') {
     if (p.x >= W/2-90 && p.x <= W/2+90 && p.y >= PAUSE_RESUME_Y-24 && p.y <= PAUSE_RESUME_Y+24) { resumeGame(); return; }
-    if (p.x >= W/2-90 && p.x <= W/2+90 && p.y >= PAUSE_QUIT_Y-22 && p.y <= PAUSE_QUIT_Y+22) { quitToTitle(); return; }
+    if (p.x >= W/2-90 && p.x <= W/2+90 && p.y >= PAUSE_QUIT_Y-22 && p.y <= PAUSE_QUIT_Y+22) { quitToHome(); return; }
     return;
   }
 }
@@ -1075,7 +1791,7 @@ shootBtn.addEventListener('pointerdown', e => {
 
 document.addEventListener('keydown', e => {
   if (state === 'TITLE') {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state = 'TIMESELECT'; }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state = 'HOME'; }
     return;
   }
   if (e.key === 'Escape' && (state === 'PLAYING' || state === 'PAUSED')) {
@@ -1108,7 +1824,7 @@ document.getElementById('pause-btn').addEventListener('click', () => {
 });
 document.getElementById('ov-btn').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
-  quitToTitle();
+  returnToProfile();
 });
 
 homePositions();
