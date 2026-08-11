@@ -1672,9 +1672,28 @@ function newVsBoard(x0, isCpu) {
     nextPair: null,
     lockedCols: [],
     pendingGarbage: 0,
+    garbageCols: [], // which columns the next drop (up to VS_GARBAGE_PER_DROP) will land in — kept in sync with pendingGarbage via refreshGarbageCols so the standby preview always matches where it actually lands
     aiTarget: null,
     alive: true,
   };
+}
+
+function shuffledCols() {
+  const cols = Array.from({ length: GRID_COLS }, (_, i) => i);
+  for (let i = cols.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cols[i], cols[j]] = [cols[j], cols[i]];
+  }
+  return cols;
+}
+
+// Re-picks which columns the NEXT drop will land in, sized to the
+// current pendingGarbage (capped at VS_GARBAGE_PER_DROP) — call this
+// any time pendingGarbage changes so vbDrawIncomingGarbage's preview and
+// vbDropGarbage's actual landing spots never disagree.
+function refreshGarbageCols(b) {
+  const n = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
+  b.garbageCols = shuffledCols().slice(0, n);
 }
 
 // VS mode has no level-up, but always spawns from the full 5-color pool
@@ -1850,23 +1869,18 @@ function vbResolveStep(b) {
 // (VS_GARBAGE_PER_DROP per drop) instead of dumping it all at once.
 function vbDropGarbage(b) {
   if (b.pendingGarbage <= 0) return;
-  const n = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
-  // A random SUBSET of columns (via shuffle), not a contiguous run from a
-  // random start — a partial-row attack (e.g. a 1-chain's 5 cells) used
-  // to always land as one predictable block of neighboring columns.
-  const cols = Array.from({ length: GRID_COLS }, (_, i) => i);
-  for (let i = cols.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cols[i], cols[j]] = [cols[j], cols[i]];
-  }
+  // Uses the exact columns already committed to in b.garbageCols (set by
+  // refreshGarbageCols) — the same list vbDrawIncomingGarbage previewed —
+  // so what landed always matches what was shown standing by above the
+  // board, instead of silently re-rolling a different set at drop time.
   let placed = 0;
-  for (let i = 0; i < n; i++) {
-    const c = cols[i];
+  b.garbageCols.forEach(c => {
     for (let r = GRID_ROWS - 1; r >= 0; r--) {
       if (b.grid[c][r] === null) { b.grid[c][r] = GARBAGE; placed++; break; }
     }
-  }
+  });
   b.pendingGarbage -= placed; // a full column that couldn't take garbage just carries the remainder to the next drop
+  refreshGarbageCols(b);
   if (b.grid[VS_SPAWN_COL][1] !== null || b.grid[VS_SPAWN_COL][0] !== null) b.alive = false;
 }
 
@@ -1908,7 +1922,11 @@ function vbUpdateBoard(b, opponent) {
           const cancel = Math.min(atk, b.pendingGarbage);
           b.pendingGarbage -= cancel;
           atk -= cancel;
-          if (atk > 0) opponent.pendingGarbage += atk;
+          refreshGarbageCols(b);
+          if (atk > 0) {
+            opponent.pendingGarbage += atk;
+            refreshGarbageCols(opponent);
+          }
         }
         b.chainCount = 0;
         b.phase = 'SPAWN_PAUSE';
@@ -2158,14 +2176,19 @@ function vbDrawHud(b, label, enemyType) {
   }
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = 'bold 14px Arial';
-  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 44);
+  ctx.fillText(label, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 90);
   // Score sits right under the name — small, same counting/scoring as
   // marathon mode (vbResolveStep uses the same STAGES pts/chain-mult
   // formula) — instead of only at the bottom, so it reads immediately
-  // alongside "YOU" rather than needing a second look.
+  // alongside "YOU" rather than needing a second look. Kept well above
+  // the incoming-お邪魔 standby row (see vbDrawIncomingGarbage) — that
+  // row's blocks are now scattered across every column instead of only
+  // the leftmost few, so anything sitting at the board's horizontal
+  // center needs real clearance from it, not just clearance from a
+  // block that used to never reach the middle.
   ctx.font = 'bold 13px Arial';
   ctx.fillStyle = '#FFE066';
-  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 28);
+  ctx.fillText(`${b.score}pt`, b.x0 + VS_GRID_W / 2, VS_GRID_Y0 - 72);
   ctx.restore();
 }
 
@@ -2191,23 +2214,28 @@ function vbDrawNextPreview(b) {
 
 // Incoming お邪魔, shown as a full-size standby row hovering directly
 // above the board's own frame, one block per column at the same size as
-// the board's own cells — so it reads as "this row is about to drop
-// in," lined up with the columns it'll land in. Same idea as Puyo Puyo's
-// VS-mode ojama tray. Only the next drop's worth (VS_GARBAGE_PER_DROP)
-// shows as blocks; anything queued beyond that shows as a "+N" count.
+// the board's own cells — lined up with the exact columns it'll land in
+// (b.garbageCols, the same list vbDropGarbage consumes), so the preview
+// never shows a different layout than what actually drops. Same idea as
+// Puyo Puyo's VS-mode ojama tray. Only the next drop's worth
+// (VS_GARBAGE_PER_DROP) shows as blocks; anything queued beyond that
+// shows as a "+N" count.
 function vbDrawIncomingGarbage(b) {
   if (b.pendingGarbage <= 0) return;
-  const shown = Math.min(b.pendingGarbage, VS_GARBAGE_PER_DROP);
+  const shown = b.garbageCols.length;
   const y = VS_GRID_Y0 - VS_CELL / 2 - 8;
-  for (let c = 0; c < shown; c++) {
+  b.garbageCols.forEach(c => {
     drawGarbageBlock(b.x0 + c * VS_CELL + VS_CELL / 2, y, VS_CELL);
-  }
+  });
   if (b.pendingGarbage > shown) {
+    // Columns are scattered (not a left-packed run), so this can't just
+    // sit after "the last block" — anchor it to the board's right edge
+    // instead.
     ctx.save();
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'right';
     ctx.fillStyle = '#FF8888';
     ctx.font = 'bold 15px Arial';
-    ctx.fillText(`+${b.pendingGarbage - shown}`, b.x0 + shown * VS_CELL + 6, y + 5);
+    ctx.fillText(`+${b.pendingGarbage - shown}`, b.x0 + VS_GRID_W, y - VS_CELL / 2 - 4);
     ctx.restore();
   }
 }
@@ -2358,6 +2386,7 @@ function advanceVsCampaign() {
   vsP.fallTimer = 0;
   vsP.chainCount = 0;
   vsP.pendingGarbage = 0;
+  vsP.garbageCols = [];
   vsP.lockedCols = [];
   state = 'PLAYING';
   vbTrySpawnPiece(vsP);
