@@ -301,7 +301,8 @@ const BALL_SKINS = [
 ];
 const MAX_STAT_LEVEL = 20;
 const SHOP_PRICE = 50;      // points to unlock a non-starting country's player
-const WIN_BASE_POINTS = 10; // points awarded for a Ready! win, before streak boost
+const WIN_BASE_POINTS = 3;  // points awarded for a Ready! win, before streak boost
+const DRAW_POINTS = 1;      // flat points awarded for a Ready! draw (no streak boost)
 function upgradeCost(level) { return level; } // Lv1→2 costs 1pt, Lv2→3 costs 2pt, ...
 function statMult(level) { return 1 + (level - 1) * 0.04; } // Lv20 ≈ +76%
 
@@ -388,6 +389,7 @@ let shootReadyFrame = -Infinity; // frameCount after which a new press is accept
 let shotMessage = '';
 let shotMessageTimer = 0;
 let ballStuckFrames = 0; // consecutive low-speed frames while pinned against a paddle (corner-jam safety valve)
+let cpuContactFrames = 0; // consecutive frames the CPU has stayed in contact with the ball (dribble guard)
 
 const player = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
 const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
@@ -650,7 +652,13 @@ function resolvePaddleHit(entity, radius) {
     // paddle also parking at its target) reads as everything freezing solid
     // in the corner. Sustained overlap just gets separated positionally and
     // lets normal wall restitution/friction bleed the energy off.
-    if (!entity.touching) {
+    // Exception: the CPU re-targets the ball's position every frame, so if
+    // it stays in sustained contact (rather than a clean one-frame touch)
+    // it can end up shepherding the ball along as it advances — reading as
+    // an illegal dribble. Force a real kick after a couple of contact
+    // frames so touching the CPU is always a single decisive hit.
+    const cpuDribbling = entity === cpu && entity.touching && cpuContactFrames >= 2;
+    if (!entity.touching || cpuDribbling) {
       const curSpeed = Math.hypot(ball.vx, ball.vy);
       let speed = Math.max(entity === player ? fxPaddleHitBase : PADDLE_HIT_BASE_SPEED, curSpeed);
       let isPowerShot = false;
@@ -671,10 +679,14 @@ function resolvePaddleHit(entity, radius) {
       } else {
         addParticles(ball.x, ball.y, '#FFE9A8', 6, 3);
       }
+      if (entity === cpu) cpuContactFrames = 0;
+    } else if (entity === cpu) {
+      cpuContactFrames++;
     }
     entity.touching = true;
   } else {
     entity.touching = false;
+    if (entity === cpu) cpuContactFrames = 0;
   }
 }
 
@@ -1549,7 +1561,7 @@ function startMatch() {
   particles = [];
   shakeX = 0; shakeY = 0; flashAlpha = 0;
   frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
-  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0;
+  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0; cpuContactFrames = 0;
   player.touching = false; cpu.touching = false;
   homePositions();
   centerBall(Math.random() < 0.5 ? -1 : 1);
@@ -1574,8 +1586,10 @@ function endMatch() {
   // Points/streak only accrue in Ready! (vs CPU) mode. A win extends the
   // streak and, from 2 wins in a row, doubles the payout; a loss — or a
   // win on a new calendar day after the streak's last win — zeroes it, so
-  // the boost never carries over to the next day.
+  // the boost never carries over to the next day. A draw earns a flat,
+  // un-boosted consolation payout and, like a loss, breaks the streak.
   const won = scoreHome > scoreAway;
+  const drew = scoreHome === scoreAway;
   lastPointsEarned = 0; lastBoostX2 = false;
   if (matchMode === 'ready') {
     if (won) {
@@ -1589,6 +1603,10 @@ function endMatch() {
     } else {
       profile.winStreak = 0;
       profile.lastWinDate = null;
+      if (drew) {
+        lastPointsEarned = DRAW_POINTS;
+        profile.points += lastPointsEarned;
+      }
     }
     saveProfile();
   }
@@ -1601,7 +1619,7 @@ function endMatch() {
   else title = '🤝 引き分け';
   document.getElementById('ov-title').textContent = title;
   let sub = `${scoreHome} - ${scoreAway}`;
-  if (matchMode === 'ready' && won) sub += `\n+${lastPointsEarned}pt${lastBoostX2 ? '（🔥ブーストx2）' : ''}`;
+  if (matchMode === 'ready' && (won || drew)) sub += `\n+${lastPointsEarned}pt${lastBoostX2 ? '（🔥ブーストx2）' : ''}`;
   document.getElementById('ov-sub').textContent = sub;
 }
 
