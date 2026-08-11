@@ -598,9 +598,15 @@ body.on-title #buildInfo { display: block; }
   var chillCount = 0;
   try { chillCount = parseInt(localStorage.getItem(CHILL_KEY), 10) || 0; } catch (e) {}
 
-  // Wordless "growing up" reward: bowtie recolors and a small accessory
-  // appear as the pet count climbs. No unlock text, no menu — just notice it.
+  // Wordless "growing up" reward: bowtie recolors and accessories keep
+  // stacking on as the pet count climbs. Tier 7 is the "final form" — from
+  // there the bowtie hue-cycles and sparkles keep drifting forever, so the
+  // look never just freezes even at very high counts.
   function chillTierFor(count) {
+    if (count >= 400) return 7;
+    if (count >= 200) return 6;
+    if (count >= 100) return 5;
+    if (count >= 60) return 4;
     if (count >= 30) return 3;
     if (count >= 15) return 2;
     if (count >= 5) return 1;
@@ -662,37 +668,74 @@ body.on-title #buildInfo { display: block; }
     ctx.fill();
   }
 
-  function drawChillSparkles(ctx, cx, cy, r, now) {
-    var pts = [
-      { dx: -0.95, dy: -0.55, ph: 0 },
-      { dx: 0.92, dy: -0.65, ph: 1.3 },
-      { dx: -0.75, dy: 0.15, ph: 2.4 },
-      { dx: 0.85, dy: 0.05, ph: 3.6 }
-    ];
-    pts.forEach(function (p) {
-      var tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(now * 0.003 + p.ph));
+  // count sparkles procedurally around the head so higher tiers can just
+  // ask for more of them instead of needing a hand-placed point per tier.
+  function drawChillSparkles(ctx, cx, cy, r, now, count) {
+    for (var i = 0; i < count; i++) {
+      var ang = (Math.PI * 2 / count) * i + 0.3;
+      var rad = 0.75 + (i % 2) * 0.22;
+      var dx = Math.cos(ang) * rad;
+      var dy = Math.sin(ang) * rad * 0.8 - 0.15;
+      var tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(now * 0.003 + i * 1.3));
       ctx.save();
       ctx.globalAlpha = tw;
-      ctx.translate(cx + r * p.dx, cy + r * p.dy);
+      ctx.translate(cx + r * dx, cy + r * dy);
       ctx.fillStyle = '#FFE9A8';
-      drawStar(ctx, r * 0.09);
+      drawStar(ctx, r * 0.085);
       ctx.restore();
-    });
+    }
+  }
+
+  function sparkleCountForTier(tier) {
+    if (tier >= 7) return 10;
+    if (tier >= 6) return 8;
+    if (tier >= 4) return 6;
+    return 4;
+  }
+
+  function drawChillHalo(ctx, cx, cy, r, tier) {
+    var strength = tier >= 6 ? 0.3 : 0.16;
+    var grad = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.6);
+    grad.addColorStop(0, 'rgba(255,210,150,' + strength + ')');
+    grad.addColorStop(1, 'rgba(255,210,150,0)');
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawChillStarAccessory(ctx, cx, cy, r) {
+    ctx.save();
+    ctx.translate(cx + r * 0.55, cy - r * 0.55);
+    ctx.fillStyle = '#FFE9A8';
+    drawStar(ctx, r * 0.14);
+    ctx.restore();
+  }
+
+  // hue-cycling color pair, used once the bowtie stops settling on a fixed
+  // color (tier 5+) so the "final form" keeps visibly shifting forever.
+  function rainbowPair(now) {
+    var hue = Math.floor((now * 0.05) % 360);
+    return ['hsl(' + hue + ',78%,66%)', 'hsl(' + hue + ',70%,38%)'];
   }
 
   var CHILL_TIER_COLORS = {
     1: ['#FF8FB0', '#B9527A'],
     2: ['#FFD35C', '#C8961E'],
-    3: ['#C77DFF', '#7A3D9C']
+    3: ['#C77DFF', '#7A3D9C'],
+    4: ['#FF6B4A', '#7A2E1A']
   };
 
   function drawChillCosmetics(ctx, cx, cy, r, tier, now) {
     if (tier >= 1) {
-      var c = CHILL_TIER_COLORS[tier];
+      var c = tier >= 5 ? rainbowPair(now) : CHILL_TIER_COLORS[tier];
       drawChillBowtie(ctx, cx, cy, r, c[0], c[1]);
     }
     if (tier >= 2) drawChillAccessory(ctx, cx, cy, r);
-    if (tier >= 3) drawChillSparkles(ctx, cx, cy, r, now);
+    if (tier >= 5) drawChillStarAccessory(ctx, cx, cy, r);
+    if (tier >= 3) drawChillSparkles(ctx, cx, cy, r, now, sparkleCountForTier(tier));
   }
 
   // ---- idle-only overlays: wings, blink, doze Zzz ----
@@ -776,8 +819,11 @@ body.on-title #buildInfo { display: block; }
     }
 
     var tier = chillTierFor(chillCount);
+    if (tier >= 4) drawChillHalo(ctx, cx, cy, r, tier);
 
-    if (wingAmt > 0.02) drawChillWings(ctx, cx, cy, r, wingAmt);
+    var restWingAmt = tier >= 6 ? 0.18 : 0;
+    var totalWingAmt = Math.max(wingAmt, restWingAmt);
+    if (totalWingAmt > 0.02) drawChillWings(ctx, cx, cy, r, totalWingAmt);
 
     ctx.save();
     ctx.translate(cx, cy);
