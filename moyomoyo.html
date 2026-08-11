@@ -1726,7 +1726,16 @@ function vbTriggerRainbows(b, seedCells, affectedCols) {
         const nc = c + dc, nr = r + dr;
         if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
         const stage = b.grid[nc][nr];
-        if (stage === null || stage === GARBAGE) continue; // garbage is inert — it doesn't ride along with a blast
+        if (stage === null) continue;
+        if (stage === GARBAGE) {
+          // Puyo-style: お邪魔 next to anything that just popped clears
+          // along with it instead of sitting on the board forever.
+          const { x: gx, y: gy } = vbCellCenter(b, nc, nr);
+          addParticles(gx, gy, '#8A8A96', 8, 4);
+          b.grid[nc][nr] = null;
+          affectedCols.add(nc);
+          continue;
+        }
         if (stage === RAINBOW) {
           b.grid[nc][nr] = null;
           affectedCols.add(nc);
@@ -1790,6 +1799,25 @@ function vbResolveStep(b) {
     addParticles(mx, my, STAGES[g.stage].color, 8 + g.cells.length, 3);
   });
 
+  // Puyo-style: お邪魔 directly adjacent to a cell that actually vanished
+  // this step (not one that got upgraded into a new stage) clears along
+  // with it, instead of sitting on the board forever.
+  const poppedGarbage = new Set();
+  clearedCells.forEach(([c, r]) => {
+    if (b.grid[c][r] !== null) return; // this one got upgraded, not actually gone
+    [[c+1,r],[c-1,r],[c,r+1],[c,r-1]].forEach(([nc, nr]) => {
+      if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) return;
+      if (b.grid[nc][nr] === GARBAGE) poppedGarbage.add(nc + ',' + nr);
+    });
+  });
+  poppedGarbage.forEach(key => {
+    const [nc, nr] = key.split(',').map(Number);
+    const { x, y } = vbCellCenter(b, nc, nr);
+    addParticles(x, y, '#8A8A96', 10, 4);
+    b.grid[nc][nr] = null;
+    affectedCols.add(nc);
+  });
+
   const rainbowFired = vbTriggerRainbows(b, clearedCells, affectedCols);
   addShake(rainbowFired ? 10 : (3 + b.chainCount));
   if (!b.isCpu) playSfx(rainbowFired ? 'magic' : 'match', b.chainCount);
@@ -1845,7 +1873,16 @@ function vbUpdateBoard(b, opponent) {
         b.pauseTimer = 16;
       } else {
         if (b.chainCount > 0) {
-          opponent.pendingGarbage += garbageCellsForChain(b.chainCount);
+          let atk = garbageCellsForChain(b.chainCount);
+          // Puyo-style 相殺 (offset): a counter-attack cancels out this
+          // board's own still-pending incoming お邪魔 first — only
+          // whatever's left over after that actually reaches the
+          // opponent, instead of both sides' attacks just stacking up
+          // independently.
+          const cancel = Math.min(atk, b.pendingGarbage);
+          b.pendingGarbage -= cancel;
+          atk -= cancel;
+          if (atk > 0) opponent.pendingGarbage += atk;
         }
         b.chainCount = 0;
         b.phase = 'SPAWN_PAUSE';
