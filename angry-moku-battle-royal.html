@@ -42,7 +42,7 @@
   /* ---------- HUD ---------- */
   #hud{
     display:flex; align-items:center; justify-content:space-between;
-    padding:14px 16px 8px; gap:8px;
+    padding:14px 16px 8px calc(env(safe-area-inset-left,0px) + 60px); gap:8px;
   }
   #hud h1{
     font-size:19px; margin:0; letter-spacing:0.5px;
@@ -65,28 +65,60 @@
   .screen{display:none; flex-direction:column; flex:1; padding:0 14px;}
   .screen.active{display:flex;}
 
-  /* ---------- Home screen ---------- */
-  #homeScreen{align-items:center; justify-content:center; text-align:center; gap:14px; padding-top:10px;}
-  #homeTitle{font-size:30px; margin:4px 0 0; letter-spacing:.5px; text-shadow:0 2px 0 rgba(0,0,0,.35);}
-  #homeTitle span{color:var(--red);}
+  /* ---------- Home screen (scene layout) ---------- */
+  #homeScreen{padding:0 14px; gap:0;}
+  #homeSceneWrap{
+    position:relative; flex:1; border-radius:22px; overflow:hidden;
+    border:3px solid #3b4478; box-shadow:0 10px 28px rgba(0,0,0,.4), inset 0 0 0 6px rgba(35,44,82,.6);
+    min-height:180px; margin:4px 0 10px;
+  }
+  #homeBgCanvas{position:absolute; inset:0; width:100%; height:100%; display:block;}
+  #homeSceneOverlay{position:absolute; inset:0; pointer-events:none;}
+  #homeSceneOverlay > *{pointer-events:auto;}
+
+  #homeStatsPill{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(18,23,44,.65); backdrop-filter:blur(2px);
+    border:1px solid rgba(255,255,255,.25); color:var(--cream);
+    padding:6px 16px; border-radius:999px; font-size:12px; font-weight:700;
+    white-space:nowrap;
+  }
+  #homeTitleTag{
+    position:absolute; top:12px; left:12px;
+    background:rgba(18,23,44,.65); border:1px solid rgba(255,255,255,.25);
+    color:var(--gold); font-size:13px; font-weight:800; letter-spacing:.5px;
+    padding:6px 12px; border-radius:999px;
+  }
   #homePreviewWrap{
-    width:170px; height:170px; border-radius:50%;
-    background:radial-gradient(circle at 40% 30%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%);
+    position:absolute; left:50%; bottom:16%; transform:translateX(-50%);
+    width:190px; height:190px; border-radius:50%;
+    background:radial-gradient(circle at 40% 30%, rgba(255,255,255,.3), rgba(255,255,255,0) 60%);
   }
-  #homeStats{font-size:13px; opacity:.9; background:var(--navy-panel); border:1px solid #384073; padding:8px 16px; border-radius:999px;}
-  #homeButtons{display:flex; flex-direction:column; gap:12px; width:100%; max-width:300px; margin-top:6px;}
-  .homeBtn{
-    padding:18px; border:none; border-radius:16px; font-size:16px; font-weight:800; cursor:pointer;
-    background:linear-gradient(160deg,var(--navy-mid),var(--navy-panel)); color:var(--cream);
-    border-left:6px solid var(--gold);
-    box-shadow:0 4px 0 rgba(0,0,0,.3);
-    display:flex; align-items:center; gap:10px; text-align:left;
+  #homeSideIcons{
+    position:absolute; left:12px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:14px;
   }
-  .homeBtn:active{transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,.3);}
-  .homeBtn .bic{font-size:24px;}
-  .homeBtn.battle{border-left-color:var(--red);}
-  .homeBtn.customize{border-left-color:var(--teal);}
-  .homeBtn.spin{border-left-color:var(--gold);}
+  .sideIconBtn{
+    width:64px; height:64px; border:none; border-radius:16px; cursor:pointer;
+    background:linear-gradient(160deg,var(--navy-mid),var(--navy-panel));
+    border:1px solid rgba(255,255,255,.2);
+    color:var(--cream); box-shadow:0 4px 0 rgba(0,0,0,.35);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  }
+  .sideIconBtn:active{transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,.35);}
+  .sideIconBtn .sic{font-size:24px;}
+  .sideIconBtn .slbl{font-size:9px; font-weight:800;}
+
+  #homeBattleBtn{
+    position:absolute; right:14px; bottom:14px;
+    padding:16px 22px; border:none; border-radius:18px; cursor:pointer;
+    background:linear-gradient(160deg,var(--gold),#c8912f); color:#2a1c05;
+    font-size:16px; font-weight:900; letter-spacing:.5px;
+    box-shadow:0 6px 0 #8a651f;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  #homeBattleBtn:active{transform:translateY(3px); box-shadow:0 3px 0 #8a651f;}
+  #homeBattleBtn .bbic{font-size:26px;}
 
   /* ---------- Battle screen (2x scale) ---------- */
   #battleTop{display:flex; justify-content:space-between; gap:10px; padding:0 6px 12px; flex-wrap:wrap;}
@@ -322,6 +354,22 @@
     transform:scale(1.05);
   }
   body.on-title .moku-back{ display:none; }
+  /* Landscape-only, per series convention (matches the other 3 titles). */
+  #rotate-hint{
+    display:none;
+    position:fixed; inset:0; z-index:999;
+    background:var(--navy-deep);
+    flex-direction:column; align-items:center; justify-content:center;
+    color:#fff; font-size:18px; gap:16px;
+  }
+  #rotate-hint span{ font-size:56px; animation:rotate-hint-spin 1.5s ease-in-out infinite alternate; }
+  @keyframes rotate-hint-spin{ from{transform:rotate(-30deg);} to{transform:rotate(30deg);} }
+  @media (max-width:600px) and (orientation:portrait){
+    #rotate-hint{ display:flex; }
+    #title-frame{ display:none; }
+    #hub-link{ display:none !important; }
+    .moku-back{ display:none !important; }
+  }
   #titleScreen{
     align-items:center; justify-content:center; text-align:center;
     min-height:100vh; gap:18px; padding:24px 20px;
@@ -363,6 +411,10 @@
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <div id="buildInfo">v1.0.0 · Updated Aug 10, 2026</div>
 <a class="moku-back" href="index.html" aria-label="Back to Moku Series">←</a>
+<div id="rotate-hint">
+  <span>📱</span>
+  <p>横向きにしてプレイ！</p>
+</div>
 <div id="app">
 
   <!-- TITLE SCREEN -->
@@ -386,13 +438,18 @@
 
   <!-- HOME SCREEN -->
   <section class="screen" id="homeScreen">
-    <h2 id="homeTitle">Welcome back,<br>trainer.</h2>
-    <div id="homePreviewWrap"><canvas id="homePreview" width="170" height="170"></canvas></div>
-    <div id="homeStats">Level <span id="homeLevel">1</span> · <span id="homeDiff">Easy</span> · 🪙 <span id="homeCoins">0</span></div>
-    <div id="homeButtons">
-      <button class="homeBtn battle" data-screen="battleScreen"><span class="bic">⚔️</span> Battle</button>
-      <button class="homeBtn customize" data-screen="customizeScreen"><span class="bic">🧣</span> Customize</button>
-      <button class="homeBtn spin" data-screen="spinScreen"><span class="bic">🎡</span> Spin</button>
+    <div id="homeSceneWrap">
+      <canvas id="homeBgCanvas"></canvas>
+      <div id="homeSceneOverlay">
+        <div id="homeTitleTag">ANGRY <span style="color:var(--red);">MOKU</span></div>
+        <div id="homeStatsPill">Level <span id="homeLevel">1</span> · <span id="homeDiff">Easy</span> · 🪙 <span id="homeCoins">0</span></div>
+        <div id="homePreviewWrap"><canvas id="homePreview" width="190" height="190"></canvas></div>
+        <div id="homeSideIcons">
+          <button class="sideIconBtn homeNavBtn" data-screen="customizeScreen"><span class="sic">🧣</span><span class="slbl">Customize</span></button>
+          <button class="sideIconBtn homeNavBtn" data-screen="spinScreen"><span class="sic">🎡</span><span class="slbl">Spin</span></button>
+        </div>
+        <button id="homeBattleBtn" class="homeNavBtn" data-screen="battleScreen"><span class="bbic">⚔️</span>BATTLE</button>
+      </div>
     </div>
   </section>
 
@@ -547,7 +604,8 @@
     if(lv<=5) return "Normal";
     if(lv<=9) return "Hard";
     if(lv<=14) return "Expert";
-    return "Nightmare";
+    if(lv<=20) return "Nightmare";
+    return "Legendary";
   }
   function getCpuStats(lv){
     return {
@@ -558,9 +616,9 @@
     };
   }
 
-  /* ================= MOVE CATALOG (Lv1-10 each, from the notes + 10 new) ================= */
+  /* ================= MOVE CATALOG (Lv1-40 each: the original 10 + 30 new) ================= */
   // Clothes levels = Moku's normal move
-  const CLOTHES_MOVES = [
+  const CLOTHES_MOVES_BASE = [
     {nm:"Feather Gust",   dmg:8,  icon:"🍃",  status:null},
     {nm:"Wing Slash",     dmg:12, icon:"🪽",  status:null},
     {nm:"Talon Strike",   dmg:16, icon:"🦅",  status:"burn"},
@@ -573,7 +631,7 @@
     {nm:"Glacier Strike", dmg:60, icon:"🧊",  status:"freeze"},
   ];
   // Hat levels = Moku's super move
-  const HAT_MOVES = [
+  const HAT_MOVES_BASE = [
     {nm:"Moonlit Tempest Cyclone", dmg:25,  icon:"🌘", status:"freeze"},
     {nm:"Feather Clone",           dmg:35,  icon:"🪶", status:null},
     {nm:"Shadow Wingstorm",        dmg:45,  icon:"🌑", status:"burn"},
@@ -586,26 +644,96 @@
     {nm:"Cosmic Owl Judgment",     dmg:180, icon:"🌌", status:"burn"},
   ];
 
+  // Word banks used to procedurally build 30 more levels of each, so Lv11-40 stay
+  // flavorful without hand-authoring 60+ individual entries.
+  const ELEMENT_ADJ = ["Storm","Blazing","Frost","Shadow","Radiant","Void","Crimson","Emerald","Golden","Obsidian",
+    "Thunder","Glacial","Solar","Lunar","Astral","Infernal","Verdant","Sapphire","Ruby","Onyx",
+    "Silver","Ember","Gale","Prism","Twilight","Dawn","Cosmic","Mythic","Eternal","Divine"];
+  const ELEMENT_ICON = ["🌩️","🔥","❄️","🌑","✨","⚫","🔴","🟢","🟡","⬛",
+    "⚡","🧊","☀️","🌙","🌌","😈","🍃","🔷","💎","◼️",
+    "⚪","🔥","💨","🔺","🌆","🌅","🌠","🐉","♾️","👑"];
+  const CLOTHES_NOUN = ["Strike","Slash","Peck","Gust","Talon","Dive","Claw","Fang","Rend","Burst",
+    "Barrage","Crescent","Impact","Flare","Sweep","Lunge","Thrust","Slice","Pounce","Snap",
+    "Whirl","Spiral","Ripple","Shockwave","Surge","Blitz","Flash","Storm","Cyclone","Nova"];
+  const HAT_NOUN = ["Requiem","Ascension","Onslaught","Cataclysm","Genesis","Apocalypse","Dominion","Reckoning","Convergence","Singularity",
+    "Rampage","Devastation","Annihilation","Transcendence","Obliteration","Maelstrom","Inferno","Tempest","Eruption","Cascade",
+    "Vortex","Nebula","Supernova","Eclipse","Zenith","Nadir","Paragon","Nemesis","Judgment","Ascendancy"];
+  const STATUS_CYCLE = ["burn","freeze","burn","freeze",null];
+
+  const CLOTHES_MOVES_GEN = [];
+  const HAT_MOVES_GEN = [];
+  for(let i=0;i<30;i++){
+    CLOTHES_MOVES_GEN.push({
+      nm: ELEMENT_ADJ[i]+" "+CLOTHES_NOUN[i],
+      dmg: 60 + (i+1)*7,
+      icon: ELEMENT_ICON[i],
+      status: STATUS_CYCLE[i%STATUS_CYCLE.length]
+    });
+    HAT_MOVES_GEN.push({
+      nm: ELEMENT_ADJ[i]+" "+HAT_NOUN[i],
+      dmg: 180 + (i+1)*22,
+      icon: ELEMENT_ICON[i],
+      status: STATUS_CYCLE[(i+2)%STATUS_CYCLE.length]
+    });
+  }
+
+  const CLOTHES_EXCLUSIVE = {nm:"Eternal Phoenix Talon", dmg:400, icon:"🦚", status:"burn"};
+  const HAT_EXCLUSIVE = {nm:"Voidstar Requiem", dmg:1200, icon:"🕳️", status:"freeze"};
+
+  const CLOTHES_MOVES = CLOTHES_MOVES_BASE.concat(CLOTHES_MOVES_GEN, [CLOTHES_EXCLUSIVE]);
+  const HAT_MOVES = HAT_MOVES_BASE.concat(HAT_MOVES_GEN, [HAT_EXCLUSIVE]);
+
   function statusIcon(s){ return s==="burn" ? "🔥" : s==="freeze" ? "❄️" : ""; }
 
+  function genColor(i){ return "hsl("+((i*47)%360)+",55%,42%)"; }
+
   /* ================= ITEM CATALOG ================= */
+  const CLOTHES_COST_BASE = [0,40,90,150,230,320,420,540,680,850];
+  const HAT_COST_BASE = [0,60,120,200,300,420,560,720,900,1150];
+  const CLOTHES_COLOR_BASE = [null,"#57a08c","#3d3a5e","#4fa88c","#1c2a52","#5b6aa0","#a4292c","#8fd9ff","#a4292c","#8fd9ff"];
+  const HAT_COLOR_BASE = ["#cfd6e6","#e8d9c0","#3d3a5e","#6a4fa8","#e8b84b","#e0985f","#8fd9ff","#d6474a","#9fd8ff","#3a2e6a"];
+
+  const SWORD_NOUN = ["Blade","Saber","Katana","Rapier","Cleaver","Longsword","Dagger","Halberd","Spear","Glaive",
+    "Claymore","Scimitar","Cutlass","Broadsword","Estoc","Falchion","Kris","Machete","Axe","Warhammer",
+    "Mace","Trident","Lance","Whip","Chakram","Naginata","Zweihander","Katar","Tessen","Nunchaku"];
+  const SWORD_ICONS = ["🗡️","⚔️","🔪","🪓","🔱","🌟"];
+
+  const genSwords = [];
+  for(let i=0;i<30;i++){
+    genSwords.push({
+      id:"weapon_gen"+i,
+      nm: ELEMENT_ADJ[i]+" "+SWORD_NOUN[i],
+      cost: 240 + (i+1)*45,
+      icon: SWORD_ICONS[i%SWORD_ICONS.length],
+      color: genColor(i)
+    });
+  }
+
   const ITEMS = {
-    hat: HAT_MOVES.map((m,i)=>({
-      id:"hat_lv"+(i+1),
-      nm:"Lv"+(i+1)+" · "+m.nm,
-      cost:[0,60,120,200,300,420,560,720,900,1150][i],
-      icon:m.icon,
-      color:["#cfd6e6","#e8d9c0","#3d3a5e","#6a4fa8","#e8b84b","#e0985f","#8fd9ff","#d6474a","#9fd8ff","#3a2e6a"][i],
-      status:m.status
-    })),
-    clothes: CLOTHES_MOVES.map((m,i)=>({
-      id:"clothes_lv"+(i+1),
-      nm:"Lv"+(i+1)+" · "+m.nm,
-      cost:[0,40,90,150,230,320,420,540,680,850][i],
-      icon:m.icon,
-      color:[null,"#57a08c","#3d3a5e","#4fa88c","#1c2a52","#5b6aa0","#a4292c","#8fd9ff","#a4292c","#8fd9ff"][i],
-      status:m.status
-    })),
+    hat: HAT_MOVES.map((m,i)=>{
+      const isExclusive = i === HAT_MOVES.length-1;
+      return {
+        id: isExclusive ? "hat_exclusive" : "hat_lv"+(i+1),
+        nm: isExclusive ? "★ EXCLUSIVE · "+m.nm : "Lv"+(i+1)+" · "+m.nm,
+        cost: isExclusive ? Infinity : (i<10 ? HAT_COST_BASE[i] : 1150+(i-9)*140),
+        icon: m.icon,
+        color: isExclusive ? "#e8b84b" : (i<10 ? HAT_COLOR_BASE[i] : genColor(i)),
+        status: m.status,
+        spinOnly: isExclusive
+      };
+    }),
+    clothes: CLOTHES_MOVES.map((m,i)=>{
+      const isExclusive = i === CLOTHES_MOVES.length-1;
+      return {
+        id: isExclusive ? "clothes_exclusive" : "clothes_lv"+(i+1),
+        nm: isExclusive ? "★ EXCLUSIVE · "+m.nm : "Lv"+(i+1)+" · "+m.nm,
+        cost: isExclusive ? Infinity : (i<10 ? CLOTHES_COST_BASE[i] : 850+(i-9)*90),
+        icon: m.icon,
+        color: isExclusive ? "#d6474a" : (i<10 ? CLOTHES_COLOR_BASE[i] : genColor(i)),
+        status: m.status,
+        spinOnly: isExclusive
+      };
+    }),
     weapon: [
       {id:"weapon_none",    nm:"Bare Talons",    cost:0,   icon:"🦶", color:null},
       {id:"weapon_blade",   nm:"Wing Blade",     cost:30,  icon:"🗡️", color:"#cfd6e6"},
@@ -613,15 +741,16 @@
       {id:"weapon_axe",     nm:"Lightning Axe",  cost:120, icon:"🪓", color:"#4fa88c"},
       {id:"weapon_trident", nm:"Golden Trident", cost:170, icon:"🔱", color:"#e8b84b"},
       {id:"weapon_scythe",  nm:"Shadow Scythe",  cost:240, icon:"🌙", color:"#3d3a5e"},
-      {id:"weapon_celestial", nm:"Celestial Blade", cost:Infinity, icon:"🌠", color:"#e8b84b", spinOnly:true},
-    ],
+    ].concat(genSwords).concat([
+      {id:"weapon_celestial", nm:"★ EXCLUSIVE · Celestial Blade", cost:Infinity, icon:"🌠", color:"#e8b84b", spinOnly:true},
+    ]),
     wings: [
       {id:"wing_none",    nm:"No Wings",       cost:0,   icon:"🦉", color:null},
       {id:"wing_small",   nm:"Small Wings",    cost:40,  icon:"🕊️", color:"#cfd6e6"},
       {id:"wing_big",     nm:"Big Wings",      cost:90,  icon:"🦅", color:"#57a08c"},
       {id:"wing_dragon",  nm:"Dragon Wings",   cost:180, icon:"🐉", color:"#3d8f4f"},
       {id:"wing_angel",   nm:"Angel Wings",    cost:260, icon:"👼", color:"#fff2c0"},
-      {id:"wing_phoenix", nm:"Phoenix Wings",  cost:Infinity, icon:"🔥", color:"#d6474a", spinOnly:true},
+      {id:"wing_phoenix", nm:"★ EXCLUSIVE · Phoenix Wings",  cost:Infinity, icon:"🔥", color:"#d6474a", spinOnly:true},
     ],
     charm: [
       {id:"charm_none",     nm:"No Charm",        cost:0,   icon:"⭕", color:null, desc:"No bonus"},
@@ -629,7 +758,7 @@
       {id:"charm_power",    nm:"Power Charm",     cost:130, icon:"💪", color:"#e0985f", desc:"+15% move damage"},
       {id:"charm_vitality", nm:"Vitality Charm",  cost:160, icon:"❤️", color:"#d6474a", desc:"+50 max HP"},
       {id:"charm_luck",     nm:"Luck Charm",      cost:200, icon:"🍀", color:"#4fa88c", desc:"+25% spin coins"},
-      {id:"charm_golden",   nm:"Golden Charm",    cost:Infinity, icon:"✨", color:"#e8b84b", spinOnly:true, desc:"+speed +dmg +HP"},
+      {id:"charm_golden",   nm:"★ EXCLUSIVE · Golden Charm",    cost:Infinity, icon:"✨", color:"#e8b84b", spinOnly:true, desc:"+speed +dmg +HP"},
     ]
   };
   let custTab = "hat";
@@ -667,9 +796,11 @@
 
   /* ================= EVENT (limited-time spin exclusive) ================= */
   const EVENT_POOL = [
-    {id:"wing_phoenix",  tab:"wings",  label:"🔥 Phoenix Wings"},
-    {id:"charm_golden",  tab:"charm",  label:"✨ Golden Charm"},
-    {id:"weapon_celestial", tab:"weapon", label:"🌠 Celestial Blade"},
+    {id:"wing_phoenix",     tab:"wings",   label:"🔥 Phoenix Wings"},
+    {id:"charm_golden",     tab:"charm",   label:"✨ Golden Charm"},
+    {id:"weapon_celestial", tab:"weapon",  label:"🌠 Celestial Blade"},
+    {id:"hat_exclusive",    tab:"hat",     label:"🕳️ Voidstar Requiem Hat"},
+    {id:"clothes_exclusive",tab:"clothes", label:"🦚 Eternal Phoenix Talon Attire"},
   ];
   function ensureEvent(){
     if(!save.event || Date.now() > save.event.expiresAt){
@@ -1245,9 +1376,139 @@
     pctx.clearRect(0,0,150,150);
     const c = ownerColors("player");
     drawOwl(pctx, 75,80, 52, c, {});
-    hpctx.clearRect(0,0,170,170);
-    drawOwl(hpctx, 85,90, 58, c, {});
+    hpctx.clearRect(0,0,190,190);
+    drawOwl(hpctx, 95,100, 64, c, {});
     refreshEquipBadges();
+  }
+
+  /* ================= HOME SCENE: time-of-day skyline ================= */
+  const homeBgCanvas = document.getElementById("homeBgCanvas");
+  const hbctx = homeBgCanvas.getContext("2d");
+
+  function timePeriod(){
+    const h = new Date().getHours();
+    if(h>=5 && h<7) return "dawn";
+    if(h>=7 && h<17) return "day";
+    if(h>=17 && h<19) return "sunset";
+    return "night"; // 19:00–5:00
+  }
+
+  function resizeHomeCanvas(){
+    const rect = homeBgCanvas.getBoundingClientRect();
+    if(rect.width<10) return; // not visible/laid out yet
+    homeBgCanvas.width = rect.width;
+    homeBgCanvas.height = rect.height;
+  }
+  window.addEventListener("resize", resizeHomeCanvas);
+
+  const HOME_PALETTES = {
+    dawn:   {sky:["#2b2f6b","#c8577a","#ffb37a"], sun:"#ffd08a", silhouette:"#1b1f3d"},
+    day:    {sky:["#3fa9f5","#8fd7ff","#d8f3ff"], sun:"#fff6c8", silhouette:"#233a52"},
+    sunset: {sky:["#2a1f5e","#c1477a","#ff9d5c"], sun:"#ffb15c", silhouette:"#1a1330"},
+    night:  {sky:["#050818","#0d1440","#1b2a52"], sun:null,      silhouette:"#05070f"}
+  };
+
+  function hash01(seed){ const x = Math.sin(seed*12.9898)*43758.5453; return x - Math.floor(x); }
+
+  function drawTowers(g, cx, baseY, towerH, pal, period){
+    const towerW = towerH*0.16;
+    const gap = towerW*1.7;
+    [-1,1].forEach(side=>{
+      const x = cx + side*gap/2;
+      g.fillStyle = pal.silhouette;
+      g.beginPath();
+      g.moveTo(x-towerW/2, baseY);
+      g.lineTo(x-towerW/2, baseY-towerH*0.55);
+      g.lineTo(x-towerW/3, baseY-towerH*0.55);
+      g.lineTo(x-towerW/3, baseY-towerH*0.8);
+      g.lineTo(x-towerW/5, baseY-towerH*0.8);
+      g.lineTo(x-towerW/5, baseY-towerH*0.92);
+      g.lineTo(x, baseY-towerH);
+      g.lineTo(x+towerW/5, baseY-towerH*0.92);
+      g.lineTo(x+towerW/5, baseY-towerH*0.8);
+      g.lineTo(x+towerW/3, baseY-towerH*0.8);
+      g.lineTo(x+towerW/3, baseY-towerH*0.55);
+      g.lineTo(x+towerW/2, baseY-towerH*0.55);
+      g.lineTo(x+towerW/2, baseY);
+      g.closePath();
+      g.fill();
+      // antenna spike
+      g.strokeStyle = pal.silhouette; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(x,baseY-towerH); g.lineTo(x,baseY-towerH*1.08); g.stroke();
+      // lit windows at dusk/night
+      if(period==="night" || period==="sunset"){
+        g.fillStyle = "rgba(255,220,140,0.85)";
+        let seed = side*1000;
+        for(let wy=baseY-18; wy>baseY-towerH*0.72; wy-=13){
+          for(let wx=x-towerW/2+6; wx<x+towerW/2-6; wx+=9){
+            seed++;
+            if(hash01(seed)<0.35) g.fillRect(wx,wy,2.4,4.5);
+          }
+        }
+      }
+    });
+    // sky bridge
+    g.fillStyle = pal.silhouette;
+    g.fillRect(cx-gap/2+towerW/2, baseY-towerH*0.44, gap-towerW, towerH*0.035);
+  }
+
+  function drawHomeScene(){
+    const w = homeBgCanvas.width, h = homeBgCanvas.height;
+    if(!w || !h) return;
+    const period = timePeriod();
+    const pal = HOME_PALETTES[period];
+    const now = performance.now();
+
+    // sky
+    const grad = hbctx.createLinearGradient(0,0,0,h);
+    pal.sky.forEach((c,i)=>grad.addColorStop(i/(pal.sky.length-1), c));
+    hbctx.fillStyle = grad; hbctx.fillRect(0,0,w,h);
+
+    // sun / moon / stars
+    if(period==="night"){
+      for(let i=0;i<50;i++){
+        const sx = hash01(i*3.1)*w, sy = hash01(i*7.7)*h*0.6;
+        const tw = 0.5+0.5*Math.sin(now/900 + i);
+        hbctx.fillStyle = "rgba(255,255,255,"+(0.3+0.5*tw)+")";
+        hbctx.fillRect(sx,sy,1.6,1.6);
+      }
+      hbctx.fillStyle = "#e8e8f0";
+      hbctx.beginPath(); hbctx.arc(w*0.78,h*0.16,h*0.045,0,Math.PI*2); hbctx.fill();
+    } else {
+      let sx,sy;
+      if(period==="dawn"){ sx=w*0.22; sy=h*0.55; }
+      else if(period==="day"){ sx=w*0.72; sy=h*0.16; }
+      else { sx=w*0.76; sy=h*0.48; }
+      const glow = hbctx.createRadialGradient(sx,sy,0,sx,sy,h*0.28);
+      glow.addColorStop(0, pal.sun+"66"); glow.addColorStop(1, pal.sun+"00");
+      hbctx.fillStyle = glow; hbctx.beginPath(); hbctx.arc(sx,sy,h*0.28,0,Math.PI*2); hbctx.fill();
+      hbctx.fillStyle = pal.sun;
+      hbctx.beginPath(); hbctx.arc(sx,sy,h*0.06,0,Math.PI*2); hbctx.fill();
+    }
+
+    // distant city skyline (small buildings)
+    hbctx.fillStyle = pal.silhouette;
+    const baseY = h*0.82;
+    for(let i=0;i<14;i++){
+      const bw = w*0.045;
+      const bx = i*(w/14);
+      if(bx>w*0.5 && bx<w*0.75) continue; // leave room for the towers
+      const bh = h*(0.08+hash01(i*5.2)*0.16);
+      hbctx.fillRect(bx,baseY-bh,bw,bh);
+    }
+
+    drawTowers(hbctx, w*0.62, baseY, h*0.56, pal, period);
+
+    // ground
+    hbctx.fillStyle = pal.silhouette;
+    hbctx.fillRect(0,baseY,w,h-baseY);
+  }
+
+  function homeBgLoop(){
+    if(document.getElementById("homeScreen").classList.contains("active")){
+      drawHomeScene();
+    }
+    requestAnimationFrame(homeBgLoop);
   }
 
   function refreshEquipBadges(){
@@ -1398,12 +1659,13 @@
     document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
     document.getElementById(screenId).classList.add("active");
     if(screenId==="customizeScreen") renderPreview();
+    if(screenId==="homeScreen") resizeHomeCanvas();
     persistSave();
   }
   document.querySelectorAll(".navbtn").forEach(btn=>{
     btn.addEventListener("click", ()=>goToScreen(btn.dataset.screen));
   });
-  document.querySelectorAll(".homeBtn").forEach(btn=>{
+  document.querySelectorAll(".homeNavBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>goToScreen(btn.dataset.screen));
   });
 
@@ -1420,6 +1682,8 @@
   loadSave().then(()=>{ buildCustGrid(); renderPreview(); refreshMoveLabels(); refreshEventUI(); });
   resetBattle();
   requestAnimationFrame(loop);
+  requestAnimationFrame(()=>{ resizeHomeCanvas(); });
+  requestAnimationFrame(homeBgLoop);
 
 })();
 </script>
