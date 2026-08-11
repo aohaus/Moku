@@ -239,6 +239,40 @@ body.on-title #buildInfo { display: block; }
 #resultDesc { font-size: 13.5px; color: rgba(245,237,231,0.6); line-height: 1.6; max-width: 320px; }
 #resultStars { font-size: 26px; letter-spacing: 0.1em; color: var(--hi); margin: 4px 0; }
 #resultButtons { display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+
+/* ---------- chill mode: no reading, no fail state, just tap Moku ---------- */
+#chillScreen { align-items: center; justify-content: center; text-align: center; gap: 14px; }
+#chillCount {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+  color: rgba(245,237,231,0.45);
+}
+#chillFaceWrap {
+  width: clamp(200px, 58vw, 260px); height: clamp(200px, 58vw, 260px);
+  animation: chillBob 3.2s ease-in-out infinite;
+}
+#chillFaceInner {
+  position: relative;
+  width: 100%; height: 100%;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+#chillFace { width: 100%; height: 100%; display: block; }
+@keyframes chillBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes chillBounce { 0% { transform: scale(1); } 30% { transform: scale(1.12); } 60% { transform: scale(0.96); } 100% { transform: scale(1); } }
+@keyframes chillBounceBig { 0% { transform: scale(1); } 25% { transform: scale(1.22); } 55% { transform: scale(0.92); } 80% { transform: scale(1.06); } 100% { transform: scale(1); } }
+#chillFaceInner.chill-bounce { animation: chillBounce 0.4s ease; }
+#chillFaceInner.chill-bounce-big { animation: chillBounceBig 0.55s ease; }
+#chillLine { font-size: 17px; font-weight: 800; min-height: 26px; color: var(--hi); }
+.chillHeart {
+  position: absolute; top: 8%; font-size: 22px; color: var(--hi);
+  pointer-events: none;
+  animation: chillHeartRise 0.9s ease-out forwards;
+}
+@keyframes chillHeartRise {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-70px) scale(1.2); }
+}
 </style>
 </head>
 <body class="on-title">
@@ -253,7 +287,8 @@ body.on-title #buildInfo { display: block; }
     <h1 id="titleLogo">SHIRI <span>OF MOKU</span></h1>
     <p id="titleSub">モヨを怒(おこ)らせずに話(はな)しきれ</p>
     <nav id="titleMenu">
-      <button class="titleMenuItem" id="btnGoStageSelect">▶ はじめる</button>
+      <button class="titleMenuItem" id="btnGoStageSelect">▶ クイズモード</button>
+      <button class="titleMenuItem" id="btnGoChill">▶ のんびりモード</button>
     </nav>
     <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬&nbsp; M O K U M O K U &nbsp;S E R I E S</div>
   </section>
@@ -280,6 +315,14 @@ body.on-title #buildInfo { display: block; }
     <div id="chatLog"></div>
     <div id="mokuBubble"><p id="mokuLine"></p></div>
     <div id="choiceList"></div>
+  </section>
+
+  <!-- CHILL MODE: just tap/pet Moku, no reading, no losing -->
+  <section class="screen" id="chillScreen">
+    <div id="chillCount">🐾 <span id="chillCountNum">0</span></div>
+    <div id="chillFaceWrap"><div id="chillFaceInner"><canvas id="chillFace" width="240" height="240"></canvas></div></div>
+    <p id="chillLine">&nbsp;</p>
+    <button class="textLink dim" id="btnBackToTitleFromChill">◀ タイトルへ</button>
   </section>
 
   <!-- RESULT SCREEN -->
@@ -369,6 +412,16 @@ body.on-title #buildInfo { display: block; }
       { text: 'フクロウにしては', type: 'mine', reply: 'フクロウにしてはとはなんだモヨ!!' }
     ]}
   ];
+
+  // Chill mode: short, mostly-kana reaction lines for tapping/petting Moku.
+  // Kept text-light on purpose — no furigana needed, nothing to read closely.
+  var CHILL_LINES = [
+    'なでなでモヨ〜', 'えへへモヨ', 'もふもふ〜', 'くすぐったいモヨ',
+    'うれしいモヨ!', 'もっとモヨ〜', 'ふわぁ〜モヨ', 'すきモヨ',
+    'んふふモヨ', 'ぽかぽかモヨ', 'ねむいモヨ…', 'たのしいモヨ!',
+    'ぴょんっ!', 'きもちいいモヨ〜'
+  ];
+  var CHILL_SPECIAL_LINES = ['だいすきモヨ!!', 'さいこうモヨ!!'];
 
   // Fully made-up "next game" running joke — no gameplay effect.
   var IDEA_JOKES = [
@@ -539,6 +592,42 @@ body.on-title #buildInfo { display: block; }
     wrap.classList.add(kind === 'mine' ? 'flash-hit' : 'flash-heal');
   }
 
+  // ---------- chill mode ----------
+  var CHILL_KEY = 'moku:' + GAME_ID + ':chillPets';
+  var chillFace = document.getElementById('chillFace');
+  var chillCount = 0;
+  try { chillCount = parseInt(localStorage.getItem(CHILL_KEY), 10) || 0; } catch (e) {}
+
+  function updateChillCount() {
+    document.getElementById('chillCountNum').textContent = chillCount;
+  }
+
+  function popChillHeart() {
+    var wrap = document.getElementById('chillFaceInner');
+    var heart = document.createElement('span');
+    heart.className = 'chillHeart';
+    heart.textContent = '♥';
+    heart.style.left = (38 + Math.random() * 24) + '%';
+    wrap.appendChild(heart);
+    heart.addEventListener('animationend', function () { heart.remove(); });
+  }
+
+  function petMoku() {
+    chillCount++;
+    updateChillCount();
+    try { localStorage.setItem(CHILL_KEY, String(chillCount)); } catch (e) {}
+
+    var special = Math.random() < 0.08;
+    var pool = special ? CHILL_SPECIAL_LINES : CHILL_LINES;
+    document.getElementById('chillLine').textContent = pool[Math.floor(Math.random() * pool.length)];
+
+    var inner = document.getElementById('chillFaceInner');
+    inner.classList.remove('chill-bounce', 'chill-bounce-big');
+    void inner.offsetWidth;
+    inner.classList.add(special ? 'chill-bounce-big' : 'chill-bounce');
+    popChillHeart();
+  }
+
   // ---------- stage select ----------
   function renderStageList() {
     var wrap = document.getElementById('stageList');
@@ -705,6 +794,16 @@ body.on-title #buildInfo { display: block; }
   document.getElementById('btnResultToSelect').addEventListener('click', function () {
     renderStageList();
     showScreen('stageSelectScreen');
+  });
+  document.getElementById('btnGoChill').addEventListener('click', function () {
+    updateChillCount();
+    document.getElementById('chillLine').innerHTML = '&nbsp;';
+    drawFace(chillFace, 0);
+    showScreen('chillScreen');
+  });
+  document.getElementById('chillFaceInner').addEventListener('click', petMoku);
+  document.getElementById('btnBackToTitleFromChill').addEventListener('click', function () {
+    showScreen('titleScreen');
   });
 })();
 </script>
