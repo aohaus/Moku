@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Mokuball</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  background:
+    radial-gradient(circle at 22% 16%, rgba(185,140,255,0.14), transparent 46%),
+    linear-gradient(165deg, #0d0a17 0%, #1b1330 55%, #0a0812 100%);
+  color: #EDEEF6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+:root { --hi: #B98CFF; --lo: #4B2E7A; }
+
+/* ---------- rotate-to-landscape gate ---------- */
+#rotate-hint {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #0a0812;
+  flex-direction: column; align-items: center; justify-content: center;
+  color: #EDEEF6; font-size: 15px; font-weight: 700; gap: 16px; text-align: center;
+  padding: 20px;
+}
+#rotate-hint span { font-size: 52px; display: inline-block; animation: spin 1.5s ease-in-out infinite alternate; }
+@keyframes spin { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+#rotate-hint p { color: rgba(237,238,246,0.6); font-size: 12.5px; font-weight: 600; max-width: 260px; line-height: 1.6; }
+
+/* ---------- shared frame / hub link (Moku series design system) ---------- */
+#title-frame {
+  display: block;
+  position: fixed; inset: 14px;
+  border: 3px solid var(--hi);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#title-frame::after {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid var(--lo);
+  border-radius: 8px;
+}
+#hub-link {
+  display: block;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  z-index: 6;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--hi);
+  text-decoration: none;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
+@keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+#buildInfo {
+  display: block;
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  left: calc(env(safe-area-inset-left, 0px) + 18px);
+  z-index: 6;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.28);
+  pointer-events: none;
+}
+body.playing #hub-link,
+body.playing #buildInfo { display: none; }
+
+@media (max-width: 900px) and (orientation: portrait) {
+  #rotate-hint { display: flex; }
+  #title-frame, #hub-link, #buildInfo, #wrapper { display: none !important; }
+}
+
+/* ---------- table wrapper ---------- */
+#wrapper {
+  position: relative;
+  width: 100vw;
+  max-width: min(1180px, calc(100vh * 1.78));
+  aspect-ratio: 960 / 540;
+}
+#tableSkin {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(165deg, #150f22 0%, #1c1330 60%, #0f0a1a 100%);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(185,140,255,0.18);
+  perspective: 720px;
+  perspective-origin: 50% 6%;
+}
+canvas#c {
+  display: block;
+  width: 100%; height: 100%;
+  transform: rotateX(20deg) scale(1.045);
+  transform-origin: 50% 100%;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  z-index: 15;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 0;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+#hud .stageName {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  color: var(--hi);
+  background: rgba(10,8,18,0.5);
+  padding: 5px 10px; border-radius: 999px;
+}
+#hud .right { display: flex; align-items: center; gap: 8px; }
+#hud .score {
+  font-size: 15px; font-weight: 800; color: #EDEEF6;
+  background: rgba(10,8,18,0.5);
+  padding: 5px 12px; border-radius: 999px;
+}
+#hud .balls {
+  font-size: 12px; font-weight: 800; color: #FFC94A;
+  background: rgba(10,8,18,0.5);
+  padding: 5px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+#pauseBtn {
+  pointer-events: auto;
+  appearance: none; border: none; cursor: pointer;
+  background: rgba(10,8,18,0.5);
+  color: #EDEEF6;
+  width: 28px; height: 28px; border-radius: 50%;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#objRow {
+  position: absolute; top: 40px; left: 0; right: 0;
+  z-index: 15;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  pointer-events: none;
+}
+#objRow .obj {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
+  color: rgba(237,238,246,0.65);
+  background: rgba(10,8,18,0.4);
+  padding: 3px 9px; border-radius: 999px;
+}
+#objRow .obj b { color: var(--hi); font-weight: 800; }
+.nudgeRow { display: flex; gap: 3px; align-items: center; }
+.nudgePip { width: 5px; height: 5px; border-radius: 50%; background: var(--hi); box-shadow: 0 0 5px rgba(185,140,255,0.7); }
+.nudgePip.used { background: rgba(255,255,255,0.16); box-shadow: none; }
+
+/* ---------- control zones (untransformed, cover full wrapper) ---------- */
+#controls {
+  position: absolute; inset: 0;
+  z-index: 12;
+  display: flex;
+}
+#controls .zone { flex: 1 1 0; height: 100%; }
+#controls .zone.center { flex: 0.9 1 0; }
+.zone:active { background: rgba(185,140,255,0.05); }
+
+/* ---------- screens (title / stage select / result / pause) ---------- */
+.screen {
+  position: absolute; inset: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 22px 28px;
+  background: radial-gradient(circle at 50% 20%, rgba(185,140,255,0.08), transparent 55%), rgba(9,7,15,0.94);
+  border-radius: 16px;
+}
+.screen.active { display: flex; }
+
+#titleBall {
+  width: clamp(54px, 9vw, 76px); height: clamp(54px, 9vw, 76px);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(26px, 4.4vw, 38px);
+  background: radial-gradient(circle at 34% 26%, #fff9, transparent 42%), radial-gradient(circle at 50% 55%, var(--hi), var(--lo) 80%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 12px 24px rgba(0,0,0,0.5), 0 0 26px rgba(185,140,255,0.35);
+  animation: ballFloat 3.2s ease-in-out infinite;
+}
+@keyframes ballFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+#titleLogo {
+  font-weight: 800; letter-spacing: 0.02em;
+  font-size: clamp(24px, 5vw, 36px);
+  line-height: 1.15;
+  text-shadow: 0 0 22px rgba(185,140,255,0.4);
+}
+#titleLogo span { color: var(--hi); }
+#titleSub {
+  font-size: clamp(10px, 1.4vw, 12.5px);
+  font-weight: 700; letter-spacing: 0.06em;
+  color: rgba(237,238,246,0.6);
+}
+#titleMenu { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.menuItem {
+  font-weight: 800; font-size: clamp(13px, 2vw, 16px);
+  padding: 6px 16px;
+  color: rgba(237,238,246,0.5);
+  cursor: pointer;
+}
+.menuItem.sel { color: var(--hi); text-shadow: 0 0 14px rgba(185,140,255,0.55); }
+.menuItem.sel::before { content: '▸ '; }
+#titleFooterTag {
+  margin-top: 16px; padding-top: 10px; width: min(300px, 90%);
+  border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 9px; letter-spacing: 0.05em; color: rgba(237,238,246,0.4);
+}
+
+.screenTitle { font-size: clamp(16px, 2.6vw, 20px); font-weight: 800; }
+.screenSub { font-size: 11px; color: rgba(237,238,246,0.55); margin-bottom: 4px; }
+
+#stageList {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  max-width: 92%;
+  margin-top: 4px;
+}
+.stageItem {
+  width: 108px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+}
+.stageItem.sel { border-color: var(--hi); box-shadow: 0 0 0 1px var(--hi), 0 0 16px rgba(185,140,255,0.35); }
+.stageItem .num { font-size: 9px; font-weight: 800; letter-spacing: 0.06em; color: rgba(237,238,246,0.4); }
+.stageItem.sel .num { color: var(--hi); }
+.stageItem .nm { font-size: 12px; font-weight: 700; margin-top: 2px; line-height: 1.3; min-height: 2.6em; }
+.stageItem .st { font-size: 10px; margin-top: 4px; color: var(--hi); letter-spacing: 0.06em; }
+.stageItem.locked { opacity: 0.35; cursor: default; }
+.stageItem.locked .st { color: rgba(237,238,246,0.3); }
+
+#resultTitle { font-size: clamp(20px, 3.4vw, 28px); font-weight: 800; }
+#resultDesc { font-size: 12px; color: rgba(237,238,246,0.6); line-height: 1.6; }
+#resultScore { font-size: clamp(20px, 3vw, 26px); font-weight: 800; color: var(--hi); font-variant-numeric: tabular-nums; margin: 2px 0; }
+
+.textLink { font-weight: 800; font-size: 12.5px; color: rgba(237,238,246,0.55); padding: 6px 0; cursor: pointer; }
+.textLink.active { color: var(--hi); text-shadow: 0 0 10px rgba(185,140,255,0.5); }
+</style>
+</head>
+<body>
+<div id="rotate-hint"><span>📱</span><p>Mokuballは横向きプレイです。<br>端末を横向きにしてください。</p></div>
+<div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
+
+<div id="wrapper">
+  <div id="tableSkin"><canvas id="c"></canvas></div>
+
+  <div id="hud" style="visibility:hidden">
+    <div class="stageName" id="hudStage">1 · おうちのにわ</div>
+    <div class="right">
+      <div class="score" id="hudScore">0</div>
+      <div class="balls" id="hudBalls">🦉 x1</div>
+      <button id="pauseBtn" type="button" aria-label="Pause">⏸</button>
+    </div>
+  </div>
+  <div id="objRow" style="visibility:hidden">
+    <div class="obj">🌍 <b id="objGate">0/3</b></div>
+    <div class="nudgeRow" id="nudgeRow"></div>
+  </div>
+
+  <div id="controls">
+    <div class="zone left" id="zoneLeft"></div>
+    <div class="zone center" id="zoneCenter"></div>
+    <div class="zone right" id="zoneRight"></div>
+  </div>
+
+  <section class="screen active" id="titleScreen">
+    <div id="titleBall">🦉</div>
+    <h1 id="titleLogo">MOKU<span>BALL</span></h1>
+    <p id="titleSub">せかいをめぐる たびのピンボール</p>
+    <nav id="titleMenu">
+      <div class="menuItem sel" data-action="continue">たびにでる</div>
+      <div class="menuItem" data-action="select">せかいをえらぶ</div>
+    </nav>
+    <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
+  </section>
+
+  <section class="screen" id="stageSelectScreen">
+    <h2 class="screenTitle">せかいをえらぶ</h2>
+    <p class="screenSub">クリアするとつぎの せかいへ すすめる</p>
+    <div id="stageList"></div>
+    <div class="textLink" id="backFromSelect" style="margin-top:8px;">◀ もどる</div>
+  </section>
+
+  <section class="screen" id="resultScreen">
+    <h1 id="resultTitle">STAGE CLEAR</h1>
+    <p id="resultDesc"></p>
+    <div id="resultScore">0</div>
+    <nav id="resultMenu" style="margin-top:6px; display:flex; flex-direction:column; align-items:center; gap:2px;"></nav>
+  </section>
+
+  <section class="screen" id="pauseScreen">
+    <h2 class="screenTitle">ポーズ</h2>
+    <nav id="pauseMenu" style="display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:8px;">
+      <div class="menuItem sel" data-action="resume">つづける</div>
+      <div class="menuItem" data-action="restart">さいしょから</div>
+      <div class="menuItem" data-action="quit">タイトルへ</div>
+    </nav>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var GAME_ID = 'mokuball';
+  var SAVE_KEY = 'moku:' + GAME_ID + ':progress';
+
+  // ---------- stage config ----------
+  var STAGES = [
+    { name: 'おうちのにわ',       scoreTarget: 2500,  gateTarget: 3, extraBallAt: 10 },
+    { name: 'まちかどアーケード', scoreTarget: 4500,  gateTarget: 4, extraBallAt: 14 },
+    { name: 'しんりんのこみち',   scoreTarget: 7000,  gateTarget: 4, extraBallAt: 16 },
+    { name: 'みなとのよる',       scoreTarget: 10500, gateTarget: 5, extraBallAt: 18 },
+    { name: 'ほしめぐりのとう',   scoreTarget: 15000, gateTarget: 6, extraBallAt: 22 }
+  ];
+
+  // ---------- save data ----------
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && data.gameId === GAME_ID) return data;
+      }
+    } catch (e) {}
+    return { version: 1, gameId: GAME_ID, unlockedStage: 1, stageBest: {}, highScore: 0, updatedAt: '' };
+  }
+  var progress = loadProgress();
+  function saveProgress() {
+    progress.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) {}
+  }
+
+  // ---------- canvas ----------
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var W = 960, H = 540;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.scale(DPR, DPR);
+
+  // ---------- table geometry ----------
+  var CX = 480;
+  var PF_BOTTOM = 505;
+  var DRAIN_Y = 528;
+
+  var leftPivot = { x: 430, y: 468 };
+  var rightPivot = { x: 530, y: 468 };
+  var FLEN = 85;
+  var FRAD = 9;
+  var BALL_R = 11;
+
+  var LEFT_REST = 2.4, LEFT_ACTIVE = 0.55;
+  var RIGHT_REST = Math.PI - LEFT_REST, RIGHT_ACTIVE = Math.PI - LEFT_ACTIVE;
+
+  function mirrorPt(p) { return { x: 2 * CX - p.x, y: p.y }; }
+
+  var RW = [{ x: 760, y: 40 }, { x: 918, y: 120 }, { x: 918, y: 360 }, { x: 630, y: 490 }];
+  var LW = RW.map(mirrorPt);
+  var TW = [LW[0], { x: 330, y: 18 }, { x: 630, y: 18 }, RW[0]];
+
+  function polySegs(pts) {
+    var segs = [];
+    for (var i = 0; i < pts.length - 1; i++) segs.push([pts[i], pts[i + 1]]);
+    return segs;
+  }
+  var WALLS = polySegs(RW).concat(polySegs(LW)).concat(polySegs(TW));
+
+  var GATE = { x: CX, y: 100, r: 32 };
+  var BUMPER_BASE = [
+    { x: 400, y: 182, r: 25 },
+    { x: 560, y: 182, r: 25 },
+    { x: 480, y: 262, r: 21 }
+  ];
+  var BUMPER_EXTRA = { x: 480, y: 150, r: 17 }; // stage 4-5 add a fourth bumper
+
+  var BUMPER_POINTS = 100;
+  var GATE_POINTS = 250;
+  var NUDGE_MAX = 6;
+
+  // ---------- state ----------
+  var STATE = 'TITLE'; // TITLE | STAGE_SELECT | SERVE | PLAY | RESULT | PAUSE
+  var curStage = 1;
+  var score = 0;
+  var ballsRemaining = 1;
+  var gateHits = 0;
+  var gateCooldown = 0;
+  var bumperPops = 0;
+  var extraBallAwarded = false;
+  var nudgeCount = 0;
+  var tilted = false;
+  var shakeT = 0, shakeMag = 0;
+  var flashPops = []; // transient score popups {x,y,txt,t}
+
+  var ball = null;
+  var leftFlip = { act: 0 };  // act: 0..1 activation amount
+  var rightFlip = { act: 0 };
+  var leftHeld = false, rightHeld = false;
+
+  function stageConf(n) { return STAGES[n - 1]; }
+  function bumpersForStage(n) {
+    return n >= 4 ? BUMPER_BASE.concat([BUMPER_EXTRA]) : BUMPER_BASE;
+  }
+
+  // ---------- physics helpers ----------
+  function closestOnSeg(px, py, ax, ay, bx, by) {
+    var vx = bx - ax, vy = by - ay;
+    var wx = px - ax, wy = py - ay;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return { x: ax + vx * t, y: ay + vy * t };
+  }
+
+  function collideCircleSeg(b, ax, ay, bx, by, thickness) {
+    var cp = closestOnSeg(b.x, b.y, ax, ay, bx, by);
+    var dx = b.x - cp.x, dy = b.y - cp.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = b.r + thickness;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      b.x += nx * overlap; b.y += ny * overlap;
+      var vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) {
+        var REST = 0.5;
+        b.vx -= (1 + REST) * vn * nx;
+        b.vy -= (1 + REST) * vn * ny;
+        b.vx *= 0.985; b.vy *= 0.985;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function collideCircleCircle(b, ox, oy, or_, pop) {
+    var dx = b.x - ox, dy = b.y - oy;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = b.r + or_;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      b.x += nx * overlap; b.y += ny * overlap;
+      var vn = b.vx * nx + b.vy * ny;
+      var REST = 0.65;
+      if (vn < 0) { b.vx -= (1 + REST) * vn * nx; b.vy -= (1 + REST) * vn * ny; }
+      if (pop) { b.vx += nx * pop; b.vy += ny * pop; }
+      return true;
+    }
+    return false;
+  }
+
+  function flipperAngle(side) {
+    var act = side < 0 ? leftFlip.act : rightFlip.act;
+    var rest = side < 0 ? LEFT_REST : RIGHT_REST;
+    var active = side < 0 ? LEFT_ACTIVE : RIGHT_ACTIVE;
+    return rest + (active - rest) * act;
+  }
+  function flipperTip(side) {
+    var piv = side < 0 ? leftPivot : rightPivot;
+    var ang = flipperAngle(side);
+    return { x: piv.x + Math.cos(ang) * FLEN, y: piv.y + Math.sin(ang) * FLEN };
+  }
+  function collideFlipper(side) {
+    if (!ball) return;
+    var piv = side < 0 ? leftPivot : rightPivot;
+    var tip = flipperTip(side);
+    var wasVn = null;
+    var cp = closestOnSeg(ball.x, ball.y, piv.x, piv.y, tip.x, tip.y);
+    var dx = ball.x - cp.x, dy = ball.y - cp.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = ball.r + FRAD;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      ball.x += nx * overlap; ball.y += ny * overlap;
+      var vn = ball.vx * nx + ball.vy * ny;
+      var REST = 0.55;
+      if (vn < 0) { ball.vx -= (1 + REST) * vn * nx; ball.vy -= (1 + REST) * vn * ny; }
+      var act = side < 0 ? leftFlip.act : rightFlip.act;
+      var held = side < 0 ? leftHeld : rightHeld;
+      if (held && act < 0.92) {
+        var dpiv = Math.sqrt((cp.x - piv.x) * (cp.x - piv.x) + (cp.y - piv.y) * (cp.y - piv.y));
+        var kick = (dpiv / FLEN) * 15;
+        ball.vx += nx * kick;
+        ball.vy += ny * kick - 2;
+      }
+    }
+  }
+
+  // ---------- game flow ----------
+  function goTitle() {
+    STATE = 'TITLE';
+    document.body.classList.remove('playing');
+    showScreen('titleScreen');
+    hudVisible(false);
+  }
+  function goStageSelect() {
+    STATE = 'STAGE_SELECT';
+    document.body.classList.remove('playing');
+    buildStageList();
+    showScreen('stageSelectScreen');
+    hudVisible(false);
+  }
+  function startStage(n) {
+    curStage = n;
+    score = 0;
+    ballsRemaining = 1;
+    STATE = 'PLAY';
+    document.body.classList.add('playing');
+    showScreen(null);
+    hudVisible(true);
+    serveBall();
+    updateHud();
+  }
+  function serveBall() {
+    ball = { x: 480 + (Math.random() - 0.5) * 80, y: 160, vx: (Math.random() - 0.5) * 0.6, vy: 0, r: BALL_R };
+    gateHits = 0;
+    gateCooldown = 0;
+    bumperPops = 0;
+    extraBallAwarded = false;
+    nudgeCount = 0;
+    tilted = false;
+    leftFlip.act = 0; rightFlip.act = 0;
+    updateHud();
+  }
+  function loseBall() {
+    ballsRemaining--;
+    if (ballsRemaining > 0) {
+      serveBall();
+    } else {
+      failStage();
+    }
+  }
+  function clearCondition() {
+    var conf = stageConf(curStage);
+    return score >= conf.scoreTarget && gateHits >= conf.gateTarget;
+  }
+  function clearStage() {
+    STATE = 'RESULT';
+    document.body.classList.remove('playing');
+    var best = progress.stageBest[curStage] || 0;
+    if (score > best) progress.stageBest[curStage] = score;
+    if (score > progress.highScore) progress.highScore = score;
+    if (curStage === progress.unlockedStage && curStage < STAGES.length) {
+      progress.unlockedStage = curStage + 1;
+    } else if (curStage === progress.unlockedStage && curStage === STAGES.length) {
+      progress.unlockedStage = curStage; // all clear, stays at max
+    }
+    saveProgress();
+    var isLast = curStage >= STAGES.length;
+    showResult(true, isLast);
+    hudVisible(false);
+  }
+  function failStage() {
+    STATE = 'RESULT';
+    document.body.classList.remove('playing');
+    var best = progress.stageBest[curStage] || 0;
+    if (score > best) progress.stageBest[curStage] = score;
+    if (score > progress.highScore) progress.highScore = score;
+    saveProgress();
+    showResult(false, false);
+    hudVisible(false);
+  }
+
+  // ---------- update ----------
+  var GRAV = 0.22;
+  function update() {
+    if (STATE !== 'PLAY' || !ball) return;
+
+    if (leftHeld && !tilted) leftFlip.act = Math.min(1, leftFlip.act + 0.28);
+    else leftFlip.act = Math.max(0, leftFlip.act - 0.16);
+    if (rightHeld && !tilted) rightFlip.act = Math.min(1, rightFlip.act + 0.28);
+    else rightFlip.act = Math.max(0, rightFlip.act - 0.16);
+
+    ball.vy += GRAV;
+    ball.vx *= 0.999;
+    var speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    var MAXSPD = 15;
+    if (speed > MAXSPD) { ball.vx *= MAXSPD / speed; ball.vy *= MAXSPD / speed; }
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    for (var i = 0; i < WALLS.length; i++) {
+      collideCircleSeg(ball, WALLS[i][0].x, WALLS[i][0].y, WALLS[i][1].x, WALLS[i][1].y, 4);
+    }
+    var bumpers = bumpersForStage(curStage);
+    bumpers.forEach(function (bmp) {
+      var hit = collideCircleCircle(ball, bmp.x, bmp.y, bmp.r, 7.5);
+      if (hit) {
+        score += BUMPER_POINTS;
+        bumperPops++;
+        addPop(bmp.x, bmp.y, '+' + BUMPER_POINTS);
+        bmp.flash = 10;
+        if (!extraBallAwarded && bumperPops >= stageConf(curStage).extraBallAt) {
+          extraBallAwarded = true;
+          ballsRemaining++;
+          addPop(bmp.x, bmp.y - 30, 'EXTRA BALL!');
+        }
+        updateHud();
+      }
+    });
+    if (gateCooldown > 0) gateCooldown--;
+    var gd = Math.sqrt((ball.x - GATE.x) * (ball.x - GATE.x) + (ball.y - GATE.y) * (ball.y - GATE.y));
+    if (gd < ball.r + GATE.r && gateCooldown === 0) {
+      var nx = (ball.x - GATE.x) / (gd || 1), ny = (ball.y - GATE.y) / (gd || 1);
+      ball.vx += nx * 3; ball.vy += ny * 3 - 2;
+      gateHits++;
+      gateCooldown = 45;
+      score += GATE_POINTS;
+      addPop(GATE.x, GATE.y, '+' + GATE_POINTS);
+      updateHud();
+    }
+
+    collideFlipper(-1);
+    collideFlipper(1);
+
+    if (clearCondition()) { clearStage(); return; }
+    if (ball.y > DRAIN_Y) { loseBall(); return; }
+
+    if (shakeT > 0) { shakeT--; }
+    flashPops.forEach(function (p) { p.t--; p.y -= 0.6; });
+    flashPops = flashPops.filter(function (p) { return p.t > 0; });
+    bumpers.forEach(function (bmp) { if (bmp.flash > 0) bmp.flash--; });
+  }
+
+  function addPop(x, y, txt) { flashPops.push({ x: x, y: y, txt: txt, t: 46 }); }
+
+  function nudge() {
+    if (STATE !== 'PLAY' || !ball) return;
+    if (tilted) return;
+    nudgeCount++;
+    if (nudgeCount > NUDGE_MAX) {
+      tilted = true;
+      leftHeld = false; rightHeld = false;
+      addPop(CX, 260, 'TILT');
+      renderNudgeRow();
+      return;
+    }
+    ball.vx += (Math.random() - 0.5) * 3.4;
+    ball.vy -= 1.2;
+    shakeT = 8; shakeMag = 5;
+    renderNudgeRow();
+  }
+
+  // ---------- draw ----------
+  function drawTable() {
+    ctx.clearRect(0, 0, W, H);
+    var ox = 0, oy = 0;
+    if (shakeT > 0) {
+      ox = (Math.random() - 0.5) * shakeMag;
+      oy = (Math.random() - 0.5) * shakeMag;
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    // playfield base
+    var grd = ctx.createLinearGradient(0, 0, 0, H);
+    grd.addColorStop(0, '#1e1530');
+    grd.addColorStop(1, '#120c1e');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    // wood-tone rail border following the wall polylines
+    ctx.strokeStyle = '#7a5230';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    [RW, LW, TW].forEach(function (pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 2;
+    [RW, LW, TW].forEach(function (pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    });
+
+    // world gate
+    ctx.beginPath();
+    ctx.arc(GATE.x, GATE.y, GATE.r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#B98CFF';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = 'rgba(185,140,255,0.8)';
+    ctx.shadowBlur = 16;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = '22px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🌍', GATE.x, GATE.y + 1);
+
+    // bumpers
+    bumpersForStage(curStage).forEach(function (bmp) {
+      var glow = bmp.flash > 0 ? 1 : 0.55;
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)');
+      g.addColorStop(0.3, '#FFC94A');
+      g.addColorStop(1, '#8A6218');
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(255,201,74,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 26 : 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fill();
+    });
+
+    // flippers
+    [-1, 1].forEach(function (side) {
+      var piv = side < 0 ? leftPivot : rightPivot;
+      var tip = flipperTip(side);
+      var grad = ctx.createLinearGradient(piv.x, piv.y, tip.x, tip.y);
+      grad.addColorStop(0, '#B98CFF');
+      grad.addColorStop(1, '#4B2E7A');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = FRAD * 2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(185,140,255,0.7)';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(piv.x, piv.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(piv.x, piv.y, FRAD * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = '#EDEEF6';
+      ctx.fill();
+    });
+
+    // ball
+    if (ball) {
+      var bg = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 1, ball.x, ball.y, ball.r);
+      bg.addColorStop(0, '#ffffff');
+      bg.addColorStop(0.45, '#d8d8e6');
+      bg.addColorStop(1, '#6d6d82');
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = bg;
+      ctx.shadowColor = 'rgba(185,140,255,0.5)';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🦉', ball.x, ball.y + 1);
+    }
+
+    // score popups
+    flashPops.forEach(function (p) {
+      ctx.globalAlpha = Math.max(0, p.t / 46);
+      ctx.fillStyle = '#EDEEF6';
+      ctx.font = '800 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.txt, p.x, p.y);
+      ctx.globalAlpha = 1;
+    });
+
+    if (tilted) {
+      ctx.fillStyle = 'rgba(255, 90, 90, 0.85)';
+      ctx.font = '800 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('TILT', CX, 300);
+    }
+
+    ctx.restore();
+  }
+
+  // ---------- HUD ----------
+  function hudVisible(v) {
+    document.getElementById('hud').style.visibility = v ? 'visible' : 'hidden';
+    document.getElementById('objRow').style.visibility = v ? 'visible' : 'hidden';
+  }
+  function updateHud() {
+    var conf = stageConf(curStage);
+    document.getElementById('hudStage').textContent = curStage + ' · ' + conf.name;
+    document.getElementById('hudScore').textContent = score.toLocaleString();
+    document.getElementById('hudBalls').textContent = '🦉 x' + ballsRemaining;
+    document.getElementById('objGate').textContent = gateHits + '/' + conf.gateTarget;
+    renderNudgeRow();
+  }
+  function renderNudgeRow() {
+    var row = document.getElementById('nudgeRow');
+    row.innerHTML = '';
+    for (var i = 0; i < NUDGE_MAX; i++) {
+      var pip = document.createElement('div');
+      pip.className = 'nudgePip' + (i < nudgeCount ? ' used' : '');
+      row.appendChild(pip);
+    }
+  }
+
+  // ---------- screens ----------
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    if (id) document.getElementById(id).classList.add('active');
+  }
+  function buildStageList() {
+    var list = document.getElementById('stageList');
+    list.innerHTML = '';
+    STAGES.forEach(function (conf, idx) {
+      var n = idx + 1;
+      var locked = n > progress.unlockedStage;
+      var el = document.createElement('div');
+      el.className = 'stageItem' + (locked ? ' locked' : '') + (n === stageSelSel ? ' sel' : '');
+      el.dataset.stage = n;
+      var best = progress.stageBest[n];
+      el.innerHTML =
+        '<div class="num">STAGE ' + n + '</div>' +
+        '<div class="nm">' + (locked ? '？？？？' : conf.name) + '</div>' +
+        '<div class="st">' + (locked ? '🔒 LOCKED' : (best ? 'BEST ' + best.toLocaleString() : 'NEW')) + '</div>';
+      if (!locked) el.addEventListener('click', function () { chooseStage(n); });
+      list.appendChild(el);
+    });
+  }
+  function chooseStage(n) {
+    if (n > progress.unlockedStage) return;
+    startStage(n);
+  }
+  var stageSelSel = 1;
+
+  function showResult(cleared, isLast) {
+    document.getElementById('resultTitle').textContent = cleared ? (isLast ? 'ALL WORLDS CLEAR!' : 'STAGE CLEAR') : 'GAME OVER';
+    document.getElementById('resultTitle').style.color = cleared ? '#B98CFF' : '#EDEEF6';
+    document.getElementById('resultDesc').textContent = cleared
+      ? (isLast ? 'すべての せかいを めぐり おえた！' : '🌍 ゲートを ' + gateHits + '回 くぐった')
+      : 'ボールが なくなった。もう一度 ちょうせん！';
+    document.getElementById('resultScore').textContent = score.toLocaleString();
+    var menu = document.getElementById('resultMenu');
+    menu.innerHTML = '';
+    var items = [];
+    if (cleared && !isLast) items.push({ label: 'つぎの せかいへ', action: function () { startStage(curStage + 1); } });
+    items.push({ label: 'もう一度', action: function () { startStage(curStage); } });
+    items.push({ label: 'せかいをえらぶ', action: goStageSelect });
+    items.push({ label: 'タイトルへ', action: goTitle });
+    items.forEach(function (it, i) {
+      var el = document.createElement('div');
+      el.className = 'menuItem' + (i === 0 ? ' sel' : '');
+      el.textContent = it.label;
+      el.addEventListener('click', it.action);
+      menu.appendChild(el);
+    });
+    resultSel = 0;
+    resultActions = items.map(function (it) { return it.action; });
+    STATE = 'RESULT';
+    showScreen('resultScreen');
+  }
+  var resultSel = 0, resultActions = [];
+
+  function pause() {
+    if (STATE !== 'PLAY') return;
+    STATE = 'PAUSE';
+    leftHeld = false; rightHeld = false;
+    showScreen('pauseScreen');
+    pauseSel = 0;
+    refreshPauseSel();
+  }
+  var pauseSel = 0;
+  function refreshPauseSel() {
+    var items = document.querySelectorAll('#pauseMenu .menuItem');
+    items.forEach(function (el, i) { el.classList.toggle('sel', i === pauseSel); });
+  }
+  document.querySelectorAll('#pauseMenu .menuItem').forEach(function (el, i) {
+    el.addEventListener('click', function () { pauseSel = i; runPauseAction(); });
+  });
+  function runPauseAction() {
+    var action = ['resume', 'restart', 'quit'][pauseSel];
+    if (action === 'resume') { STATE = 'PLAY'; showScreen(null); }
+    else if (action === 'restart') { startStage(curStage); }
+    else { goTitle(); }
+  }
+
+  // ---------- title menu ----------
+  var titleSel = 0;
+  function refreshTitleSel() {
+    document.querySelectorAll('#titleMenu .menuItem').forEach(function (el, i) { el.classList.toggle('sel', i === titleSel); });
+  }
+  document.querySelectorAll('#titleMenu .menuItem').forEach(function (el, i) {
+    el.addEventListener('click', function () { titleSel = i; runTitleAction(); });
+  });
+  function runTitleAction() {
+    var action = document.querySelectorAll('#titleMenu .menuItem')[titleSel].dataset.action;
+    if (action === 'continue') startStage(progress.unlockedStage);
+    else goStageSelect();
+  }
+  document.getElementById('backFromSelect').addEventListener('click', goTitle);
+
+  // ---------- input ----------
+  function bindHold(el, onDown, onUp) {
+    el.addEventListener('mousedown', function (e) { e.preventDefault(); onDown(); });
+    el.addEventListener('mouseup', onUp);
+    el.addEventListener('mouseleave', onUp);
+    el.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(); }, { passive: false });
+    el.addEventListener('touchend', function (e) { e.preventDefault(); onUp(); }, { passive: false });
+    el.addEventListener('touchcancel', onUp);
+  }
+  bindHold(document.getElementById('zoneLeft'), function () { leftHeld = true; }, function () { leftHeld = false; });
+  bindHold(document.getElementById('zoneRight'), function () { rightHeld = true; }, function () { rightHeld = false; });
+  document.getElementById('zoneCenter').addEventListener('mousedown', nudge);
+  document.getElementById('zoneCenter').addEventListener('touchstart', function (e) { e.preventDefault(); nudge(); }, { passive: false });
+  document.getElementById('pauseBtn').addEventListener('click', pause);
+
+  document.addEventListener('keydown', function (e) {
+    if (STATE === 'TITLE') {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        titleSel = titleSel === 0 ? 1 : 0;
+        refreshTitleSel();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        runTitleAction();
+      }
+      return;
+    }
+    if (STATE === 'STAGE_SELECT') {
+      if (e.key === 'ArrowRight') { stageSelSel = Math.min(STAGES.length, stageSelSel + 1); buildStageList(); }
+      else if (e.key === 'ArrowLeft') { stageSelSel = Math.max(1, stageSelSel - 1); buildStageList(); }
+      else if (e.key === 'Enter' || e.key === ' ') { chooseStage(stageSelSel); }
+      return;
+    }
+    if (STATE === 'RESULT') {
+      if (e.key === 'ArrowUp') { resultSel = (resultSel + resultActions.length - 1) % resultActions.length; refreshResultSel(); }
+      else if (e.key === 'ArrowDown') { resultSel = (resultSel + 1) % resultActions.length; refreshResultSel(); }
+      else if (e.key === 'Enter' || e.key === ' ') { resultActions[resultSel](); }
+      return;
+    }
+    if (STATE === 'PAUSE') {
+      if (e.key === 'ArrowUp') { pauseSel = (pauseSel + 2) % 3; refreshPauseSel(); }
+      else if (e.key === 'ArrowDown') { pauseSel = (pauseSel + 1) % 3; refreshPauseSel(); }
+      else if (e.key === 'Enter' || e.key === ' ') { runPauseAction(); }
+      else if (e.key === 'Escape') { STATE = 'PLAY'; showScreen(null); }
+      return;
+    }
+    if (STATE === 'PLAY') {
+      if (e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') leftHeld = true;
+      else if (e.key === 'ArrowRight' || e.key === '/' || e.key === 'm' || e.key === 'M') rightHeld = true;
+      else if (e.key === 'ArrowDown' || e.key === ' ') nudge();
+      else if (e.key === 'Escape') pause();
+    }
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') leftHeld = false;
+    else if (e.key === 'ArrowRight' || e.key === '/' || e.key === 'm' || e.key === 'M') rightHeld = false;
+  });
+  function refreshResultSel() {
+    document.querySelectorAll('#resultMenu .menuItem').forEach(function (el, i) { el.classList.toggle('sel', i === resultSel); });
+  }
+
+  // ---------- loop ----------
+  function loop() {
+    update();
+    drawTable();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  refreshTitleSel();
+})();
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # Moku Series 共通仕様
 
 Mokuシリーズはポータル(`index.html`)から各ミニゲーム(単一HTMLファイル)へ遷移する構成。
-9タイトル予定、現在3タイトル稼働中(Angry Mokumoku / Moyomoyo / MK Mobile)。
+9タイトル予定、現在6タイトル稼働中(Angry Mokumoku / Moyomoyo / MK Mobile / Angry Moku Battle Royal / Shiri of Moku / Mokuball)。
 
 ## 1. ゲーム間の技術構成
 
@@ -59,6 +59,9 @@ Mokuシリーズはポータル(`index.html`)から各ミニゲーム(単一HTML
     - Angry Mokumoku: `#4CBE55` / `#1A5020`(緑)
     - Moyomoyo: `#E98FC7` / `#7A3D63`(ピンク)
     - MK Mobile: `#FFC94A` / `#8A6218`(黄)
+    - Angry Moku Battle Royal: `#6E7BFF` / `#2B2F80`(藍)
+    - Shiri of Moku: `#FF6B4A` / `#7A2E1A`(朱)
+    - Mokuball: `#B98CFF` / `#4B2E7A`(紫)
     - 追加タイトルは新規ペアを定義(既存と被らない色相を選ぶ)
 - **タイポグラフィ**: `-apple-system, "Segoe UI", Roboto, sans-serif`。見出しは `font-weight: 800`、字間 `0.01〜0.04em`。
 - **共通コンポーネント**
@@ -71,43 +74,16 @@ Mokuシリーズはポータル(`index.html`)から各ミニゲーム(単一HTML
 - **実装方針**: 上記トークン・コンポーネントを `shared/moku-ui.css` に切り出し、各ゲームHTMLで `<link>` または `<style>@import` して再利用する。
 - **言語**: `index.html`(ハブ画面)の表示文言は、特段の指定がない限り英語ベースとする(2026-08-10〜)。各ゲーム本編(`angry-mokumoku.html` 等)は従来通り日本語UIのままでよい — SPEC.md §09チェックリストの「言語は日本語UIで統一」はゲーム本編のみに適用し、ハブ画面には適用しない。
 
-## 4. 「ポータルへ戻る」導線
+## 4. 「ポータルへ戻る」導線 / タイトル画面の共通フレーム
 
-各ゲーム画面の左上に、ポータル(`index.html`)へ戻る小さなボタンを共通配置する。
+**この章は実装済みパターンに合わせて更新済み(2026-08-11)。** 当初案の丸ボタン(`.moku-back`)は採用されず、実際には全タイトルが以下の3点セット(HTML固定要素、canvas描画ではない)をタイトル画面にのみ表示する方式に収束している。
 
-- **配置**: 画面左上に `position: fixed`。セーフエリア対応のため `env(safe-area-inset-*)` を考慮した余白を確保。
-- **見た目**: ゲームのプレイを邪魔しない最小サイズの丸ボタン(アイコンのみ、ラベルなし)。半透明の黒背景 + 白系アイコンで、どのアクセントカラーの上でも視認できるようにする(ゲームごとの `--hi` に依存させない)。
-- **アイコン**: `←`(矢印)を採用。ポータルの絵文字トーンに合わせ `🦉` も検討したが、視認性優先で矢印に決定。
-- **挙動**: タップで `index.html` に遷移。進行中のゲームがある場合は確認ダイアログなどは出さず即遷移(セーブは各ゲーム側で都度自動保存する前提のため)。
-- **共通スニペット(案)**: `shared/moku-ui.css` に `.moku-back` クラスとして定義し、各ゲームHTMLの `<body>` 直下に以下を配置する。
-  ```html
-  <a class="moku-back" href="index.html" aria-label="Back to Moku Series">←</a>
-  ```
-  ```css
-  .moku-back {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 12px);
-    left: calc(env(safe-area-inset-left, 0px) + 12px);
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: rgba(10, 11, 18, 0.55);
-    backdrop-filter: blur(4px);
-    color: #EDEEF6;
-    font-size: 18px;
-    font-weight: 700;
-    text-decoration: none;
-    z-index: 1000;
-    transition: background .15s ease, transform .15s ease;
-  }
-  .moku-back:hover, .moku-back:focus-visible {
-    background: rgba(10, 11, 18, 0.8);
-    transform: scale(1.05);
-  }
-  ```
+- **`#title-frame`**: 画面全体を囲む二重線枠。`position: fixed; inset: 14px;` の外枠(3px, `var(--hi)`)+ `::after` による内枠(inset 5px, 1px, `var(--lo)`)。角丸10px/8px。全タイトル共通・固定値、変更しない。
+- **`#hub-link`**: 右上に固定配置する `<a href="index.html">🦉 Mokuシリーズ ▶</a>`。ゲームごとの `--hi` を文字色に使い、2.2sの緩いパルスアニメーションを掛ける。
+- **`#buildInfo`**: 左下に固定配置するバージョン表記。詳細は5章。
+- **表示タイミング**: 3要素とも「タイトル画面でのみ表示」。`body.on-title` のようなクラス、または各ゲームの画面遷移関数内で `style.display` を直接切り替える方式のいずれでもよい。プレイ中は必ず非表示にする。
+- **実装例**: `angry-mokumoku.html` / `shiri-of-moku.html` / `mokuball.html` を参照。
+- **横向き専用タイトルの場合**: `angry-mokumoku.html` と `mokuball.html` はゲーム内容上、横持ち固定(landscape-only)。`@media (max-width: 900px) and (orientation: portrait)` 相当の条件で `#rotate-hint`(回転を促す全画面オーバーレイ)を表示し、同条件で `#title-frame` / `#hub-link` / `#buildInfo` / ゲーム本体を非表示にするパターンを両タイトルで踏襲している。縦持ち基本のタイトルではこの節は不要。
 
 ## 5. バージョン / 最終更新日時の表示
 
