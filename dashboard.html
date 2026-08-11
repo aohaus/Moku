@@ -215,8 +215,12 @@ footer {
       cls: 'mm', emoji: '🍬', name: 'Moyomoyo',
       read: function () {
         var best = readInt('moyomoyo-best');
-        if (best === null || best <= 0) return null;
-        return { stats: [{ num: best.toLocaleString(), lbl: 'Best Score' }] };
+        var questBest = readInt('moyomoyo-quest-best');
+        if ((best === null || best <= 0) && (questBest === null || questBest <= 0)) return null;
+        var stats = [];
+        stats.push({ num: best && best > 0 ? best.toLocaleString() : '—', lbl: 'Marathon Best' });
+        stats.push({ num: questBest && questBest > 0 ? questBest.toLocaleString() : '—', lbl: 'Moyo Quest Best' });
+        return { stats: stats };
       }
     },
     {

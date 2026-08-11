@@ -516,6 +516,10 @@ let fallTimer = 0;
 let chainCount = 0;
 let score = 0;
 let bestScore = parseInt(localStorage.getItem('moyomoyo-best') || '0', 10);
+// Separate best for Moyo Quest (VS-CPU boss ladder) — a quest run's score
+// isn't comparable to a marathon run's (different board size/pace), so it
+// gets its own key rather than sharing moyomoyo-best.
+let questBestScore = parseInt(localStorage.getItem('moyomoyo-quest-best') || '0', 10);
 let grid = [];        // grid[col][row] = stage number | RAINBOW | null
 let piece = null;     // { col, row, rot, s1, s2 } — s1/s2 may be RAINBOW
 let lockedCols = [];  // columns the most recently locked piece occupied
@@ -1107,8 +1111,12 @@ const TITLE_MENU_Y = 566, TITLE_MENU_GAP = 56, TITLE_MENU_GAP_EXTRA_AFTER_FIRST 
 // screen, overlays) is intentionally still Japanese.
 const TITLE_MENU_ITEMS = ['Start', '⚔️ Moyo Quest', '🏆 Ranking'];
 
+// Both Start and Moyo Quest can show a "Best ###pt" subtext line below
+// their label (see drawTitleScreen), so every item from index 2 onward
+// needs the extra gap reserved twice over — once per subtext line above
+// it — or Ranking collides with Moyo Quest's best score.
 function titleMenuItemY(i) {
-  return TITLE_MENU_Y + i * TITLE_MENU_GAP + (i >= 1 ? TITLE_MENU_GAP_EXTRA_AFTER_FIRST : 0);
+  return TITLE_MENU_Y + i * TITLE_MENU_GAP + Math.min(i, 2) * TITLE_MENU_GAP_EXTRA_AFTER_FIRST;
 }
 
 function activateTitleMenu(i) {
@@ -1247,6 +1255,14 @@ function drawTitleScreen() {
       ctx.fillStyle = sel ? 'rgba(255,233,245,0.75)' : 'rgba(255,255,255,0.45)';
       ctx.font = '19px Arial';
       ctx.fillText(`Best ${bestScore}pt`, W/2, y + 24);
+      ctx.restore();
+    }
+    if (i === 1 && questBestScore > 0) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = sel ? 'rgba(255,233,245,0.75)' : 'rgba(255,255,255,0.45)';
+      ctx.font = '19px Arial';
+      ctx.fillText(`Best ${questBestScore}pt`, W/2, y + 24);
       ctx.restore();
     }
   });
@@ -2369,6 +2385,10 @@ function startVsGame() {
 function endRunVs() {
   state = 'GAMEOVER';
   playSfx(vsWinnerIsPlayer ? 'magic' : 'gameover');
+  if (vsP.score > questBestScore) {
+    questBestScore = vsP.score;
+    localStorage.setItem('moyomoyo-quest-best', String(questBestScore));
+  }
   const ov = document.getElementById('overlay');
   ov.classList.remove('hidden');
   document.getElementById('ov-title').textContent = vsWinnerIsPlayer ? '🏆 5体撃破！チャンピオン！' : '😵 まけ...';
