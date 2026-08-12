@@ -371,20 +371,30 @@ canvas#c {
   var PF_BOTTOM = 505;
   var DRAIN_Y = 530;
 
-  // Flipper pivots sit close together; rest angle points DOWN-AND-INWARD
-  // (tips nearly meet, narrow "center drain" gap — the classic risk of not
-  // flipping in time) and active angle swings UP-AND-OUTWARD (the actual
-  // batting motion). The previous build had this backwards.
-  var leftPivot = { x: 400, y: 455 };
-  var rightPivot = { x: 560, y: 455 };
-  var FLEN = 80;
-  var FRAD = 9;
   var BALL_R = 11;
 
-  var LEFT_REST = 0.70, LEFT_ACTIVE = -0.60;
-  var RIGHT_REST = Math.PI - LEFT_REST, RIGHT_ACTIVE = Math.PI - LEFT_ACTIVE;
-
+  // Rest angle points DOWN-AND-INWARD (tips nearly meet, narrow "centre
+  // drain" gap — the classic risk of not flipping in time) and active
+  // angle swings UP-AND-OUTWARD (the actual batting motion). Mirrored for
+  // the right side of each pair via mirrorAngle().
+  var REST_L = 0.70, ACT_L = -0.60;
+  function mirrorAngle(a) { return Math.PI - a; }
   function mirrorPt(p) { return { x: 2 * CX - p.x, y: p.y }; }
+
+  // All flippers share just the two buttons (side: -1 = left button,
+  // +1 = right button) — no new controls. Multiple flippers replace what
+  // the previous build did with passive guide walls: the upper pair lets
+  // the player actively bat an incoming ball toward the bumpers instead of
+  // a funnel railroading it there, and the single left guard flipper is
+  // the classic real-machine answer to a troublesome outlane — it rests
+  // clear of the channel and sweeps into it on the same left button.
+  var FLIPPERS = [
+    { id: 'mainL', side: -1, piv: { x: 400, y: 455 }, flen: 80, frad: 9, rest: REST_L, active: ACT_L, act: 0 },
+    { id: 'mainR', side: 1, piv: { x: 560, y: 455 }, flen: 80, frad: 9, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
+    { id: 'upperL', side: -1, piv: { x: 372, y: 250 }, flen: 68, frad: 8, rest: REST_L, active: ACT_L, act: 0 },
+    { id: 'upperR', side: 1, piv: { x: 588, y: 250 }, flen: 68, frad: 8, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
+    { id: 'guardL', side: -1, piv: { x: 272, y: 438 }, flen: 50, frad: 8, rest: 1.745, active: 0.35, act: 0 }
+  ];
   function mirrorPoly(pts) { return pts.map(mirrorPt); }
 
   // Outer boundary. Each side funnels down into that side's OUTLANE, which
@@ -424,14 +434,10 @@ canvas#c {
     { x: 745, y: 268, r: 10 }, { x: 685, y: 350, r: 10 }
   ];
 
-  // Funnel. Whatever the ball's trajectory after entering through the
-  // shooter-gate gap — the previous single top rail only routed it
-  // correctly at one specific speed, and any deviation sent it sailing
-  // across the whole table into an outlane — these two walls converge on
-  // the bumper cluster and physically cannot be skated past, so delivery
-  // to the bumpers no longer depends on hitting an exact velocity window.
-  var LEFT_FUNNEL = [{ x: 150, y: 130 }, { x: 300, y: 190 }, { x: 420, y: 262 }];
-  var RIGHT_FUNNEL = [{ x: 800, y: 130 }, { x: 640, y: 190 }, { x: 540, y: 262 }];
+  // No funnel walls here on purpose — passive guide rails were railroading
+  // the ball to the bumpers, which killed the unpredictable-bounce feel
+  // that's the actual fun of pinball. The upper flipper pair (see FLIPPERS
+  // above) does that job instead, through the player's own skill.
 
   function polySegs(pts) {
     var segs = [];
@@ -445,7 +451,6 @@ canvas#c {
   // re-plunge check in update() instead.
   var WALLS = polySegs(RW).concat(polySegs(LW)).concat(polySegs(TW))
     .concat(polySegs(LANE_DIVIDER)).concat(polySegs(LANE_OUTER))
-    .concat(polySegs(LEFT_FUNNEL)).concat(polySegs(RIGHT_FUNNEL))
     .concat(polySegsClosed(LEFT_WEDGE)).concat(polySegsClosed(RIGHT_WEDGE));
 
   // (29) slingshots, sitting above each flipper at the inlane/outlane
@@ -493,22 +498,19 @@ canvas#c {
   ];
   var BUMPER_EXTRA = { x: 200, y: 270, r: 18 }; // stage 4-5 add a fourth bumper
 
-  // (19) top lanes — rollovers strung along the right funnel, so a ball
-  // riding it down naturally crosses all three
-  var TOP_LANES = [{ x: 755, y: 145, r: 15 }, { x: 650, y: 186, r: 15 }, { x: 560, y: 245, r: 15 }];
+  // (19) top lanes — rollovers along the top dome, crossed right after
+  // the ball clears the shooter-lane gap
+  var TOP_LANES = [{ x: 300, y: 75, r: 15 }, { x: 480, y: 65, r: 15 }, { x: 660, y: 75, r: 15 }];
   // (20) spinner — free-spinning gate, scores by how fast the ball passes
   var SPINNER = { x: 115, y: 175, r: 20 };
-  // (21) drop targets — knock all three down for a bonus, then they reset
+  // (21) drop targets — a bank sitting directly above the gate, in the
+  // ball's very first moments in the field. Which targets are still up
+  // changes where an incoming ball deflects, not just how much it scores —
+  // knock the whole bank down for a bonus, then it resets.
   var DROP_TARGETS = [
-    { x: 105, y: 330, hw: 7, hh: 17 },
-    { x: 105, y: 372, hw: 7, hh: 17 },
-    { x: 105, y: 414, hw: 7, hh: 17 }
-  ];
-  // (22) standup targets — stay up, score on every hit
-  var STANDUPS = [
-    { x: 680, y: 250, hw: 7, hh: 17 },
-    { x: 680, y: 292, hw: 7, hh: 17 },
-    { x: 680, y: 334, hw: 7, hh: 17 }
+    { x: 440, y: 148, hw: 7, hh: 15 },
+    { x: 480, y: 148, hw: 7, hh: 15 },
+    { x: 520, y: 148, hw: 7, hh: 15 }
   ];
   // (28) kick-out hole — swallows the ball, then spits it back out
   var HOLE = { x: 108, y: 252, r: 17 };
@@ -528,7 +530,6 @@ canvas#c {
   var LANE_POINTS = 60, LANE_SET_BONUS = 500;
   var SPINNER_POINTS = 20;
   var DROP_POINTS = 120, DROP_BANK_BONUS = 600;
-  var STANDUP_POINTS = 80;
   var HOLE_POINTS = 350;
   var RAMP_POINTS = 400;
   var KICKBACK_POINTS = 100;
@@ -552,7 +553,6 @@ canvas#c {
   var laneLit = [false, false, false];
   var dropDown = [false, false, false];
   var dropResetT = 0;
-  var standupCool = [0, 0, 0];
   var spinnerCool = 0, spinnerSpin = 0;
   var kickbackArmed = true;
   var holdKind = null; // null | 'hole' | 'ramp' — ball captured, own motion
@@ -562,8 +562,6 @@ canvas#c {
   var ballSaveT = 0;   // grace period at the start of each ball
 
   var ball = null;
-  var leftFlip = { act: 0 };  // act: 0..1 activation amount
-  var rightFlip = { act: 0 };
   var leftHeld = false, rightHeld = false;
 
   function stageConf(n) { return STAGES[n - 1]; }
@@ -659,26 +657,20 @@ canvas#c {
     };
   }
 
-  function flipperAngle(side) {
-    var act = side < 0 ? leftFlip.act : rightFlip.act;
-    var rest = side < 0 ? LEFT_REST : RIGHT_REST;
-    var active = side < 0 ? LEFT_ACTIVE : RIGHT_ACTIVE;
-    return rest + (active - rest) * act;
+  function flipperAngle(f) {
+    return f.rest + (f.active - f.rest) * f.act;
   }
-  function flipperTip(side) {
-    var piv = side < 0 ? leftPivot : rightPivot;
-    var ang = flipperAngle(side);
-    return { x: piv.x + Math.cos(ang) * FLEN, y: piv.y + Math.sin(ang) * FLEN };
+  function flipperTip(f) {
+    var ang = flipperAngle(f);
+    return { x: f.piv.x + Math.cos(ang) * f.flen, y: f.piv.y + Math.sin(ang) * f.flen };
   }
-  function collideFlipper(side) {
+  function collideFlipper(f) {
     if (!ball) return;
-    var piv = side < 0 ? leftPivot : rightPivot;
-    var tip = flipperTip(side);
-    var wasVn = null;
-    var cp = closestOnSeg(ball.x, ball.y, piv.x, piv.y, tip.x, tip.y);
+    var tip = flipperTip(f);
+    var cp = closestOnSeg(ball.x, ball.y, f.piv.x, f.piv.y, tip.x, tip.y);
     var dx = ball.x - cp.x, dy = ball.y - cp.y;
     var dist = Math.sqrt(dx * dx + dy * dy);
-    var minDist = ball.r + FRAD;
+    var minDist = ball.r + f.frad;
     if (dist < minDist && dist > 0.0001) {
       var nx = dx / dist, ny = dy / dist;
       var overlap = minDist - dist;
@@ -686,11 +678,10 @@ canvas#c {
       var vn = ball.vx * nx + ball.vy * ny;
       var REST = 0.55;
       if (vn < 0) { ball.vx -= (1 + REST) * vn * nx; ball.vy -= (1 + REST) * vn * ny; }
-      var act = side < 0 ? leftFlip.act : rightFlip.act;
-      var held = side < 0 ? leftHeld : rightHeld;
-      if (held && act < 0.92) {
-        var dpiv = Math.sqrt((cp.x - piv.x) * (cp.x - piv.x) + (cp.y - piv.y) * (cp.y - piv.y));
-        var kick = (dpiv / FLEN) * 15;
+      var held = f.side < 0 ? leftHeld : rightHeld;
+      if (held && f.act < 0.92) {
+        var dpiv = Math.sqrt((cp.x - f.piv.x) * (cp.x - f.piv.x) + (cp.y - f.piv.y) * (cp.y - f.piv.y));
+        var kick = (dpiv / f.flen) * 15;
         ball.vx += nx * kick;
         ball.vy += ny * kick - 2;
       }
@@ -736,11 +727,10 @@ canvas#c {
     gateCooldown = 0;
     nudgeCount = 0;
     tilted = false;
-    leftFlip.act = 0; rightFlip.act = 0;
+    FLIPPERS.forEach(function (f) { f.act = 0; });
     laneLit = [false, false, false];
     dropDown = [false, false, false];
     dropResetT = 0;
-    standupCool = [0, 0, 0];
     spinnerCool = 0; spinnerSpin = 0;
     kickbackArmed = true;
     holdKind = null; holdT = 0; rampT = 0; holeCool = 0; stallFrames = 0;
@@ -837,10 +827,11 @@ canvas#c {
       return;
     }
 
-    if (leftHeld && !tilted) leftFlip.act = Math.min(1, leftFlip.act + 0.28);
-    else leftFlip.act = Math.max(0, leftFlip.act - 0.16);
-    if (rightHeld && !tilted) rightFlip.act = Math.min(1, rightFlip.act + 0.28);
-    else rightFlip.act = Math.max(0, rightFlip.act - 0.16);
+    FLIPPERS.forEach(function (f) {
+      var held = f.side < 0 ? leftHeld : rightHeld;
+      if (held && !tilted) f.act = Math.min(1, f.act + 0.28);
+      else f.act = Math.max(0, f.act - 0.16);
+    });
 
     ball.vy += GRAV;
     ball.vx *= 0.999;
@@ -953,22 +944,10 @@ canvas#c {
       addPop(dt.x, dt.y - 20, '+' + DROP_POINTS);
       if (dropDown[0] && dropDown[1] && dropDown[2]) {
         score += DROP_BANK_BONUS;
-        addPop(300, 230, 'BANK DOWN +' + DROP_BANK_BONUS);
+        addPop(480, 120, 'BANK DOWN +' + DROP_BANK_BONUS);
         if (!kickbackArmed) { kickbackArmed = true; addPop(KICKBACK.x, KICKBACK.y - 30, 'KICKBACK RELIT'); }
         dropResetT = 100; // targets pop back up after a moment
       }
-      updateHud();
-    }
-
-    // (22) standup targets — stay up, score on every hit
-    for (var si = 0; si < STANDUPS.length; si++) {
-      var st = STANDUPS[si];
-      if (!collideCircleRect(ball, st.x, st.y, st.hw, st.hh)) continue;
-      if (standupCool[si] > 0) continue;
-      standupCool[si] = 14;
-      st.flash = 10;
-      score += STANDUP_POINTS;
-      addPop(st.x - 30, st.y, '+' + STANDUP_POINTS);
       updateHud();
     }
 
@@ -996,8 +975,7 @@ canvas#c {
       return;
     }
 
-    collideFlipper(-1);
-    collideFlipper(1);
+    FLIPPERS.forEach(collideFlipper);
 
     if (clearCondition()) { clearStage(); return; }
 
@@ -1044,12 +1022,10 @@ canvas#c {
       dropResetT--;
       if (dropResetT === 0) dropDown = [false, false, false];
     }
-    for (var i = 0; i < standupCool.length; i++) if (standupCool[i] > 0) standupCool[i]--;
     flashPops.forEach(function (p) { p.t--; p.y -= 0.6; });
     flashPops = flashPops.filter(function (p) { return p.t > 0; });
     bumpersForStage(curStage).forEach(function (b) { if (b.flash > 0) b.flash--; });
     DROP_TARGETS.forEach(function (t) { if (t.flash > 0) t.flash--; });
-    STANDUPS.forEach(function (t) { if (t.flash > 0) t.flash--; });
     SLINGS.forEach(function (s) { if (s.flash > 0) s.flash--; });
     POSTS.forEach(function (p) { if (p.flash > 0) p.flash--; });
   }
@@ -1096,7 +1072,7 @@ canvas#c {
     ctx.fillRect(800, 40, 66, PF_BOTTOM - 40);
 
     // wood-tone rail border following the wall polylines
-    var RAILS = [RW, LW, TW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR, LEFT_FUNNEL, RIGHT_FUNNEL];
+    var RAILS = [RW, LW, TW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
     ctx.strokeStyle = '#7a5230';
     ctx.lineWidth = 10;
     ctx.lineCap = 'round';
@@ -1224,17 +1200,6 @@ canvas#c {
       ctx.stroke();
     });
 
-    // (22) standup targets
-    STANDUPS.forEach(function (t) {
-      ctx.fillStyle = t.flash > 0 ? '#FFF3D0' : '#FF7BA6';
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
-      ctx.fill();
-      ctx.stroke();
-    });
-
     // (28) kick-out hole
     ctx.beginPath();
     ctx.arc(HOLE.x, HOLE.y, HOLE.r, 0, Math.PI * 2);
@@ -1300,14 +1265,14 @@ canvas#c {
     });
 
     // flippers
-    [-1, 1].forEach(function (side) {
-      var piv = side < 0 ? leftPivot : rightPivot;
-      var tip = flipperTip(side);
+    FLIPPERS.forEach(function (f) {
+      var piv = f.piv;
+      var tip = flipperTip(f);
       var grad = ctx.createLinearGradient(piv.x, piv.y, tip.x, tip.y);
       grad.addColorStop(0, '#B98CFF');
       grad.addColorStop(1, '#4B2E7A');
       ctx.strokeStyle = grad;
-      ctx.lineWidth = FRAD * 2;
+      ctx.lineWidth = f.frad * 2;
       ctx.lineCap = 'round';
       ctx.shadowColor = 'rgba(185,140,255,0.7)';
       ctx.shadowBlur = 14;
@@ -1317,7 +1282,7 @@ canvas#c {
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.arc(piv.x, piv.y, FRAD * 0.7, 0, Math.PI * 2);
+      ctx.arc(piv.x, piv.y, f.frad * 0.7, 0, Math.PI * 2);
       ctx.fillStyle = '#EDEEF6';
       ctx.fill();
     });
