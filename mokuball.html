@@ -327,11 +327,11 @@ canvas#c {
 
   // ---------- stage config ----------
   var STAGES = [
-    { name: 'おうちのにわ',       scoreTarget: 2500,  gateTarget: 3, extraBallAt: 10 },
-    { name: 'まちかどアーケード', scoreTarget: 4500,  gateTarget: 4, extraBallAt: 14 },
-    { name: 'しんりんのこみち',   scoreTarget: 7000,  gateTarget: 4, extraBallAt: 16 },
-    { name: 'みなとのよる',       scoreTarget: 10500, gateTarget: 5, extraBallAt: 18 },
-    { name: 'ほしめぐりのとう',   scoreTarget: 15000, gateTarget: 6, extraBallAt: 22 }
+    { name: 'おうちのにわ',       scoreTarget: 3500,  gateTarget: 3, extraBallAt: 10 },
+    { name: 'まちかどアーケード', scoreTarget: 6000,  gateTarget: 4, extraBallAt: 14 },
+    { name: 'しんりんのこみち',   scoreTarget: 9500,  gateTarget: 4, extraBallAt: 16 },
+    { name: 'みなとのよる',       scoreTarget: 13500, gateTarget: 5, extraBallAt: 18 },
+    { name: 'ほしめぐりのとう',   scoreTarget: 18000, gateTarget: 6, extraBallAt: 22 }
   ];
 
   // ---------- save data ----------
@@ -375,8 +375,8 @@ canvas#c {
   // (tips nearly meet, narrow "center drain" gap — the classic risk of not
   // flipping in time) and active angle swings UP-AND-OUTWARD (the actual
   // batting motion). The previous build had this backwards.
-  var leftPivot = { x: 400, y: 460 };
-  var rightPivot = { x: 560, y: 460 };
+  var leftPivot = { x: 400, y: 455 };
+  var rightPivot = { x: 560, y: 455 };
   var FLEN = 80;
   var FRAD = 9;
   var BALL_R = 11;
@@ -385,50 +385,128 @@ canvas#c {
   var RIGHT_REST = Math.PI - LEFT_REST, RIGHT_ACTIVE = Math.PI - LEFT_ACTIVE;
 
   function mirrorPt(p) { return { x: 2 * CX - p.x, y: p.y }; }
+  function mirrorPoly(pts) { return pts.map(mirrorPt); }
 
-  // main field boundary. Left side is a continuous wall from dome to
-  // flipper funnel; the right side has a deliberate rectangular gap
-  // (x 870-940, y 45-250) where the shooter lane feeds in — no diagonal
-  // wall spanning that gap, so the ball doesn't have to out-race a moving
-  // boundary on the way in.
-  var LW = [{ x: 90, y: 45 }, { x: 90, y: 250 }, { x: 320, y: 490 }];
-  var RW = [{ x: 870, y: 250 }, { x: 640, y: 490 }];
+  // Outer boundary. Each side funnels down into that side's OUTLANE, which
+  // drains. The right side mirrors the left except above y=250, where a
+  // rectangular gap (x 870-940) lets the shooter lane feed the ball in —
+  // no diagonal wall spans that gap, so the ball doesn't have to out-race
+  // a moving boundary on the way into the field.
+  var LW = [{ x: 90, y: 45 }, { x: 90, y: 250 }, { x: 215, y: 430 }, { x: 248, y: DRAIN_Y }];
+  var RW = mirrorPoly([{ x: 90, y: 250 }, { x: 215, y: 430 }, { x: 248, y: DRAIN_Y }]);
   var TW = [{ x: 90, y: 45 }, { x: 300, y: 15 }, { x: 700, y: 18 }, { x: 870, y: 45 }];
 
-  // shooter lane: walled-off strip along the right edge (870-940) the ball
-  // launches up through, curving left into the field through the gap.
+  // (31) shooter lane: walled-off strip along the right edge (870-940) the
+  // ball launches up through, curving left into the field through the gap.
   var LANE_DIVIDER = [{ x: 870, y: 250 }, { x: 870, y: PF_BOTTOM }];
   var LANE_OUTER = [{ x: 870, y: 45 }, { x: 940, y: 55 }, { x: 940, y: PF_BOTTOM }];
   var LANE_FLOOR = [{ x: 940, y: PF_BOTTOM }, { x: 870, y: PF_BOTTOM }];
 
-  // slingshots: kicker wedges just above each flipper, at the inlane /
-  // outlane split — the ball gets an extra "twang" pop off these.
-  var LEFT_SLING = [{ x: 322, y: 418 }, { x: 372, y: 462 }, { x: 296, y: 480 }];
-  var RIGHT_SLING = LEFT_SLING.map(mirrorPt);
+  // (23)(24) return lane / outlane. This wedge is the divider between the
+  // two: its top edge is the INLANE floor — a ball landing on it rolls
+  // straight down onto the flipper — while its outer edge is the inner
+  // wall of the OUTLANE, which runs past it to the drain.
+  var LEFT_WEDGE = [{ x: 285, y: 412 }, { x: 398, y: 450 }, { x: 392, y: PF_BOTTOM }, { x: 300, y: PF_BOTTOM }];
+  var RIGHT_WEDGE = mirrorPoly(LEFT_WEDGE);
+
+  // Top arc rail (habitrail). A plunged ball comes over the top and lands
+  // on this, then rolls left across the top lanes before dropping into the
+  // gate/bumper cluster. Without it the ball simply parabolas back down the
+  // right-hand side and never touches anything.
+  var TOP_RAIL = [{ x: 862, y: 88 }, { x: 740, y: 98 }, { x: 620, y: 108 }, { x: 500, y: 124 }];
 
   function polySegs(pts) {
     var segs = [];
     for (var i = 0; i < pts.length - 1; i++) segs.push([pts[i], pts[i + 1]]);
     return segs;
   }
-  // LANE_FLOOR is drawn (closes the lane visually) but excluded from
-  // collision: if the ball ever rattles back into the lane's lower
-  // chamber, it should fall through and drain like any other lost ball,
-  // not bounce forever with nothing to score.
-  var WALLS = polySegs(RW).concat(polySegs(LW)).concat(polySegs(TW))
-    .concat(polySegs(LANE_DIVIDER)).concat(polySegs(LANE_OUTER));
-  var SLING_WALLS = polySegs(LEFT_SLING).concat(polySegs(RIGHT_SLING));
+  function polySegsClosed(pts) { return polySegs(pts.concat([pts[0]])); }
 
-  var GATE = { x: CX, y: 100, r: 32 };
+  // LANE_FLOOR is drawn (it closes the lane visually) but is deliberately
+  // not collidable — a ball that comes back down the lane is caught by the
+  // re-plunge check in update() instead.
+  var WALLS = polySegs(RW).concat(polySegs(LW)).concat(polySegs(TW))
+    .concat(polySegs(LANE_DIVIDER)).concat(polySegs(LANE_OUTER)).concat(polySegs(TOP_RAIL))
+    .concat(polySegsClosed(LEFT_WEDGE)).concat(polySegsClosed(RIGHT_WEDGE));
+
+  // (29) slingshots, sitting above each flipper at the inlane/outlane
+  // split. The long UPPER-INNER edge is the kicker face: a ball dropping
+  // toward the flipper hits it and is thrown back up and toward the centre
+  // of the table. (The previous build's wedges faced the wrong way, which
+  // is what punted the ball back into the shooter lane.)
+  var LEFT_SLING_PTS = [{ x: 312, y: 338 }, { x: 298, y: 398 }, { x: 400, y: 395 }];
+  var RIGHT_SLING_PTS = mirrorPoly(LEFT_SLING_PTS);
+
+  // Builds a slingshot: all three edges are solid, but only the kicker
+  // face (edge index 2, the long playfield-facing one) adds the pop. Each
+  // face carries its own outward normal so the kick pushes the ball away
+  // from the actual surface rather than radially from the triangle.
+  function buildSling(pts) {
+    var cx = (pts[0].x + pts[1].x + pts[2].x) / 3;
+    var cy = (pts[0].y + pts[1].y + pts[2].y) / 3;
+    var obj = { pts: pts, flash: 0 };
+    obj.faces = [[0, 1], [1, 2], [2, 0]].map(function (e, i) {
+      var a = pts[e[0]], b = pts[e[1]];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len, ny = dx / len;
+      var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
+      return { a: a, b: b, nx: nx, ny: ny, kick: i === 2, owner: obj };
+    });
+    return obj;
+  }
+  var SLINGS = [buildSling(LEFT_SLING_PTS), buildSling(RIGHT_SLING_PTS)];
+
+  // The gate sits directly under the rail's drop-off point, so every
+  // plunge feeds it, and the bumpers fan out below it.
+  var GATE = { x: 405, y: 180, r: 30 };
+  // (26) bumpers
   var BUMPER_BASE = [
-    { x: 400, y: 182, r: 25 },
-    { x: 560, y: 182, r: 25 },
-    { x: 480, y: 262, r: 21 }
+    { x: 365, y: 255, r: 25 },
+    { x: 545, y: 240, r: 25 },
+    { x: 470, y: 322, r: 21 }
   ];
-  var BUMPER_EXTRA = { x: 480, y: 150, r: 17 }; // stage 4-5 add a fourth bumper
+  var BUMPER_EXTRA = { x: 620, y: 272, r: 17 }; // stage 4-5 add a fourth bumper
+
+  // (19) top lanes — rollovers sitting on the top rail; light all three
+  var TOP_LANES = [{ x: 740, y: 83, r: 15 }, { x: 620, y: 93, r: 15 }, { x: 500, y: 109, r: 15 }];
+  // (20) spinner — free-spinning gate, scores by how fast the ball passes
+  var SPINNER = { x: 175, y: 140, r: 20 };
+  // (21) drop targets — knock all three down for a bonus, then they reset
+  var DROP_TARGETS = [
+    { x: 215, y: 310, hw: 18, hh: 7 },
+    { x: 258, y: 310, hw: 18, hh: 7 },
+    { x: 301, y: 310, hw: 18, hh: 7 }
+  ];
+  // (22) standup targets — stay up, score on every hit
+  var STANDUPS = [
+    { x: 735, y: 250, hw: 7, hh: 17 },
+    { x: 735, y: 292, hw: 7, hh: 17 },
+    { x: 735, y: 334, hw: 7, hh: 17 }
+  ];
+  // (28) kick-out hole — swallows the ball, then spits it back out
+  var HOLE = { x: 250, y: 205, r: 17 };
+  // (27) ramp lane — enter with enough speed and the ball is routed
+  // around the right side and fed back into the right return lane
+  var RAMP_ENTRY = { x: 775, y: 148, r: 26 };
+  var RAMP_PATH = [
+    { x: 775, y: 148 }, { x: 826, y: 205 }, { x: 812, y: 295 },
+    { x: 738, y: 355 }, { x: 668, y: 396 }
+  ];
+  // (25) kickback — one free save per ball, left outlane only
+  var KICKBACK = { x: 258, y: 496 };
 
   var BUMPER_POINTS = 100;
   var GATE_POINTS = 250;
+  var SLING_POINTS = 30;
+  var LANE_POINTS = 60, LANE_SET_BONUS = 500;
+  var SPINNER_POINTS = 20;
+  var DROP_POINTS = 120, DROP_BANK_BONUS = 600;
+  var STANDUP_POINTS = 80;
+  var HOLE_POINTS = 350;
+  var RAMP_POINTS = 400;
+  var KICKBACK_POINTS = 100;
   var NUDGE_MAX = 6;
 
   // ---------- state ----------
@@ -444,6 +522,16 @@ canvas#c {
   var tilted = false;
   var shakeT = 0, shakeMag = 0;
   var flashPops = []; // transient score popups {x,y,txt,t}
+
+  // per-ball playfield object state
+  var laneLit = [false, false, false];
+  var dropDown = [false, false, false];
+  var dropResetT = 0;
+  var standupCool = [0, 0, 0];
+  var spinnerCool = 0, spinnerSpin = 0;
+  var kickbackArmed = true;
+  var holdKind = null; // null | 'hole' | 'ramp' — ball captured, own motion
+  var holdT = 0, rampT = 0;
 
   var ball = null;
   var leftFlip = { act: 0 };  // act: 0..1 activation amount
@@ -503,6 +591,46 @@ canvas#c {
     return false;
   }
 
+  // Axis-aligned rect (centre + half-extents) vs ball, used by the drop
+  // and standup targets. Falls back to least-penetration push-out when the
+  // ball's centre ends up inside the rect.
+  function collideCircleRect(b, rx, ry, hw, hh) {
+    var nx2 = Math.max(rx - hw, Math.min(b.x, rx + hw));
+    var ny2 = Math.max(ry - hh, Math.min(b.y, ry + hh));
+    var dx = b.x - nx2, dy = b.y - ny2;
+    var d2 = dx * dx + dy * dy;
+    if (d2 >= b.r * b.r) return false;
+    var nx, ny, overlap;
+    var d = Math.sqrt(d2);
+    if (d > 0.0001) {
+      nx = dx / d; ny = dy / d; overlap = b.r - d;
+    } else {
+      var px = hw + b.r - Math.abs(b.x - rx);
+      var py = hh + b.r - Math.abs(b.y - ry);
+      if (px < py) { nx = b.x < rx ? -1 : 1; ny = 0; overlap = px; }
+      else { nx = 0; ny = b.y < ry ? -1 : 1; overlap = py; }
+    }
+    b.x += nx * overlap; b.y += ny * overlap;
+    var vn = b.vx * nx + b.vy * ny;
+    if (vn < 0) {
+      var REST = 0.55;
+      b.vx -= (1 + REST) * vn * nx;
+      b.vy -= (1 + REST) * vn * ny;
+    }
+    return true;
+  }
+
+  // Position along a polyline at t in 0..1 — drives the ramp ride.
+  function pathPoint(path, t) {
+    var seg = Math.max(0, Math.min(1, t)) * (path.length - 1);
+    var i = Math.min(path.length - 2, Math.floor(seg));
+    var f = seg - i;
+    return {
+      x: path[i].x + (path[i + 1].x - path[i].x) * f,
+      y: path[i].y + (path[i + 1].y - path[i].y) * f
+    };
+  }
+
   function flipperAngle(side) {
     var act = side < 0 ? leftFlip.act : rightFlip.act;
     var rest = side < 0 ? LEFT_REST : RIGHT_REST;
@@ -559,6 +687,9 @@ canvas#c {
     curStage = n;
     score = 0;
     ballsRemaining = 1;
+    gateHits = 0;
+    bumperPops = 0;
+    extraBallAwarded = false;
     STATE = 'PLAY';
     document.body.classList.add('playing');
     showScreen(null);
@@ -570,15 +701,30 @@ canvas#c {
     // auto-plunge: starts at the foot of the shooter lane and launches
     // itself up and left, curving into the main field through the gap
     // above the lane divider — no plunger control needed.
-    ball = { x: 905, y: 485, vx: 0, vy: -14.5, r: BALL_R, laneKicked: false };
-    gateHits = 0;
+    // Slight plunger variance, so no two balls run the identical line.
+    ball = { x: 905, y: 485, vx: 0, vy: -14.5 + (Math.random() - 0.5) * 0.8, r: BALL_R, laneKicked: false };
+    // gateHits / bumperPops / extraBallAwarded are STAGE-level progress and
+    // are reset in startStage() — only the per-ball state is cleared here.
     gateCooldown = 0;
-    bumperPops = 0;
-    extraBallAwarded = false;
     nudgeCount = 0;
     tilted = false;
     leftFlip.act = 0; rightFlip.act = 0;
+    laneLit = [false, false, false];
+    dropDown = [false, false, false];
+    dropResetT = 0;
+    standupCool = [0, 0, 0];
+    spinnerCool = 0; spinnerSpin = 0;
+    kickbackArmed = true;
+    holdKind = null; holdT = 0; rampT = 0;
     updateHud();
+  }
+  // A ball that drifts back down the shooter lane is not a lost ball on a
+  // real machine — it just sits in the lane until it's plunged again.
+  function replunge() {
+    ball.x = 905; ball.y = 485;
+    ball.vx = 0; ball.vy = -14.5;
+    ball.laneKicked = false;
+    addPop(902, 430, 'RE-PLUNGE');
   }
   function loseBall() {
     ballsRemaining--;
@@ -624,6 +770,33 @@ canvas#c {
   function update() {
     if (STATE !== 'PLAY' || !ball) return;
 
+    // Captured states drive the ball themselves — no gravity, no walls.
+    if (holdKind === 'hole') {
+      ball.x = HOLE.x; ball.y = HOLE.y;
+      if (--holdT <= 0) {
+        holdKind = null;
+        ball.vx = 2.4; ball.vy = -12.5;
+        addPop(HOLE.x, HOLE.y - 26, 'KICK OUT!');
+      }
+      tickEffects();
+      return;
+    }
+    if (holdKind === 'ramp') {
+      rampT++;
+      var rt = rampT / 46;
+      if (rt >= 1) {
+        var end = RAMP_PATH[RAMP_PATH.length - 1];
+        ball.x = end.x; ball.y = end.y;
+        ball.vx = -2.4; ball.vy = 2.6; // fed into the right return lane
+        holdKind = null;
+      } else {
+        var rp = pathPoint(RAMP_PATH, rt);
+        ball.x = rp.x; ball.y = rp.y;
+      }
+      tickEffects();
+      return;
+    }
+
     if (leftHeld && !tilted) leftFlip.act = Math.min(1, leftFlip.act + 0.28);
     else leftFlip.act = Math.max(0, leftFlip.act - 0.16);
     if (rightHeld && !tilted) rightFlip.act = Math.min(1, rightFlip.act + 0.28);
@@ -636,8 +809,8 @@ canvas#c {
     // one-time guide-rail kick curves it left into the field once it has
     // cleared the lane's lower section (mirrors the curved rail a real
     // machine uses to route the plunger lane into the playfield).
-    if (!ball.laneKicked && ball.x > 800 && ball.y < 240) {
-      ball.vx -= 4.5;
+    if (!ball.laneKicked && ball.x > 800 && ball.y < 110) {
+      ball.vx -= 5.5 + (Math.random() - 0.5) * 0.9;
       ball.laneKicked = true;
     }
 
@@ -650,16 +823,20 @@ canvas#c {
     for (var i = 0; i < WALLS.length; i++) {
       collideCircleSeg(ball, WALLS[i][0].x, WALLS[i][0].y, WALLS[i][1].x, WALLS[i][1].y, 4);
     }
-    for (var s = 0; s < SLING_WALLS.length; s++) {
-      var seg = SLING_WALLS[s];
-      var wasHit = collideCircleSeg(ball, seg[0].x, seg[0].y, seg[1].x, seg[1].y, 3);
-      if (wasHit) {
-        var mx = (seg[0].x + seg[1].x) / 2, my = (seg[0].y + seg[1].y) / 2;
-        var ddx = ball.x - mx, ddy = ball.y - my;
-        var dd = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
-        ball.vx += (ddx / dd) * 4.5;
-        ball.vy += (ddy / dd) * 4.5 - 2;
-        addPop(ball.x, ball.y - 14, 'TWANG');
+    // (29) slingshots — every face is solid, but only the kicker face pops
+    // the ball, and it pops along that face's own outward normal.
+    for (var s = 0; s < SLINGS.length; s++) {
+      var faces = SLINGS[s].faces;
+      for (var fi = 0; fi < faces.length; fi++) {
+        var f = faces[fi];
+        if (!collideCircleSeg(ball, f.a.x, f.a.y, f.b.x, f.b.y, 3)) continue;
+        if (!f.kick) continue;
+        ball.vx += f.nx * 11;
+        ball.vy += f.ny * 11;
+        f.owner.flash = 10;
+        score += SLING_POINTS;
+        addPop((f.a.x + f.b.x) / 2, (f.a.y + f.b.y) / 2 - 16, 'TWANG');
+        updateHud();
       }
     }
     var bumpers = bumpersForStage(curStage);
@@ -684,22 +861,133 @@ canvas#c {
       var nx = (ball.x - GATE.x) / (gd || 1), ny = (ball.y - GATE.y) / (gd || 1);
       ball.vx += nx * 3; ball.vy += ny * 3 - 2;
       gateHits++;
-      gateCooldown = 45;
+      gateCooldown = 24;
       score += GATE_POINTS;
       addPop(GATE.x, GATE.y, '+' + GATE_POINTS);
       updateHud();
+    }
+
+    // (19) top lanes — rollovers, no collision; light all three for a bonus
+    for (var li = 0; li < TOP_LANES.length; li++) {
+      var ln = TOP_LANES[li];
+      if (laneLit[li]) continue;
+      if (Math.sqrt((ball.x - ln.x) * (ball.x - ln.x) + (ball.y - ln.y) * (ball.y - ln.y)) >= ball.r + ln.r) continue;
+      laneLit[li] = true;
+      score += LANE_POINTS;
+      addPop(ln.x, ln.y - 18, '+' + LANE_POINTS);
+      if (laneLit[0] && laneLit[1] && laneLit[2]) {
+        score += LANE_SET_BONUS;
+        addPop(CX, 88, 'LANES COMPLETE +' + LANE_SET_BONUS);
+        laneLit = [false, false, false];
+      }
+      updateHud();
+    }
+
+    // (20) spinner — pass-through gate, scores by how fast it's hit
+    var spd2 = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (spinnerCool === 0 &&
+        Math.sqrt((ball.x - SPINNER.x) * (ball.x - SPINNER.x) + (ball.y - SPINNER.y) * (ball.y - SPINNER.y)) < ball.r + SPINNER.r) {
+      var spins = Math.max(1, Math.round(spd2 * 0.9));
+      score += spins * SPINNER_POINTS;
+      spinnerSpin = 28;
+      spinnerCool = 18;
+      addPop(SPINNER.x, SPINNER.y - 24, 'SPIN x' + spins);
+      updateHud();
+    }
+
+    // (21) drop targets
+    for (var di = 0; di < DROP_TARGETS.length; di++) {
+      var dt = DROP_TARGETS[di];
+      if (dropDown[di]) continue;
+      if (!collideCircleRect(ball, dt.x, dt.y, dt.hw, dt.hh)) continue;
+      dropDown[di] = true;
+      dt.flash = 12;
+      score += DROP_POINTS;
+      addPop(dt.x, dt.y - 20, '+' + DROP_POINTS);
+      if (dropDown[0] && dropDown[1] && dropDown[2]) {
+        score += DROP_BANK_BONUS;
+        addPop(258, 282, 'BANK DOWN +' + DROP_BANK_BONUS);
+        dropResetT = 100; // targets pop back up after a moment
+      }
+      updateHud();
+    }
+
+    // (22) standup targets — stay up, score on every hit
+    for (var si = 0; si < STANDUPS.length; si++) {
+      var st = STANDUPS[si];
+      if (!collideCircleRect(ball, st.x, st.y, st.hw, st.hh)) continue;
+      if (standupCool[si] > 0) continue;
+      standupCool[si] = 14;
+      st.flash = 10;
+      score += STANDUP_POINTS;
+      addPop(st.x - 30, st.y, '+' + STANDUP_POINTS);
+      updateHud();
+    }
+
+    // (27) ramp lane — needs to be entered with upward momentum
+    if (Math.sqrt((ball.x - RAMP_ENTRY.x) * (ball.x - RAMP_ENTRY.x) + (ball.y - RAMP_ENTRY.y) * (ball.y - RAMP_ENTRY.y)) < RAMP_ENTRY.r &&
+        ball.vy < 2) {
+      holdKind = 'ramp'; rampT = 0;
+      ball.vx = 0; ball.vy = 0;
+      score += RAMP_POINTS;
+      addPop(RAMP_ENTRY.x, RAMP_ENTRY.y - 26, 'RAMP +' + RAMP_POINTS);
+      updateHud();
+      tickEffects();
+      return;
+    }
+
+    // (28) kick-out hole — swallows the ball, ejects it a beat later
+    if (Math.sqrt((ball.x - HOLE.x) * (ball.x - HOLE.x) + (ball.y - HOLE.y) * (ball.y - HOLE.y)) < HOLE.r * 0.8) {
+      holdKind = 'hole'; holdT = 52;
+      ball.vx = 0; ball.vy = 0;
+      score += HOLE_POINTS;
+      addPop(HOLE.x, HOLE.y - 26, '+' + HOLE_POINTS);
+      updateHud();
+      tickEffects();
+      return;
     }
 
     collideFlipper(-1);
     collideFlipper(1);
 
     if (clearCondition()) { clearStage(); return; }
+
+    // (31) back down the shooter lane — re-plunge instead of losing the ball
+    if (ball.x > 878 && ball.y > 470 && ball.vy > 0) {
+      replunge();
+      tickEffects();
+      return;
+    }
+
+    // (25) kickback — one free save per ball, left outlane only
+    if (kickbackArmed && ball.y > 478 && ball.x > 200 && ball.x < 305) {
+      kickbackArmed = false;
+      ball.vy = -14; ball.vx = 1.8;
+      score += KICKBACK_POINTS;
+      addPop(ball.x, ball.y - 30, 'KICKBACK!');
+      updateHud();
+    }
+
     if (ball.y > DRAIN_Y) { loseBall(); return; }
 
-    if (shakeT > 0) { shakeT--; }
+    tickEffects();
+  }
+
+  function tickEffects() {
+    if (shakeT > 0) shakeT--;
+    if (spinnerCool > 0) spinnerCool--;
+    if (spinnerSpin > 0) spinnerSpin--;
+    if (dropResetT > 0) {
+      dropResetT--;
+      if (dropResetT === 0) dropDown = [false, false, false];
+    }
+    for (var i = 0; i < standupCool.length; i++) if (standupCool[i] > 0) standupCool[i]--;
     flashPops.forEach(function (p) { p.t--; p.y -= 0.6; });
     flashPops = flashPops.filter(function (p) { return p.t > 0; });
-    bumpers.forEach(function (bmp) { if (bmp.flash > 0) bmp.flash--; });
+    bumpersForStage(curStage).forEach(function (b) { if (b.flash > 0) b.flash--; });
+    DROP_TARGETS.forEach(function (t) { if (t.flash > 0) t.flash--; });
+    STANDUPS.forEach(function (t) { if (t.flash > 0) t.flash--; });
+    SLINGS.forEach(function (s) { if (s.flash > 0) s.flash--; });
   }
 
   function addPop(x, y, txt) { flashPops.push({ x: x, y: y, txt: txt, t: 46 }); }
@@ -744,7 +1032,7 @@ canvas#c {
     ctx.fillRect(870, 40, 70, PF_BOTTOM - 40);
 
     // wood-tone rail border following the wall polylines
-    var RAILS = [RW, LW, TW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
+    var RAILS = [RW, LW, TW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR, TOP_RAIL];
     ctx.strokeStyle = '#7a5230';
     ctx.lineWidth = 10;
     ctx.lineCap = 'round';
@@ -764,21 +1052,144 @@ canvas#c {
       ctx.stroke();
     });
 
-    // slingshots (inlane/outlane kicker wedges)
-    [LEFT_SLING, RIGHT_SLING].forEach(function (pts) {
+    function tracePoly(pts) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(185,140,255,0.16)';
+    }
+
+    // (27) ramp lane — drawn as a raised translucent channel
+    ctx.save();
+    ctx.strokeStyle = 'rgba(185,140,255,0.20)';
+    ctx.lineWidth = 26;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(RAMP_PATH[0].x, RAMP_PATH[0].y);
+    for (var rpi = 1; rpi < RAMP_PATH.length; rpi++) ctx.lineTo(RAMP_PATH[rpi].x, RAMP_PATH[rpi].y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(185,140,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    // ramp entry mouth
+    ctx.beginPath();
+    ctx.arc(RAMP_ENTRY.x, RAMP_ENTRY.y, RAMP_ENTRY.r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#B98CFF';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(185,140,255,0.75)';
+    ctx.font = '800 9px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('RAMP', RAMP_ENTRY.x, RAMP_ENTRY.y);
+
+    // (23)(24) inlane / outlane divider wedges
+    [LEFT_WEDGE, RIGHT_WEDGE].forEach(function (pts) {
+      tracePoly(pts);
+      ctx.fillStyle = 'rgba(122,82,48,0.55)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    // (29) slingshots
+    SLINGS.forEach(function (sl) {
+      tracePoly(sl.pts);
+      ctx.fillStyle = sl.flash > 0 ? 'rgba(185,140,255,0.5)' : 'rgba(185,140,255,0.16)';
       ctx.fill();
       ctx.strokeStyle = '#B98CFF';
       ctx.lineWidth = 3;
       ctx.shadowColor = 'rgba(185,140,255,0.6)';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = sl.flash > 0 ? 20 : 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
+
+    // (19) top lanes — rollover arrows, filled once lit
+    TOP_LANES.forEach(function (ln, i) {
+      ctx.beginPath();
+      ctx.arc(ln.x, ln.y, ln.r, 0, Math.PI * 2);
+      ctx.fillStyle = laneLit[i] ? 'rgba(255,201,74,0.75)' : 'rgba(255,255,255,0.07)';
+      ctx.fill();
+      ctx.strokeStyle = laneLit[i] ? '#FFC94A' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = laneLit[i] ? '#2b1d05' : 'rgba(255,255,255,0.45)';
+      ctx.font = '800 12px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('▲', ln.x, ln.y + 1);
+    });
+
+    // (20) spinner — a bar that whips around when the ball passes through
+    ctx.save();
+    ctx.translate(SPINNER.x, SPINNER.y);
+    ctx.rotate(spinnerSpin * 0.55);
+    ctx.strokeStyle = spinnerSpin > 0 ? '#FFC94A' : 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -SPINNER.r * 0.8);
+    ctx.lineTo(0, SPINNER.r * 0.8);
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(SPINNER.x, SPINNER.y, SPINNER.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // (21) drop targets — hidden while knocked down
+    DROP_TARGETS.forEach(function (t, i) {
+      if (dropDown[i]) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(t.x - t.hw, t.y + t.hh);
+        ctx.lineTo(t.x + t.hw, t.y + t.hh);
+        ctx.stroke();
+        return;
+      }
+      ctx.fillStyle = t.flash > 0 ? '#FFF3D0' : '#5FE3C0';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // (22) standup targets
+    STANDUPS.forEach(function (t) {
+      ctx.fillStyle = t.flash > 0 ? '#FFF3D0' : '#FF7BA6';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // (28) kick-out hole
+    ctx.beginPath();
+    ctx.arc(HOLE.x, HOLE.y, HOLE.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#07050d';
+    ctx.fill();
+    ctx.strokeStyle = '#FFC94A';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(255,201,74,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // (25) kickback — lit while it still has a save left
+    ctx.fillStyle = kickbackArmed ? '#5FE3C0' : 'rgba(255,255,255,0.18)';
+    ctx.font = '800 14px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('▲', KICKBACK.x, KICKBACK.y);
+    ctx.font = '700 7px sans-serif';
+    ctx.fillText('KICK', KICKBACK.x, KICKBACK.y + 11);
 
     // world gate
     ctx.beginPath();
