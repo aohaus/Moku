@@ -35,20 +35,27 @@ body {
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,0.55);
 }
-/* Canvas keeps its 960:560 aspect ratio and fills up to the available
-   height (100dvh, mobile-Safari-toolbar-safe), shrinking by width
-   instead whenever the viewport is narrower than that ratio needs. */
+/* Canvas has no explicit width/height of its own here — only max-width and
+   max-height. That leaves its INTRINSIC size (the canvas.width/height pixel
+   attributes set in JS, at the same 1260:574 ratio) as the only thing
+   driving its aspect ratio, so the browser's standard replaced-element
+   sizing (the same algorithm <img> uses) scales it down uniformly to fit
+   within whichever of the two bounds is tighter.
+   Giving it an explicit `height: 100dvh` + `width: auto` here instead (as a
+   prior version of this rule did) looks equivalent, but isn't: once
+   max-width clamped the auto width, the height — never itself auto — held
+   at its full dvh value, silently stretching the pitch and every character
+   on it taller than wide. That's invisible on phones, where landscape is
+   already close to this canvas's own ~2.2:1 ratio and max-width rarely
+   binds, but very visible on an iPad, whose landscape viewport is
+   considerably less wide relative to its height. */
 canvas {
   display: block;
   cursor: pointer;
   touch-action: none;
-  aspect-ratio: 1260 / 574;
-  height: 100vh;
-  height: 100dvh;
+  max-width: 100%;
   max-height: min(900px, calc(100vh - 16px));
   max-height: min(900px, calc(100dvh - 16px));
-  max-width: 100%;
-  width: auto;
 }
 #hud {
   position: absolute; top: 0; left: 0; right: 0;
@@ -415,7 +422,9 @@ let shootPressFrame = -Infinity; // frameCount when the shoot button was last ac
 let shootReadyFrame = -Infinity; // frameCount after which a new press is accepted (cooldown)
 let shotMessage = '';
 let shotMessageTimer = 0;
-let ballStuckFrames = 0; // consecutive low-speed frames while pinned against a paddle (corner-jam safety valve)
+// Corner-jam safety valve: tracks net ball displacement over a rolling
+// window while any paddle is touching it (see updateBall()).
+let stuckRefX = null, stuckRefY = null, stuckRefFrames = 0;
 
 const player = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
 const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false, contactFrames: 0 };
@@ -772,29 +781,39 @@ function updateBall() {
     if (!inGoalMouth) { ball.x = PITCH_X1 - BALL_R; ball.vx = -ball.vx * WALL_BOUNCE; }
   }
 
-  // Safety valve: a paddle (especially the CPU, which actively chases the
-  // ball) can keep pinning the ball against a corner — every frame it
-  // re-separates them positionally, the wall clamp snaps the ball right
-  // back, and since contact never breaks no fresh kick ever fires. Rather
-  // than chase every geometric case that causes this, detect the resulting
-  // near-zero speed while pinned and force an escape after a short grace
-  // period, well before it reads as the game having stalled.
-  const ballSpeed = Math.hypot(ball.vx, ball.vy);
-  if (ballSpeed < 0.6 && (player.touching || cpu.touching || gkPlayer.touching || gkCPU.touching)) {
-    ballStuckFrames++;
-    if (ballStuckFrames > 24) {
-      // Escapes at full BALL_MAX_SPEED, well above any CPU_LEVELS maxSpeed —
-      // a weaker nudge lets the CPU (which re-evaluates its target every
-      // frame) simply run the ball straight back down within a frame or
-      // two, recreating the same jam instead of breaking it.
-      const cx = HALF_X - ball.x, cy = PITCH_CY - ball.y;
-      const cd = Math.hypot(cx, cy) || 1;
-      ball.vx = (cx / cd) * BALL_MAX_SPEED;
-      ball.vy = (cy / cd) * BALL_MAX_SPEED;
-      ballStuckFrames = 0;
+  // Safety valve: a paddle (especially the CPU/keepers, which re-target or
+  // re-patrol on their own) can keep pinning the ball against a corner —
+  // every frame it re-separates them positionally, the wall clamp snaps the
+  // ball right back, and since contact never breaks no fresh kick ever
+  // fires. This is tracked by NET DISPLACEMENT over a rolling window,
+  // rather than instantaneous speed: the dribble guard above periodically
+  // forces a real kick on sustained AI contact, which spikes the ball's
+  // instantaneous speed every couple of frames even while it is, in
+  // practice, going nowhere (each kick just gets reflected straight back
+  // by the wall/paddle) — a speed-threshold check keeps getting reset by
+  // those spikes and never actually fires. Position doesn't lie: if the
+  // ball hasn't gone anywhere across the window despite ongoing contact,
+  // it's stuck regardless of how its velocity has been bouncing around.
+  const anyTouching = player.touching || cpu.touching || gkPlayer.touching || gkCPU.touching;
+  if (anyTouching) {
+    if (stuckRefX === null) { stuckRefX = ball.x; stuckRefY = ball.y; stuckRefFrames = 0; }
+    stuckRefFrames++;
+    if (stuckRefFrames >= 40) {
+      const moved = Math.hypot(ball.x - stuckRefX, ball.y - stuckRefY);
+      if (moved < 30) {
+        // Escapes at full BALL_MAX_SPEED, well above any CPU_LEVELS
+        // maxSpeed or keeper patrol speed — a weaker nudge lets them simply
+        // run the ball straight back down within a frame or two, recreating
+        // the same jam instead of breaking it.
+        const cx = HALF_X - ball.x, cy = PITCH_CY - ball.y;
+        const cd = Math.hypot(cx, cy) || 1;
+        ball.vx = (cx / cd) * BALL_MAX_SPEED;
+        ball.vy = (cy / cd) * BALL_MAX_SPEED;
+      }
+      stuckRefX = ball.x; stuckRefY = ball.y; stuckRefFrames = 0; // refresh the window either way
     }
   } else {
-    ballStuckFrames = 0;
+    stuckRefX = null; stuckRefFrames = 0;
   }
 }
 
@@ -1622,7 +1641,8 @@ function startMatch() {
   particles = [];
   shakeX = 0; shakeY = 0; flashAlpha = 0;
   frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
-  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0;
+  shotMessage = ''; shotMessageTimer = 0;
+  stuckRefX = null; stuckRefY = null; stuckRefFrames = 0;
   player.touching = false; cpu.touching = false; cpu.contactFrames = 0;
   gkPlayer.touching = false; gkPlayer.contactFrames = 0;
   gkCPU.touching = false; gkCPU.contactFrames = 0;
