@@ -188,11 +188,8 @@ canvas#c {
 .screen.active { display: flex; }
 
 #titleBall {
-  width: clamp(54px, 9vw, 76px); height: clamp(54px, 9vw, 76px);
+  width: clamp(84px, 15vw, 120px); height: clamp(84px, 15vw, 120px);
   border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: clamp(26px, 4.4vw, 38px);
-  background: radial-gradient(circle at 34% 26%, #fff9, transparent 42%), radial-gradient(circle at 50% 55%, var(--hi), var(--lo) 80%);
   box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 12px 24px rgba(0,0,0,0.5), 0 0 26px rgba(185,140,255,0.35);
   animation: ballFloat 3.2s ease-in-out infinite;
 }
@@ -285,7 +282,7 @@ canvas#c {
   </div>
 
   <section class="screen active" id="titleScreen">
-    <div id="titleBall">🦉</div>
+    <canvas id="titleBall" width="200" height="200"></canvas>
     <h1 id="titleLogo">MOKU<span>BALL</span></h1>
     <p id="titleSub">せかいをめぐる たびのピンボール</p>
     <nav id="titleMenu">
@@ -402,8 +399,16 @@ canvas#c {
     // inward. RW isn't a mirror of LW (the shooter lane eats the right
     // side's upper half), so wingR's numbers are its own, not mirrorAngle()
     // of wingL's — verified separately against RW's actual geometry.
-    { id: 'wingL', side: -1, piv: { x: 210, y: 340 }, flen: 42, frad: 8, rest: 0.70, active: -0.50, act: 0 },
-    { id: 'wingR', side: 1, piv: { x: 707, y: 320 }, flen: 42, frad: 8, rest: 2.44, active: 3.64, act: 0 }
+    // Positioned at each OUTLANE's mouth, not just "near the wall" — the
+    // first placement sat up by the ramp/bumpers, nowhere close to where
+    // a draining ball actually travels, so pressing the button never did
+    // anything for a ball already headed for the drain. The outlane
+    // channel itself is only ~1.5 ball-widths wide (too tight to put a
+    // flipper inside without recreating the POST-style pinch bug), so
+    // these sit right where the channel opens into the main field
+    // instead, sweeping across that gap.
+    { id: 'wingL', side: -1, piv: { x: 280, y: 390 }, flen: 20, frad: 8, rest: 0.80, active: 0, act: 0 },
+    { id: 'wingR', side: 1, piv: { x: 680, y: 385 }, flen: 24, frad: 8, rest: 2.30, active: 3.00, act: 0 }
   ];
   function mirrorPoly(pts) { return pts.map(mirrorPt); }
 
@@ -441,15 +446,17 @@ canvas#c {
   // outlane, untouched. These sit in the side approaches to break that up.
   // Verified numerically (not by hand) against the actual collision math
   // used at runtime — closestOnSeg/circle-circle distance minus ball
-  // radius, post radius and wall/sling thickness — because the previous
-  // two rounds of hand-measured positions both left a pocket narrower than
-  // a ball's diameter against the nearby SLINGSHOT (not just the outer
-  // wall, which is the only thing earlier passes checked), and the ball
-  // would wedge into it and Tilt out. Every post below keeps at least one
-  // full ball-diameter of clearance from both the outer wall and its
-  // side's slingshot.
+  // radius, post radius and wall/sling thickness — because several
+  // earlier rounds of hand-measured positions left a pocket narrower than
+  // a ball's diameter against the nearby SLINGSHOT or RAMP (not just the
+  // outer wall, which is the only thing the first pass checked), and the
+  // ball would wedge into it and Tilt out. POST2 also needed a genuine
+  // SIDE check, not just a distance one: it was 29px clear of the LW
+  // *line* by distance alone, but that line is finite and the post was
+  // actually sitting past its end, outside the playfield entirely, which
+  // pure distance-to-segment can't catch on its own.
   var POSTS = [
-    { x: 200, y: 300, r: 10 }, { x: 170, y: 390, r: 10 },
+    { x: 200, y: 300, r: 10 }, { x: 254, y: 350, r: 10 },
     { x: 728, y: 262, r: 10 }, { x: 600, y: 320, r: 10 }
   ];
 
@@ -516,16 +523,18 @@ canvas#c {
   // there's real open space between the bumpers and the flippers —
   // needed as a "shot lane", not just filler.
   var GATE = { x: 480, y: 185, r: 26 };
-  // (26) bumpers — a tight triangular nest, dead centre. Sits 30px lower
-  // than the first pass: at the old height the now-doubled-length upper
-  // flippers' resting body physically overlapped the top two bumpers'
-  // collision circles by ~16px, which is a real bug (two overlapping
-  // solid colliders fighting over the same ball produces erratic
-  // push-out behaviour) — not just a visual one.
+  // (26) bumpers — a tight triangular nest, dead centre. The eyes (top
+  // pair) can't move up much further: the upper flippers' resting body
+  // already passes within a few px of them at y=282, a hard ceiling set
+  // by an earlier bug where they overlapped outright. The nose (bottom)
+  // has real room though, since it sits further from the upper flippers'
+  // pivots — pulled it up 35px on its own, which is what actually buys
+  // the requested distance from the MAIN flippers below (the nose was
+  // the closest of the three to them, so it's the one that mattered).
   var BUMPER_BASE = [
-    { x: 432, y: 285, r: 22 },
-    { x: 528, y: 285, r: 22 },
-    { x: 480, y: 345, r: 20 }
+    { x: 432, y: 282, r: 22 },
+    { x: 528, y: 282, r: 22 },
+    { x: 480, y: 310, r: 20 }
   ];
   var BUMPER_EXTRA = { x: 200, y: 270, r: 18 }; // stage 4-5 add a fourth bumper
 
@@ -677,6 +686,7 @@ canvas#c {
   var holdKind = null; // null | 'hole' | 'ramp' — ball captured, own motion
   var holdT = 0, rampT = 0;
   var holeCool = 0; // blocks re-capture while the ball is leaving the hole
+  var rampCool = 0; // blocks re-capture while the ball is leaving the ramp
   var stallFrames = 0; // drives the ball-search nudge
   var ballSaveT = 0;   // grace period at the start of each ball
 
@@ -856,7 +866,7 @@ canvas#c {
     spinnerCool = 0; spinnerSpin = 0;
     kickbackArmedL = true;
     kickbackArmedR = true;
-    holdKind = null; holdT = 0; rampT = 0; holeCool = 0; stallFrames = 0;
+    holdKind = null; holdT = 0; rampT = 0; holeCool = 0; rampCool = 0; stallFrames = 0;
     ballSaveT = 780; // ~13s of ball save, as on a real machine
     updateHud();
   }
@@ -942,6 +952,7 @@ canvas#c {
         ball.x = end.x; ball.y = end.y;
         ball.vx = -3; ball.vy = 3.5; // fed back down toward the bumper nest
         holdKind = null;
+        rampCool = 45;
       } else {
         var rp = pathPoint(RAMP_PATH, rt);
         ball.x = rp.x; ball.y = rp.y;
@@ -1106,8 +1117,16 @@ canvas#c {
       updateHud();
     }
 
-    // (27) ramp lane — needs to be entered with upward momentum
-    if (Math.sqrt((ball.x - RAMP_ENTRY.x) * (ball.x - RAMP_ENTRY.x) + (ball.y - RAMP_ENTRY.y) * (ball.y - RAMP_ENTRY.y)) < RAMP_ENTRY.r &&
+    // (27) ramp lane — needs to be entered with upward momentum. Guarded by
+    // rampCool the same way the kick-out hole is: the ramp was shortened
+    // (see RAMP_PATH below) to fit the space next to the slingshot/outer
+    // wall, which puts its release point only ~70px from RAMP_ENTRY —
+    // close enough that a ball bouncing off the nearby post/sling/wall
+    // could re-enter the capture radius within a frame or two of being
+    // released, re-awarding RAMP_POINTS on a loop. holeCool exists for
+    // exactly this failure mode at the other captured feature.
+    if (rampCool === 0 &&
+        Math.sqrt((ball.x - RAMP_ENTRY.x) * (ball.x - RAMP_ENTRY.x) + (ball.y - RAMP_ENTRY.y) * (ball.y - RAMP_ENTRY.y)) < RAMP_ENTRY.r &&
         ball.vy < 6) {
       holdKind = 'ramp'; rampT = 0;
       ball.vx = 0; ball.vy = 0;
@@ -1202,6 +1221,7 @@ canvas#c {
     if (spinnerCool > 0) spinnerCool--;
     if (spinnerSpin > 0) spinnerSpin--;
     if (holeCool > 0) holeCool--;
+    if (rampCool > 0) rampCool--;
     if (diverterCool > 0) diverterCool--;
     if (ballSaveT > 0) ballSaveT--;
     if (dropResetT > 0) {
@@ -1274,12 +1294,24 @@ canvas#c {
       var last = pts[pts.length - 1];
       ctx.lineTo(last.x, last.y);
     }
-    var RAILS = [RW, LW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
+    // LW/RW get the same smoothed-curve treatment as TW now — the outer
+    // boundary was kinked hard at the point where each side's straight
+    // upper wall meets its diagonal outlane run, which is a large share
+    // of why the frame read as an angular, warped shape instead of a
+    // single rounded body. Collision still uses the straight polyline
+    // (moving it risked reopening every post/sling/ramp clearance this
+    // session already fixed), but visually it now reads as one continuous
+    // curve from the dome down into each outlane, closer to Moku's own
+    // round silhouette. The shooter lane stays straight on purpose — a
+    // real machine's lane guide is a straight metal rail, not a curve.
+    var CURVED_RAILS = [RW, LW];
+    var STRAIGHT_RAILS = [LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
     ctx.strokeStyle = '#7a5230';
     ctx.lineWidth = 10;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    RAILS.forEach(function (pts) {
+    CURVED_RAILS.forEach(function (pts) { ctx.beginPath(); tracePathSmooth(ctx, pts); ctx.stroke(); });
+    STRAIGHT_RAILS.forEach(function (pts) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1288,7 +1320,8 @@ canvas#c {
     ctx.beginPath(); tracePathSmooth(ctx, TW); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.lineWidth = 2;
-    RAILS.forEach(function (pts) {
+    CURVED_RAILS.forEach(function (pts) { ctx.beginPath(); tracePathSmooth(ctx, pts); ctx.stroke(); });
+    STRAIGHT_RAILS.forEach(function (pts) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1840,6 +1873,97 @@ canvas#c {
   function refreshResultSel() {
     document.querySelectorAll('#resultMenu .menuItem').forEach(function (el, i) { el.classList.toggle('sel', i === resultSel); });
   }
+
+  // Ported from shiri-of-moku.html's drawMokumoku() (itself ported from
+  // angry-mokumoku.html) so the title screen shows the same character as
+  // the rest of the series instead of a generic owl emoji.
+  function drawMokumoku(ctx, x, y, r, angle, mood) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle || 0);
+    mood = mood || 'neutral';
+
+    ctx.fillStyle = mood === 'super-angry' ? '#D48060' : '#C8956A';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    var bodyShade = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+    bodyShade.addColorStop(0, 'rgba(255,255,255,0.15)');
+    bodyShade.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = bodyShade;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#E8D5B0';
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.66, r * 0.76, 0, 0, Math.PI * 2); ctx.fill();
+
+    var eyeH = mood === 'super-angry' ? r * 0.145 : mood === 'angry' ? r * 0.175 : r * 0.235;
+    var eyeW = r * 0.19;
+
+    ctx.fillStyle = '#151515';
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.stroke();
+
+    if (mood === 'angry' || mood === 'super-angry') {
+      var slope = mood === 'super-angry' ? r * 0.16 : r * 0.10;
+      ctx.strokeStyle = '#4A1800';
+      ctx.lineWidth = mood === 'super-angry' ? r * 0.09 : r * 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.52, -r * 0.36 - slope); ctx.lineTo(-r * 0.14, -r * 0.36 + slope * 0.3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.14, -r * 0.36 + slope * 0.3); ctx.lineTo(r * 0.52, -r * 0.36 - slope); ctx.stroke();
+    }
+
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(-r * 0.27, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.37, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = mood === 'super-angry' ? '#C87818' : '#E89230';
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.02, r * 0.24, r * 0.115, 0, 0, Math.PI * 2); ctx.fill();
+
+    if (mood === 'super-angry') {
+      ctx.fillStyle = '#2A1000';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.15, r * 0.115, r * 0.10, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.10, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.17, r * 0.115, r * 0.06, 0, 0, Math.PI); ctx.fill();
+    } else if (mood === 'angry') {
+      ctx.fillStyle = '#5A2800';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.14, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.09, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.155, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+    } else {
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.115, r * 0.135, 0, 0, Math.PI); ctx.fill();
+    }
+
+    ctx.fillStyle = '#3DA890';
+    ctx.beginPath(); ctx.ellipse(-r * 0.28, r * 0.47, r * 0.24, r * 0.13, -0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.28, r * 0.47, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2A7868';
+    ctx.beginPath(); ctx.arc(0, r * 0.47, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2A7868'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-r * 0.04, r * 0.47); ctx.lineTo(-r * 0.48, r * 0.45); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.04, r * 0.47); ctx.lineTo(r * 0.48, r * 0.45); ctx.stroke();
+
+    ctx.fillStyle = '#E89230';
+    ctx.beginPath(); ctx.ellipse(-r * 0.26, r * 0.88, r * 0.13, r * 0.08, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.26, r * 0.88, r * 0.13, r * 0.08, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#C06810'; ctx.lineWidth = 1.2;
+    [-r * 0.26, r * 0.26].forEach(function (fx) {
+      ctx.beginPath(); ctx.moveTo(fx - r * 0.07, r * 0.9); ctx.lineTo(fx - r * 0.15, r * 0.96); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx, r * 0.92); ctx.lineTo(fx, r * 1.0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx + r * 0.07, r * 0.9); ctx.lineTo(fx + r * 0.15, r * 0.96); ctx.stroke();
+    });
+
+    ctx.restore();
+  }
+  (function () {
+    var tb = document.getElementById('titleBall');
+    if (!tb) return;
+    var tbCtx = tb.getContext('2d');
+    drawMokumoku(tbCtx, tb.width / 2, tb.height / 2 + 6, tb.width * 0.42, 0, 'neutral');
+  })();
 
   // ---------- loop ----------
   function loop() {
