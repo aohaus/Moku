@@ -204,6 +204,24 @@ canvas {
   animation: hubLinkPulse 2.2s ease-in-out infinite;
 }
 @keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+/* Language toggle — mirrors #hub-link's position/behavior on the opposite
+   corner so it's just as discoverable before a match starts, shown/hidden
+   in lockstep with it (see the JS toggles alongside hub-link below). */
+#lang-toggle {
+  display: block;
+  position: fixed; top: 30px; left: 24px;
+  z-index: 6;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  color: #FFC94A;
+  background: rgba(5,10,25,0.4);
+  border: 1.5px solid rgba(255,201,74,0.5);
+  border-radius: 14px;
+  padding: 5px 14px;
+  cursor: pointer;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
 #buildInfo {
   display: block;
   position: fixed; bottom: 16px; left: 22px;
@@ -219,6 +237,7 @@ canvas {
   #game-layout { display: none; }
   #title-frame { display: none; }
   #hub-link { display: none !important; }
+  #lang-toggle { display: none !important; }
   #buildInfo { display: none !important; }
 }
 </style>
@@ -226,6 +245,7 @@ canvas {
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<button id="lang-toggle" type="button">EN</button>
 <div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
 <div id="game-layout">
   <div id="wrapper">
@@ -291,11 +311,13 @@ const SHOOT_COOLDOWN_FRAMES = 18; // min frames between accepted presses, discou
 const POWER_SHOT_SPEED = 12.5;
 
 const MATCH_DURATIONS = [60, 180, 300]; // 1 / 3 / 5 minutes, in seconds
-const TIME_LABELS = ['1 分', '3 分', '5 分'];
+// CPU_LEVELS / BALL_SKINS hold gameplay data only — their display labels
+// are looked up by index/id from STRINGS below, so both languages can
+// share these same arrays.
 const CPU_LEVELS = [
-  { label: 'かんたん',   accel: 0.55, maxSpeed: 4.4, wanderAmp: 0.9, wanderMax: 46 },
-  { label: 'ふつう',     accel: 0.8,  maxSpeed: 5.6, wanderAmp: 0.6, wanderMax: 30 },
-  { label: 'むずかしい', accel: 1.05, maxSpeed: 6.8, wanderAmp: 0.3, wanderMax: 14 },
+  { accel: 0.55, maxSpeed: 4.4, wanderAmp: 0.9, wanderMax: 46 },
+  { accel: 0.8,  maxSpeed: 5.6, wanderAmp: 0.6, wanderMax: 30 },
+  { accel: 1.05, maxSpeed: 6.8, wanderAmp: 0.3, wanderMax: 14 },
 ];
 
 // ─── PLAYER ROSTER / PROGRESSION ───────────────────────────────
@@ -305,9 +327,9 @@ const STARTER_PLAYERS = [
   { id: 'esp', flag: '🇪🇸', code: 'ESP', name: 'Momin Yamal' },
 ];
 const BALL_SKINS = [
-  { id: 'trionda', label: 'トライカラー', colors: ['#2FAE66', '#2C93D6', '#F0632F'] },
-  { id: 'classic',  label: 'クラシック',   colors: ['#3A3A3A', '#3A3A3A', '#3A3A3A'] },
-  { id: 'sunset',   label: 'サンセット',   colors: ['#F0632F', '#FFC94A', '#E4483A'] },
+  { id: 'trionda', colors: ['#2FAE66', '#2C93D6', '#F0632F'] },
+  { id: 'classic',  colors: ['#3A3A3A', '#3A3A3A', '#3A3A3A'] },
+  { id: 'sunset',   colors: ['#F0632F', '#FFC94A', '#E4483A'] },
 ];
 const MAX_STAT_LEVEL = 20;
 const SHOP_PRICE = 50;      // points to unlock a non-starting country's player
@@ -329,8 +351,128 @@ function defaultProfile() {
     lastWinDate: null,  // yyyy-mm-dd of the streak's most recent win
     matchDurationIdx: 0,
     cpuLevel: 1,
+    lang: 'ja',          // 'ja' | 'en' — see STRINGS/t() below
     updatedAt: null,
   };
+}
+
+// ─── LOCALIZATION ───────────────────────────────────────────────
+// A flat key → string (or key → array/function for dynamic bits) table per
+// language. t(key) looks up the current profile.lang, falling back to
+// Japanese for any gap. Player names, country codes, and flags are already
+// language-neutral (Latin-script punny names, ISO codes, emoji) and don't
+// need an entry here.
+const STRINGS = {
+  ja: {
+    homeLinkText: '🦉 Mokuシリーズ ▶',
+    pauseTitle: '一時停止',
+    joystickLabel: '移動スティック',
+    shootLabel: 'シュート',
+    playAgain: 'もう一度！',
+    rotateHint: '横向きにしてプレイ！',
+    langToggle: 'EN',
+    timeLabels: ['1 分', '3 分', '5 分'],
+    cpuLevels: ['かんたん', 'ふつう', 'むずかしい'],
+    ballSkinLabels: { trionda: 'トライカラー', classic: 'クラシック', sunset: 'サンセット' },
+    titleTagline1: '制限時間内によりたくさんゴールを決めよう',
+    titleTagline2: 'スティックで移動・シュートでタイミングよく強打！',
+    titleStart: '▶ スタート',
+    titleFooter: 'タップ / クリックで選択　・　Enterでスタート',
+    homeTitle: '🏠 ホーム',
+    streakBoost: n => `🔥 ${n} 連勝中！ブーストx2`,
+    homeFirstTime: 'はじめての選手をえらぼう！',
+    homeContinue: '▶ すすむ',
+    homePickPlayer: '選手をえらぶ',
+    backToTitle: '◀ タイトルにもどる',
+    rosterTitle: 'スターティング選手をえらぼう',
+    backToHome: '◀ ホームへ',
+    profileTitle: '選手プロフィール',
+    tapToEdit: 'タップして編集',
+    matchTime: '試合時間',
+    cpuLevel: 'CPU レベル',
+    freePlay: '🤝 フリープレイ（Coming Soon）',
+    panelProfile: '👤 プロフィール',
+    panelUpgrade: '⬆️ アップグレード',
+    panelShop: '🛒 プレイヤーショップ',
+    panelBall: '⚽ ボール',
+    inUse: '使用中',
+    select: 'えらぶ',
+    renameBtn: '✏️ 名前を変える',
+    upgradeCost: cost => `次のLvまで ${cost}pt`,
+    upgradeBtn: '+ 強化',
+    allCollected: '全選手をコンプリート！',
+    buyBtn: price => `💰${price} こうにゅう`,
+    moreCountries: '他の国の選手 - Coming Soon',
+    equipped: '装備中',
+    pausedTitle: '⏸ 一時停止中',
+    resumeBtn: '▶ 再開',
+    pauseHome: '🏠 ホームへ',
+    victoryTitle: '🏆 勝利！',
+    defeatTitle: '😢 敗北...',
+    drawTitle: '🤝 引き分け',
+    boostSuffix: '（🔥ブーストx2）',
+    renamePrompt: '新しい名前を入力してください',
+    powerShotMsg: '⚡ 強シュート！',
+    goalMsg: '⚽ ゴール！',
+    concededMsg: '😵 失点...',
+  },
+  en: {
+    homeLinkText: '🦉 Moku Series ▶',
+    pauseTitle: 'Pause',
+    joystickLabel: 'Move stick',
+    shootLabel: 'SHOOT',
+    playAgain: 'Play Again!',
+    rotateHint: 'Rotate to play!',
+    langToggle: '日本語',
+    timeLabels: ['1 min', '3 min', '5 min'],
+    cpuLevels: ['Easy', 'Normal', 'Hard'],
+    ballSkinLabels: { trionda: 'Tri-Color', classic: 'Classic', sunset: 'Sunset' },
+    titleTagline1: 'Score as many goals as you can before time runs out',
+    titleTagline2: 'Move with the stick, time your SHOOT for a power strike!',
+    titleStart: '▶ START',
+    titleFooter: 'Tap / Click to select  ·  Enter to start',
+    homeTitle: '🏠 HOME',
+    streakBoost: n => `🔥 ${n} win streak! x2 boost`,
+    homeFirstTime: 'Pick your first player!',
+    homeContinue: '▶ Continue',
+    homePickPlayer: 'Pick a Player',
+    backToTitle: '◀ Back to Title',
+    rosterTitle: 'Choose your starting player',
+    backToHome: '◀ Back to Home',
+    profileTitle: 'Player Profile',
+    tapToEdit: 'Tap to edit',
+    matchTime: 'Match Time',
+    cpuLevel: 'CPU Level',
+    freePlay: '🤝 Free Play (Coming Soon)',
+    panelProfile: '👤 Profile',
+    panelUpgrade: '⬆️ Upgrade',
+    panelShop: '🛒 Player Shop',
+    panelBall: '⚽ Ball',
+    inUse: 'In Use',
+    select: 'Select',
+    renameBtn: '✏️ Rename',
+    upgradeCost: cost => `${cost}pt to next Lv`,
+    upgradeBtn: '+ Upgrade',
+    allCollected: 'All players collected!',
+    buyBtn: price => `💰${price} Buy`,
+    moreCountries: 'More countries - Coming Soon',
+    equipped: 'Equipped',
+    pausedTitle: '⏸ Paused',
+    resumeBtn: '▶ Resume',
+    pauseHome: '🏠 Home',
+    victoryTitle: '🏆 Victory!',
+    defeatTitle: '😢 Defeat...',
+    drawTitle: '🤝 Draw',
+    boostSuffix: ' (🔥 Boost x2)',
+    renamePrompt: 'Enter a new name',
+    powerShotMsg: '⚡ Power Shot!',
+    goalMsg: '⚽ GOAL!',
+    concededMsg: '😵 Conceded...',
+  },
+};
+function t(key) {
+  const dict = STRINGS[profile.lang] || STRINGS.ja;
+  return dict[key] !== undefined ? dict[key] : STRINGS.ja[key];
 }
 function loadProfile() {
   try {
@@ -718,7 +860,7 @@ function resolvePaddleHit(entity, radius) {
       if (isPowerShot) {
         addParticles(ball.x, ball.y, '#FF6A3D', 16, 6);
         addShake(9);
-        shotMessage = '⚡ 強シュート！';
+        shotMessage = t('powerShotMsg');
         shotMessageTimer = 36;
       } else {
         addParticles(ball.x, ball.y, '#FFE9A8', 6, 3);
@@ -818,8 +960,8 @@ function updateBall() {
 }
 
 function scoreGoal(who) {
-  if (who === 'home') { scoreHome++; goalMessage = '⚽ ゴール！'; }
-  else { scoreAway++; goalMessage = '😵 失点...'; }
+  if (who === 'home') { scoreHome++; goalMessage = t('goalMsg'); }
+  else { scoreAway++; goalMessage = t('concededMsg'); }
   updateHUD();
   addParticles(who === 'home' ? PITCH_X1 : PITCH_X0, PITCH_CY, '#FFC94A', 26, 6);
   addShake(14);
@@ -898,8 +1040,8 @@ function drawTitleScreen() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '13px Arial';
-  ctx.fillText('制限時間内によりたくさんゴールを決めよう', W/2, 320);
-  ctx.fillText('スティックで移動・シュートでタイミングよく強打！', W/2, 340);
+  ctx.fillText(t('titleTagline1'), W/2, 320);
+  ctx.fillText(t('titleTagline2'), W/2, 340);
   ctx.restore();
 
   const btnY = 390;
@@ -912,7 +1054,7 @@ function drawTitleScreen() {
   ctx.fillStyle = '#201200';
   ctx.font = 'bold 19px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('▶ スタート', W/2, btnY);
+  ctx.fillText(t('titleStart'), W/2, btnY);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
@@ -930,7 +1072,7 @@ function drawTitleScreen() {
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('タップ / クリックで選択　・　Enterでスタート', W/2, H - 20);
+  ctx.fillText(t('titleFooter'), W/2, H - 20);
 }
 
 // ─── HOME (hub) ─────────────────────────────────────────────
@@ -948,7 +1090,7 @@ function drawHome() {
   ctx.fillStyle = '#EFFFEA';
   ctx.font = 'bold 32px Arial';
   ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 18;
-  ctx.fillText('🏠 ホーム', W/2, 100);
+  ctx.fillText(t('homeTitle'), W/2, 100);
   ctx.shadowBlur = 0;
   ctx.restore();
 
@@ -960,7 +1102,7 @@ function drawHome() {
   if (profile.winStreak >= 2) {
     ctx.fillStyle = '#FF9A52';
     ctx.font = '14px Arial';
-    ctx.fillText(`🔥 ${profile.winStreak} 連勝中！ブーストx2`, W/2, 174);
+    ctx.fillText(t('streakBoost')(profile.winStreak), W/2, 174);
   }
   ctx.restore();
 
@@ -987,7 +1129,7 @@ function drawHome() {
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
     ctx.font = '16px Arial';
-    ctx.fillText('はじめての選手をえらぼう！', W/2, 280);
+    ctx.fillText(t('homeFirstTime'), W/2, 280);
     ctx.restore();
   }
 
@@ -1000,7 +1142,7 @@ function drawHome() {
   ctx.fillStyle = '#201200';
   ctx.font = 'bold 19px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(ap ? '▶ すすむ' : '選手をえらぶ', W/2, btnY);
+  ctx.fillText(ap ? t('homeContinue') : t('homePickPlayer'), W/2, btnY);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
@@ -1008,7 +1150,7 @@ function drawHome() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '13px Arial';
-  ctx.fillText('◀ タイトルにもどる', 70, H - 26);
+  ctx.fillText(t('backToTitle'), 70, H - 26);
   ctx.restore();
 }
 
@@ -1023,7 +1165,7 @@ function drawRoster() {
   ctx.fillStyle = '#EFFFEA';
   ctx.font = 'bold 26px Arial';
   ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 16;
-  ctx.fillText('スターティング選手をえらぼう', W/2, 130);
+  ctx.fillText(t('rosterTitle'), W/2, 130);
   ctx.shadowBlur = 0;
   ctx.restore();
 
@@ -1066,7 +1208,7 @@ function drawRoster() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '13px Arial';
-  ctx.fillText('◀ ホームへ', 70, H - 26);
+  ctx.fillText(t('backToHome'), 70, H - 26);
   ctx.restore();
 }
 function pickStarter(id) {
@@ -1101,7 +1243,7 @@ function drawProfile() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '13px Arial';
-  ctx.fillText('選手プロフィール', PF_AVATAR_X, 58);
+  ctx.fillText(t('profileTitle'), PF_AVATAR_X, 58);
   ctx.restore();
 
   drawMokumoku(PF_AVATAR_X, PF_AVATAR_Y, PF_AVATAR_R, 0);
@@ -1110,7 +1252,7 @@ function drawProfile() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '11px Arial';
-  ctx.fillText('タップして編集', PF_AVATAR_X, PF_AVATAR_Y + PF_AVATAR_R + 22);
+  ctx.fillText(t('tapToEdit'), PF_AVATAR_X, PF_AVATAR_Y + PF_AVATAR_R + 22);
   ctx.restore();
 
   ctx.save();
@@ -1146,7 +1288,7 @@ function drawProfile() {
   if (profile.winStreak >= 2) {
     ctx.fillStyle = '#FF9A52';
     ctx.font = '12px Arial';
-    ctx.fillText(`🔥 ${profile.winStreak}連勝中！ブーストx2`, W/2, 106);
+    ctx.fillText(t('streakBoost')(profile.winStreak), W/2, 106);
   }
   ctx.restore();
 
@@ -1154,11 +1296,11 @@ function drawProfile() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '12px Arial';
-  ctx.fillText('試合時間', W/2, PF_TIME_Y - 12);
+  ctx.fillText(t('matchTime'), W/2, PF_TIME_Y - 12);
   ctx.restore();
   const timeTotalW = PF_TIME_W * 3 + PF_TIME_GAP * 2;
   const timeStartX = W/2 - timeTotalW/2;
-  TIME_LABELS.forEach((label, i) => {
+  t('timeLabels').forEach((label, i) => {
     const x = timeStartX + i * (PF_TIME_W + PF_TIME_GAP);
     const selected = i === matchDurationIdx;
     ctx.save();
@@ -1178,7 +1320,7 @@ function drawProfile() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = '12px Arial';
-  ctx.fillText('CPU レベル', W/2, PF_LVL_Y - 10);
+  ctx.fillText(t('cpuLevel'), W/2, PF_LVL_Y - 10);
   ctx.restore();
   const lvlTotalW = PF_LVL_W * 3 + PF_LVL_GAP * 2;
   const lvlStartX = W/2 - lvlTotalW/2;
@@ -1193,7 +1335,7 @@ function drawProfile() {
     ctx.fillStyle = selected ? '#201200' : 'rgba(255,255,255,0.85)';
     ctx.font = (selected ? 'bold ' : '') + '13px Arial';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(lvl.label, x + PF_LVL_W/2, PF_LVL_Y + PF_LVL_H/2);
+    ctx.fillText(t('cpuLevels')[i], x + PF_LVL_W/2, PF_LVL_Y + PF_LVL_H/2);
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
   });
@@ -1218,7 +1360,7 @@ function drawProfile() {
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.font = '13px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🤝 フリープレイ（Coming Soon）', W/2, PF_FREEPLAY_Y);
+  ctx.fillText(t('freePlay'), W/2, PF_FREEPLAY_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
@@ -1242,7 +1384,7 @@ function drawProfile() {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.font = '12px Arial';
-  ctx.fillText('◀ ホームへ', 70, H - 26);
+  ctx.fillText(t('backToHome'), 70, H - 26);
   ctx.restore();
 
   if (profilePanel) drawProfilePanel();
@@ -1271,7 +1413,7 @@ function drawProfilePanel() {
   if (profilePanel === 'ball') return drawBallPanel();
 }
 function drawManagePanel() {
-  drawPanelFrame('👤 プロフィール');
+  drawPanelFrame(t('panelProfile'));
   const owned = ownedIds();
   owned.forEach((id, i) => {
     const pl = profile.players[id];
@@ -1292,12 +1434,12 @@ function drawManagePanel() {
     ctx.textBaseline = 'alphabetic';
     if (active) {
       ctx.fillStyle = '#FFC94A'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'right';
-      ctx.fillText('使用中', PANEL_X + PANEL_W - 100, y + (MANAGE_ROW_H - 16) / 2 + 4);
+      ctx.fillText(t('inUse'), PANEL_X + PANEL_W - 100, y + (MANAGE_ROW_H - 16) / 2 + 4);
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W - 220, y + 10, 130, 32, 16); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
-      ctx.fillText('えらぶ', PANEL_X + PANEL_W - 155, y + 10 + 16 + 4);
+      ctx.fillText(t('select'), PANEL_X + PANEL_W - 155, y + 10 + 16 + 4);
     }
     ctx.restore();
   });
@@ -1310,12 +1452,12 @@ function drawManagePanel() {
   ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W/2 - 110, renameY, 220, 42, 21); ctx.stroke();
   ctx.fillStyle = '#fff'; ctx.font = '14px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('✏️ 名前を変える', PANEL_X + PANEL_W/2, renameY + 21);
+  ctx.fillText(t('renameBtn'), PANEL_X + PANEL_W/2, renameY + 21);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
 function drawUpgradePanel() {
-  drawPanelFrame('⬆️ アップグレード');
+  drawPanelFrame(t('panelUpgrade'));
   const ap = activePlayer();
   if (!ap) return;
   [['sp', 'Sp', '#7FE87F'], ['sh', 'Sh', '#FF9A52'], ['def', 'Def', '#5CB8FF']].forEach(([key, label, color], i) => {
@@ -1333,7 +1475,7 @@ function drawUpgradePanel() {
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.font = '12px Arial';
-    ctx.fillText(maxed ? 'MAX' : `次のLvまで ${cost}pt`, PANEL_X + 50, y + 50);
+    ctx.fillText(maxed ? 'MAX' : t('upgradeCost')(cost), PANEL_X + 50, y + 50);
     ctx.restore();
     const canAfford = !maxed && profile.points >= cost;
     ctx.save();
@@ -1342,7 +1484,7 @@ function drawUpgradePanel() {
     ctx.fillStyle = maxed ? 'rgba(255,255,255,0.3)' : (canAfford ? '#201200' : 'rgba(255,255,255,0.35)');
     ctx.font = 'bold 15px Arial';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(maxed ? 'MAX' : '+ 強化', PANEL_X + PANEL_W - 125, y + 12);
+    ctx.fillText(maxed ? 'MAX' : t('upgradeBtn'), PANEL_X + PANEL_W - 125, y + 12);
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
   });
@@ -1359,14 +1501,14 @@ function upgradeStat(key) {
   saveProfile();
 }
 function drawShopPanel() {
-  drawPanelFrame('🛒 プレイヤーショップ');
+  drawPanelFrame(t('panelShop'));
   const unowned = STARTER_PLAYERS.filter(p => !(profile.players[p.id] && profile.players[p.id].owned));
   if (unowned.length === 0) {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = '16px Arial';
-    ctx.fillText('全選手をコンプリート！', PANEL_X + PANEL_W/2, PANEL_Y + 160);
+    ctx.fillText(t('allCollected'), PANEL_X + PANEL_W/2, PANEL_Y + 160);
     ctx.restore();
   } else {
     unowned.forEach((meta, i) => {
@@ -1386,7 +1528,7 @@ function drawShopPanel() {
       ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W - 220, y + 13, 150, 42, 21); ctx.fill();
       ctx.fillStyle = canAfford ? '#201200' : 'rgba(255,255,255,0.35)';
       ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(`💰${SHOP_PRICE} こうにゅう`, PANEL_X + PANEL_W - 145, y + 34);
+      ctx.fillText(t('buyBtn')(SHOP_PRICE), PANEL_X + PANEL_W - 145, y + 34);
       ctx.textBaseline = 'alphabetic';
       ctx.restore();
     });
@@ -1399,7 +1541,7 @@ function drawShopPanel() {
   ctx.setLineDash([]);
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.font = '13px Arial'; ctx.textAlign = 'center';
-  ctx.fillText('他の国の選手 - Coming Soon', PANEL_X + PANEL_W/2, moreY + (SHOP_ROW_H - 16) / 2 + 4);
+  ctx.fillText(t('moreCountries'), PANEL_X + PANEL_W/2, moreY + (SHOP_ROW_H - 16) / 2 + 4);
   ctx.restore();
 }
 function buyPlayer(id) {
@@ -1411,7 +1553,7 @@ function buyPlayer(id) {
   saveProfile();
 }
 function drawBallPanel() {
-  drawPanelFrame('⚽ ボール');
+  drawPanelFrame(t('panelBall'));
   const totalW = BALL_SKINS.length * BALL_ITEM_W + (BALL_SKINS.length - 1) * 20;
   const startX = PANEL_X + PANEL_W/2 - totalW/2;
   BALL_SKINS.forEach((skin, i) => {
@@ -1441,8 +1583,8 @@ function drawBallPanel() {
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx, cy, br, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(skin.label, x + BALL_ITEM_W/2, y + 150);
-    if (equipped) { ctx.fillStyle = '#FFC94A'; ctx.font = '12px Arial'; ctx.fillText('装備中', x + BALL_ITEM_W/2, y + 170); }
+    ctx.fillText(t('ballSkinLabels')[skin.id], x + BALL_ITEM_W/2, y + 150);
+    if (equipped) { ctx.fillStyle = '#FFC94A'; ctx.font = '12px Arial'; ctx.fillText(t('equipped'), x + BALL_ITEM_W/2, y + 170); }
     ctx.restore();
   });
 }
@@ -1466,7 +1608,7 @@ function drawVS() {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Arial';
   ctx.fillText(ap ? ap.name : '', W/2 - 220, PITCH_CY + 70);
-  ctx.fillText(`CPU (${CPU_LEVELS[cpuLevel].label})`, W/2 + 220, PITCH_CY + 70);
+  ctx.fillText(`CPU (${t('cpuLevels')[cpuLevel]})`, W/2 + 220, PITCH_CY + 70);
   ctx.restore();
 
   ctx.save();
@@ -1500,7 +1642,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = '#EFFFEA';
   ctx.font = 'bold 28px Arial';
   ctx.shadowColor = '#7FE87F'; ctx.shadowBlur = 18;
-  ctx.fillText('⏸ 一時停止中', W/2, PAUSE_TITLE_Y);
+  ctx.fillText(t('pausedTitle'), W/2, PAUSE_TITLE_Y);
   ctx.shadowBlur = 0;
   ctx.restore();
 
@@ -1510,7 +1652,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = '#201200';
   ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.fillText(t('resumeBtn'), W/2, PAUSE_RESUME_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
@@ -1522,7 +1664,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = '15px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏠 ホームへ', W/2, PAUSE_QUIT_Y);
+  ctx.fillText(t('pauseHome'), W/2, PAUSE_QUIT_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
@@ -1656,6 +1798,7 @@ function startMatch() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
+  document.getElementById('lang-toggle').style.display = 'none';
   document.getElementById('buildInfo').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
 }
@@ -1697,12 +1840,12 @@ function endMatch() {
   const ov = document.getElementById('overlay');
   ov.classList.remove('hidden');
   let title;
-  if (scoreHome > scoreAway) title = '🏆 勝利！';
-  else if (scoreHome < scoreAway) title = '😢 敗北...';
-  else title = '🤝 引き分け';
+  if (scoreHome > scoreAway) title = t('victoryTitle');
+  else if (scoreHome < scoreAway) title = t('defeatTitle');
+  else title = t('drawTitle');
   document.getElementById('ov-title').textContent = title;
   let sub = `${scoreHome} - ${scoreAway}`;
-  if (matchMode === 'ready' && (won || drew)) sub += `\n+${lastPointsEarned}pt${lastBoostX2 ? '（🔥ブーストx2）' : ''}`;
+  if (matchMode === 'ready' && (won || drew)) sub += `\n+${lastPointsEarned}pt${lastBoostX2 ? t('boostSuffix') : ''}`;
   document.getElementById('ov-sub').textContent = sub;
 }
 
@@ -1727,6 +1870,7 @@ function quitToTitle() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
@@ -1740,6 +1884,7 @@ function quitToHome() {
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
@@ -1749,6 +1894,7 @@ function returnToProfile() {
   document.getElementById('hud').style.visibility = 'hidden';
   document.getElementById('title-frame').style.display = 'block';
   document.getElementById('hub-link').style.display = 'block';
+  document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
 }
 
@@ -1803,7 +1949,7 @@ function onDown(e) {
         if (p.x >= PANEL_X+PANEL_W/2-110 && p.x <= PANEL_X+PANEL_W/2+110 && p.y >= renameY && p.y <= renameY+42) {
           const ap = activePlayer();
           if (ap) {
-            const nn = window.prompt('新しい名前を入力してください', ap.name);
+            const nn = window.prompt(t('renamePrompt'), ap.name);
             if (nn && nn.trim()) { ap.name = nn.trim().slice(0, 20); saveProfile(); }
           }
         }
@@ -1970,6 +2116,26 @@ document.getElementById('ov-btn').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
   returnToProfile();
 });
+
+// ─── LANGUAGE TOGGLE ─────────────────────────────────────────
+// Static HTML text (everything drawn on canvas re-reads t() live on its
+// own each frame, so it needs no explicit refresh here).
+function applyLanguage() {
+  document.getElementById('hub-link').textContent = t('homeLinkText');
+  document.getElementById('pause-btn').title = t('pauseTitle');
+  document.getElementById('joystick').setAttribute('aria-label', t('joystickLabel'));
+  document.getElementById('shoot-btn').setAttribute('aria-label', t('shootLabel'));
+  document.getElementById('shoot-btn').textContent = t('shootLabel');
+  document.getElementById('ov-btn').textContent = t('playAgain');
+  document.querySelector('#rotate-hint p').textContent = t('rotateHint');
+  document.getElementById('lang-toggle').textContent = t('langToggle');
+}
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  profile.lang = profile.lang === 'en' ? 'ja' : 'en';
+  saveProfile();
+  applyLanguage();
+});
+applyLanguage();
 
 // ─── VIEWPORT ZOOM GUARDS ───────────────────────────────────────
 // iOS Safari ignores the viewport meta's user-scalable=no for its own
