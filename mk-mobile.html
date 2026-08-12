@@ -1455,6 +1455,18 @@ function drawManagePanel() {
   ctx.fillText(t('renameBtn'), PANEL_X + PANEL_W/2, renameY + 21);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
+
+  const langY = renameY + 58;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,201,74,0.12)';
+  ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W/2 - 110, langY, 220, 42, 21); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,201,74,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(PANEL_X + PANEL_W/2 - 110, langY, 220, 42, 21); ctx.stroke();
+  ctx.fillStyle = '#FFC94A'; ctx.font = '14px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`🌐 ${t('langToggle')}`, PANEL_X + PANEL_W/2, langY + 21);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 function drawUpgradePanel() {
   drawPanelFrame(t('panelUpgrade'));
@@ -1952,6 +1964,14 @@ function onDown(e) {
             const nn = window.prompt(t('renamePrompt'), ap.name);
             if (nn && nn.trim()) { ap.name = nn.trim().slice(0, 20); saveProfile(); }
           }
+          return;
+        }
+        const langY = renameY + 58;
+        if (p.x >= PANEL_X+PANEL_W/2-110 && p.x <= PANEL_X+PANEL_W/2+110 && p.y >= langY && p.y <= langY+42) {
+          profile.lang = profile.lang === 'en' ? 'ja' : 'en';
+          saveProfile();
+          applyLanguage();
+          return;
         }
         return;
       }
