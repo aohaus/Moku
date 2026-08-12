@@ -391,8 +391,8 @@ canvas#c {
   var FLIPPERS = [
     { id: 'mainL', side: -1, piv: { x: 400, y: 455 }, flen: 80, frad: 9, rest: REST_L, active: ACT_L, act: 0 },
     { id: 'mainR', side: 1, piv: { x: 560, y: 455 }, flen: 80, frad: 9, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
-    { id: 'upperL', side: -1, piv: { x: 410, y: 220 }, flen: 45, frad: 7, rest: REST_L, active: ACT_L, act: 0 },
-    { id: 'upperR', side: 1, piv: { x: 550, y: 220 }, flen: 45, frad: 7, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
+    { id: 'upperL', side: -1, piv: { x: 410, y: 220 }, flen: 90, frad: 7, rest: REST_L, active: ACT_L, act: 0 },
+    { id: 'upperR', side: 1, piv: { x: 550, y: 220 }, flen: 90, frad: 7, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
     // Sits above the slingshot rather than beside it (that position
     // overlapped the sling's geometry entirely) and well clear of the
     // curving left wall — ~50px of margin, comfortably more than flen —
@@ -433,9 +433,15 @@ canvas#c {
   // Rubber posts. Real playfields are dense with these; without them a ball
   // that reaches a side wall just slides all the way down it into the
   // outlane, untouched. These sit in the side approaches to break that up.
+  // The wall they sit near isn't vertical (it curves inward with y), so a
+  // fixed x/y here can end up much closer to the wall than it looks —
+  // one of these previously overlapped the wall outright, the other had
+  // barely a ball-width of clearance, and either one traps the ball in a
+  // pocket where it can only rattle in place until Tilt. Repositioned for
+  // 40px+ clearance from the wall at each one's actual y.
   var POSTS = [
-    { x: 160, y: 300, r: 10 }, { x: 225, y: 380, r: 10 },
-    { x: 745, y: 268, r: 10 }, { x: 685, y: 350, r: 10 }
+    { x: 178, y: 300, r: 10 }, { x: 280, y: 380, r: 10 },
+    { x: 732, y: 268, r: 10 }, { x: 672, y: 350, r: 10 }
   ];
 
   // No funnel walls here on purpose — passive guide rails were railroading
@@ -495,13 +501,18 @@ canvas#c {
   // there's real open space between the bumpers and the flippers —
   // needed as a "shot lane", not just filler.
   var GATE = { x: 480, y: 185, r: 26 };
-  // (26) bumpers — a tight triangular nest, dead centre
+  // (26) bumpers — a tight triangular nest, dead centre. Sits 30px lower
+  // than the first pass: at the old height the now-doubled-length upper
+  // flippers' resting body physically overlapped the top two bumpers'
+  // collision circles by ~16px, which is a real bug (two overlapping
+  // solid colliders fighting over the same ball produces erratic
+  // push-out behaviour) — not just a visual one.
   var BUMPER_BASE = [
-    { x: 432, y: 255, r: 22 },
-    { x: 528, y: 255, r: 22 },
-    { x: 480, y: 315, r: 20 }
+    { x: 432, y: 285, r: 22 },
+    { x: 528, y: 285, r: 22 },
+    { x: 480, y: 345, r: 20 }
   ];
-  var BUMPER_EXTRA = { x: 200, y: 240, r: 18 }; // stage 4-5 add a fourth bumper
+  var BUMPER_EXTRA = { x: 200, y: 270, r: 18 }; // stage 4-5 add a fourth bumper
 
   // (19) top lanes — rollovers along the top dome, crossed right after
   // the ball clears the shooter-lane gap
@@ -529,6 +540,24 @@ canvas#c {
     { x: 645, y: 258 }, { x: 705, y: 292 }, { x: 732, y: 345 },
     { x: 692, y: 385 }, { x: 620, y: 405 }
   ];
+  // The drawn ramp tube had no collision of its own, so a ball could drift
+  // into its visual interior without ever being captured by RAMP_ENTRY —
+  // it looked walled-in but physically wasn't. These flank the path on
+  // both sides from the SECOND point on (the first segment, the entry
+  // mouth, stays open so proximity-based capture still works normally).
+  var RAMP_WALLS = (function () {
+    var HALF_W = 15, segs = [];
+    for (var i = 1; i < RAMP_PATH.length - 1; i++) {
+      var a = RAMP_PATH[i], b = RAMP_PATH[i + 1];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len * HALF_W, ny = dx / len * HALF_W;
+      segs.push([{ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }]);
+      segs.push([{ x: a.x - nx, y: a.y - ny }, { x: b.x - nx, y: b.y - ny }]);
+    }
+    return segs;
+  })();
+  WALLS = WALLS.concat(RAMP_WALLS);
   // (25) kickback — one free save per ball, on EACH outlane
   var KICKBACK_L = { x: 308, y: 496 };
   var KICKBACK_R = mirrorPt(KICKBACK_L);
@@ -1092,8 +1121,22 @@ canvas#c {
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.fillRect(800, 40, 66, PF_BOTTOM - 40);
 
-    // wood-tone rail border following the wall polylines
-    var RAILS = [RW, LW, TW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
+    // wood-tone rail border following the wall polylines. TW (the dome)
+    // is traced as a smoothed curve through its points rather than
+    // straight segments — collision still uses the straight polyline
+    // underneath, but it sits close enough to the curve that the two
+    // don't visibly diverge. Gives the top of the table a rounder,
+    // more head-like silhouette to go with the face bumpers below.
+    function tracePathSmooth(ctx, pts) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length - 1; i++) {
+        var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      }
+      var last = pts[pts.length - 1];
+      ctx.lineTo(last.x, last.y);
+    }
+    var RAILS = [RW, LW, LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
     ctx.strokeStyle = '#7a5230';
     ctx.lineWidth = 10;
     ctx.lineCap = 'round';
@@ -1104,6 +1147,7 @@ canvas#c {
       for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
     });
+    ctx.beginPath(); tracePathSmooth(ctx, TW); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.lineWidth = 2;
     RAILS.forEach(function (pts) {
@@ -1112,6 +1156,7 @@ canvas#c {
       for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
     });
+    ctx.beginPath(); tracePathSmooth(ctx, TW); ctx.stroke();
 
     function tracePoly(pts) {
       ctx.beginPath();
@@ -1268,8 +1313,71 @@ canvas#c {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('🌍', GATE.x, GATE.y + 1);
 
-    // bumpers
+    // bumpers — the core three double as Moku's face (the mini-flippers
+    // above already read as eyebrows): the top pair are eyes, the bottom
+    // one a beak. The stage 4-5 bonus bumper keeps the plain look, since
+    // it isn't part of the face.
+    function drawEyeBumper(bmp) {
+      var glow = bmp.flash > 0 ? 1 : 0.5;
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r, 0, Math.PI * 2);
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, '#FFFFFF');
+      g.addColorStop(1, '#E7E1F7');
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(185,140,255,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 26 : 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(75,46,122,0.55)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      var irisR = bmp.r * 0.56;
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, irisR, 0, Math.PI * 2);
+      var ig = ctx.createRadialGradient(bmp.x - irisR * 0.3, bmp.y - irisR * 0.3, 1, bmp.x, bmp.y, irisR);
+      ig.addColorStop(0, '#FFD98A');
+      ig.addColorStop(1, '#8A6218');
+      ctx.fillStyle = ig;
+      ctx.fill();
+      var pupilR = bmp.r * (bmp.flash > 0 ? 0.4 : 0.27);
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, pupilR, 0, Math.PI * 2);
+      ctx.fillStyle = '#1A1220';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bmp.x - bmp.r * 0.22, bmp.y - bmp.r * 0.24, bmp.r * 0.15, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fill();
+    }
+    function drawBeakBumper(bmp) {
+      var glow = bmp.flash > 0 ? 1 : 0.55;
+      ctx.beginPath();
+      ctx.moveTo(bmp.x, bmp.y - bmp.r);
+      ctx.lineTo(bmp.x + bmp.r * 0.9, bmp.y + bmp.r * 0.45);
+      ctx.quadraticCurveTo(bmp.x, bmp.y + bmp.r * 1.15, bmp.x - bmp.r * 0.9, bmp.y + bmp.r * 0.45);
+      ctx.closePath();
+      var g = ctx.createLinearGradient(bmp.x, bmp.y - bmp.r, bmp.x, bmp.y + bmp.r);
+      g.addColorStop(0, '#FFD98A');
+      g.addColorStop(1, '#C9781A');
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(255,201,74,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 24 : 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(120,70,10,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(bmp.x, bmp.y - bmp.r * 0.65);
+      ctx.lineTo(bmp.x, bmp.y + bmp.r * 0.6);
+      ctx.stroke();
+    }
     bumpersForStage(curStage).forEach(function (bmp) {
+      if (bmp === BUMPER_BASE[0] || bmp === BUMPER_BASE[1]) { drawEyeBumper(bmp); return; }
+      if (bmp === BUMPER_BASE[2]) { drawBeakBumper(bmp); return; }
       var glow = bmp.flash > 0 ? 1 : 0.55;
       var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
       g.addColorStop(0, 'rgba(255,255,255,0.9)');
