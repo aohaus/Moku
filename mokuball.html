@@ -433,15 +433,18 @@ canvas#c {
   // Rubber posts. Real playfields are dense with these; without them a ball
   // that reaches a side wall just slides all the way down it into the
   // outlane, untouched. These sit in the side approaches to break that up.
-  // The wall they sit near isn't vertical (it curves inward with y), so a
-  // fixed x/y here can end up much closer to the wall than it looks —
-  // one of these previously overlapped the wall outright, the other had
-  // barely a ball-width of clearance, and either one traps the ball in a
-  // pocket where it can only rattle in place until Tilt. Repositioned for
-  // 40px+ clearance from the wall at each one's actual y.
+  // Verified numerically (not by hand) against the actual collision math
+  // used at runtime — closestOnSeg/circle-circle distance minus ball
+  // radius, post radius and wall/sling thickness — because the previous
+  // two rounds of hand-measured positions both left a pocket narrower than
+  // a ball's diameter against the nearby SLINGSHOT (not just the outer
+  // wall, which is the only thing earlier passes checked), and the ball
+  // would wedge into it and Tilt out. Every post below keeps at least one
+  // full ball-diameter of clearance from both the outer wall and its
+  // side's slingshot.
   var POSTS = [
-    { x: 178, y: 300, r: 10 }, { x: 280, y: 380, r: 10 },
-    { x: 732, y: 268, r: 10 }, { x: 672, y: 350, r: 10 }
+    { x: 200, y: 300, r: 10 }, { x: 170, y: 390, r: 10 },
+    { x: 730, y: 268, r: 10 }, { x: 620, y: 345, r: 10 }
   ];
 
   // No funnel walls here on purpose — passive guide rails were railroading
@@ -529,6 +532,20 @@ canvas#c {
     { x: 480, y: 128, hw: 15, hh: 6 },
     { x: 520, y: 128, hw: 15, hh: 6 }
   ];
+  // (22) standup targets — a row mounted flush along the curved top frame,
+  // Moku's rust-orange "feather" colour. Flush against the wall on
+  // purpose (not just close to it): a gap narrower than a ball is exactly
+  // the kind of pocket that trapped the ball at the POSTS earlier, so
+  // each one sits with its outer edge right at the wall's own centreline
+  // instead of floating a few px clear of it. Positions verified against
+  // the TOP_LANES rollovers below them for clearance, not eyeballed.
+  var STANDUPS = [
+    { x: 130, y: 43, hw: 9, hh: 8 },
+    { x: 220, y: 29, hw: 9, hh: 8 },
+    { x: 390, y: 24, hw: 9, hh: 8 },
+    { x: 570, y: 26, hw: 9, hh: 8 },
+    { x: 740, y: 45, hw: 9, hh: 8 }
+  ];
   // (28) kick-out hole — swallows the ball, then spits it back out
   var HOLE = { x: 108, y: 252, r: 17 };
   // (27) ramp lane — a left-flipper skill shot. The left flipper's active
@@ -568,6 +585,7 @@ canvas#c {
   var LANE_POINTS = 60, LANE_SET_BONUS = 500;
   var SPINNER_POINTS = 20;
   var DROP_POINTS = 120, DROP_BANK_BONUS = 600;
+  var STANDUP_POINTS = 80;
   var HOLE_POINTS = 350;
   var RAMP_POINTS = 400;
   var KICKBACK_POINTS = 100;
@@ -591,6 +609,7 @@ canvas#c {
   var laneLit = [false, false, false];
   var dropDown = [false, false, false];
   var dropResetT = 0;
+  var standupCool = [0, 0, 0, 0, 0];
   var spinnerCool = 0, spinnerSpin = 0;
   var kickbackArmedL = true;
   var kickbackArmedR = true;
@@ -770,6 +789,7 @@ canvas#c {
     laneLit = [false, false, false];
     dropDown = [false, false, false];
     dropResetT = 0;
+    standupCool = [0, 0, 0, 0, 0];
     spinnerCool = 0; spinnerSpin = 0;
     kickbackArmedL = true;
     kickbackArmedR = true;
@@ -994,6 +1014,19 @@ canvas#c {
       updateHud();
     }
 
+    // (22) standup targets — solid, stay up, score on every hit (unlike
+    // drop targets, they never go down)
+    for (var si = 0; si < STANDUPS.length; si++) {
+      var st = STANDUPS[si];
+      if (!collideCircleRect(ball, st.x, st.y, st.hw, st.hh)) continue;
+      if (standupCool[si] > 0) continue;
+      standupCool[si] = 14;
+      st.flash = 10;
+      score += STANDUP_POINTS;
+      addPop(st.x, st.y + 22, '+' + STANDUP_POINTS);
+      updateHud();
+    }
+
     // (27) ramp lane — needs to be entered with upward momentum
     if (Math.sqrt((ball.x - RAMP_ENTRY.x) * (ball.x - RAMP_ENTRY.x) + (ball.y - RAMP_ENTRY.y) * (ball.y - RAMP_ENTRY.y)) < RAMP_ENTRY.r &&
         ball.vy < 6) {
@@ -1072,10 +1105,12 @@ canvas#c {
       dropResetT--;
       if (dropResetT === 0) dropDown = [false, false, false];
     }
+    for (var sci = 0; sci < standupCool.length; sci++) if (standupCool[sci] > 0) standupCool[sci]--;
     flashPops.forEach(function (p) { p.t--; p.y -= 0.6; });
     flashPops = flashPops.filter(function (p) { return p.t > 0; });
     bumpersForStage(curStage).forEach(function (b) { if (b.flash > 0) b.flash--; });
     DROP_TARGETS.forEach(function (t) { if (t.flash > 0) t.flash--; });
+    STANDUPS.forEach(function (t) { if (t.flash > 0) t.flash--; });
     SLINGS.forEach(function (s) { if (s.flash > 0) s.flash--; });
     POSTS.forEach(function (p) { if (p.flash > 0) p.flash--; });
   }
@@ -1266,6 +1301,23 @@ canvas#c {
       ctx.stroke();
     });
 
+    // (22) standup targets — Moku's rust-orange feather colour
+    STANDUPS.forEach(function (t) {
+      var g = ctx.createLinearGradient(t.x, t.y - t.hh, t.x, t.y + t.hh);
+      if (t.flash > 0) { g.addColorStop(0, '#FFE3B8'); g.addColorStop(1, '#FFC085'); }
+      else { g.addColorStop(0, '#E8894A'); g.addColorStop(1, '#B3541C'); }
+      ctx.fillStyle = g;
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(211,110,50,' + (t.flash > 0 ? 0.9 : 0.5) + ')';
+      ctx.shadowBlur = t.flash > 0 ? 18 : 8;
+      ctx.beginPath();
+      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    });
+
     // (28) kick-out hole
     ctx.beginPath();
     ctx.arc(HOLE.x, HOLE.y, HOLE.r, 0, Math.PI * 2);
@@ -1315,8 +1367,10 @@ canvas#c {
 
     // bumpers — the core three double as Moku's face (the mini-flippers
     // above already read as eyebrows): the top pair are eyes, the bottom
-    // one a beak. The stage 4-5 bonus bumper keeps the plain look, since
-    // it isn't part of the face.
+    // one a nose. Shapes/colours match the reference Moku app icon —
+    // plain solid-black eyes with a single highlight dot (no iris ring),
+    // and a simple rust-orange oval nose (no beak). The stage 4-5 bonus
+    // bumper keeps the plain look, since it isn't part of the face.
     function drawEyeBumper(bmp) {
       var glow = bmp.flash > 0 ? 1 : 0.5;
       ctx.beginPath();
@@ -1332,52 +1386,39 @@ canvas#c {
       ctx.strokeStyle = 'rgba(75,46,122,0.55)';
       ctx.lineWidth = 2;
       ctx.stroke();
-      var irisR = bmp.r * 0.56;
-      ctx.beginPath();
-      ctx.arc(bmp.x, bmp.y, irisR, 0, Math.PI * 2);
-      var ig = ctx.createRadialGradient(bmp.x - irisR * 0.3, bmp.y - irisR * 0.3, 1, bmp.x, bmp.y, irisR);
-      ig.addColorStop(0, '#FFD98A');
-      ig.addColorStop(1, '#8A6218');
-      ctx.fillStyle = ig;
-      ctx.fill();
-      var pupilR = bmp.r * (bmp.flash > 0 ? 0.4 : 0.27);
+      var pupilR = bmp.r * (bmp.flash > 0 ? 0.72 : 0.62);
       ctx.beginPath();
       ctx.arc(bmp.x, bmp.y, pupilR, 0, Math.PI * 2);
-      ctx.fillStyle = '#1A1220';
+      ctx.fillStyle = '#161018';
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(bmp.x - bmp.r * 0.22, bmp.y - bmp.r * 0.24, bmp.r * 0.15, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.arc(bmp.x - bmp.r * 0.22, bmp.y - bmp.r * 0.24, bmp.r * 0.16, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.fill();
     }
-    function drawBeakBumper(bmp) {
+    function drawNoseBumper(bmp) {
       var glow = bmp.flash > 0 ? 1 : 0.55;
       ctx.beginPath();
-      ctx.moveTo(bmp.x, bmp.y - bmp.r);
-      ctx.lineTo(bmp.x + bmp.r * 0.9, bmp.y + bmp.r * 0.45);
-      ctx.quadraticCurveTo(bmp.x, bmp.y + bmp.r * 1.15, bmp.x - bmp.r * 0.9, bmp.y + bmp.r * 0.45);
-      ctx.closePath();
-      var g = ctx.createLinearGradient(bmp.x, bmp.y - bmp.r, bmp.x, bmp.y + bmp.r);
-      g.addColorStop(0, '#FFD98A');
-      g.addColorStop(1, '#C9781A');
+      ctx.ellipse(bmp.x, bmp.y, bmp.r * 0.95, bmp.r * 0.76, 0, 0, Math.PI * 2);
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.25, bmp.y - bmp.r * 0.25, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, '#E8894A');
+      g.addColorStop(1, '#B3541C');
       ctx.fillStyle = g;
-      ctx.shadowColor = 'rgba(255,201,74,' + glow + ')';
+      ctx.shadowColor = 'rgba(211,110,50,' + glow + ')';
       ctx.shadowBlur = bmp.flash > 0 ? 24 : 10;
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.strokeStyle = 'rgba(120,60,20,0.5)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,70,10,0.5)';
-      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(bmp.x, bmp.y - bmp.r * 0.65);
-      ctx.lineTo(bmp.x, bmp.y + bmp.r * 0.6);
-      ctx.stroke();
+      ctx.ellipse(bmp.x - bmp.r * 0.25, bmp.y - bmp.r * 0.3, bmp.r * 0.22, bmp.r * 0.14, -0.4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fill();
     }
     bumpersForStage(curStage).forEach(function (bmp) {
       if (bmp === BUMPER_BASE[0] || bmp === BUMPER_BASE[1]) { drawEyeBumper(bmp); return; }
-      if (bmp === BUMPER_BASE[2]) { drawBeakBumper(bmp); return; }
+      if (bmp === BUMPER_BASE[2]) { drawNoseBumper(bmp); return; }
       var glow = bmp.flash > 0 ? 1 : 0.55;
       var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
       g.addColorStop(0, 'rgba(255,255,255,0.9)');
@@ -1396,17 +1437,26 @@ canvas#c {
       ctx.fill();
     });
 
-    // flippers
+    // flippers — main and upper pairs recolored to Moku's dark-brown
+    // eyebrow tone (they read as the face's eyebrows/jaw), matching the
+    // reference icon. guardL isn't part of the face, so it keeps the
+    // table's violet accent.
     FLIPPERS.forEach(function (f) {
       var piv = f.piv;
       var tip = flipperTip(f);
+      var isFace = f.id === 'mainL' || f.id === 'mainR' || f.id === 'upperL' || f.id === 'upperR';
       var grad = ctx.createLinearGradient(piv.x, piv.y, tip.x, tip.y);
-      grad.addColorStop(0, '#B98CFF');
-      grad.addColorStop(1, '#4B2E7A');
+      if (isFace) {
+        grad.addColorStop(0, '#8A5A34');
+        grad.addColorStop(1, '#3B2415');
+      } else {
+        grad.addColorStop(0, '#B98CFF');
+        grad.addColorStop(1, '#4B2E7A');
+      }
       ctx.strokeStyle = grad;
       ctx.lineWidth = f.frad * 2;
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(185,140,255,0.7)';
+      ctx.shadowColor = isFace ? 'rgba(138,90,52,0.65)' : 'rgba(185,140,255,0.7)';
       ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.moveTo(piv.x, piv.y);
