@@ -1,7 +1,8 @@
 # Moku Series 共通仕様
 
 Mokuシリーズはポータル(`index.html`)から各ミニゲーム(単一HTMLファイル)へ遷移する構成。
-9タイトル予定、現在6タイトル稼働中(Angry Mokumoku / Moyomoyo / MK Mobile / Angry Moku Battle Royal / Shiri of Moku / Mokuball)。
+9タイトル予定、現在5タイトル稼働中(Angry Mokumoku / Moyomoyo / MK Mobile / Angry Moku Battle Royal / Shiri of Moku)。
+Mokuball は実装済みだがハブ未公開(準備中)。
 
 ## 1. ゲーム間の技術構成
 

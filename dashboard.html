@@ -150,7 +150,6 @@ header p.sub {
 .row.mk { --hi: #FFC94A; }
 .row.br { --hi: #6E7BFF; }
 .row.so { --hi: #FF6B4A; }
-.row.mb { --hi: #B98CFF; }
 
 footer {
   margin-top: auto;
@@ -256,16 +255,6 @@ footer {
         }
         var stats = [{ num: (p.unlockedStage || 1) + ' / 20', lbl: 'Stage' }];
         if (stars) stats.push({ num: stars, lbl: 'Stars' });
-        return { stats: stats, updatedAt: p.updatedAt };
-      }
-    },
-    {
-      cls: 'mb', emoji: '🔮', name: 'Mokuball',
-      read: function () {
-        var p = readJSON('moku:mokuball:progress');
-        if (!p || !p.updatedAt) return null;
-        var stats = [{ num: (p.unlockedStage || 1) + ' / 5', lbl: 'World' }];
-        if (p.highScore) stats.push({ num: p.highScore.toLocaleString(), lbl: 'High Score' });
         return { stats: stats, updatedAt: p.updatedAt };
       }
     }
