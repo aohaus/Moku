@@ -532,6 +532,7 @@ canvas#c {
   var kickbackArmed = true;
   var holdKind = null; // null | 'hole' | 'ramp' — ball captured, own motion
   var holdT = 0, rampT = 0;
+  var holeCool = 0; // blocks re-capture while the ball is leaving the hole
 
   var ball = null;
   var leftFlip = { act: 0 };  // act: 0..1 activation amount
@@ -715,7 +716,7 @@ canvas#c {
     standupCool = [0, 0, 0];
     spinnerCool = 0; spinnerSpin = 0;
     kickbackArmed = true;
-    holdKind = null; holdT = 0; rampT = 0;
+    holdKind = null; holdT = 0; rampT = 0; holeCool = 0;
     updateHud();
   }
   // A ball that drifts back down the shooter lane is not a lost ball on a
@@ -775,8 +776,13 @@ canvas#c {
       ball.x = HOLE.x; ball.y = HOLE.y;
       if (--holdT <= 0) {
         holdKind = null;
+        // Eject clear of the saucer and hold the sensor off, or the ball
+        // is still inside the capture radius next frame and gets swallowed
+        // again immediately — an infinite kick-out loop paying out points.
+        ball.y = HOLE.y - (HOLE.r + ball.r + 3);
         ball.vx = 2.4; ball.vy = -12.5;
-        addPop(HOLE.x, HOLE.y - 26, 'KICK OUT!');
+        holeCool = 40;
+        addPop(HOLE.x, HOLE.y - 40, 'KICK OUT!');
       }
       tickEffects();
       return;
@@ -937,7 +943,8 @@ canvas#c {
     }
 
     // (28) kick-out hole — swallows the ball, ejects it a beat later
-    if (Math.sqrt((ball.x - HOLE.x) * (ball.x - HOLE.x) + (ball.y - HOLE.y) * (ball.y - HOLE.y)) < HOLE.r * 0.8) {
+    if (holeCool === 0 &&
+        Math.sqrt((ball.x - HOLE.x) * (ball.x - HOLE.x) + (ball.y - HOLE.y) * (ball.y - HOLE.y)) < HOLE.r * 0.8) {
       holdKind = 'hole'; holdT = 52;
       ball.vx = 0; ball.vy = 0;
       score += HOLE_POINTS;
@@ -977,6 +984,7 @@ canvas#c {
     if (shakeT > 0) shakeT--;
     if (spinnerCool > 0) spinnerCool--;
     if (spinnerSpin > 0) spinnerSpin--;
+    if (holeCool > 0) holeCool--;
     if (dropResetT > 0) {
       dropResetT--;
       if (dropResetT === 0) dropDown = [false, false, false];
