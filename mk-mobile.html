@@ -264,12 +264,15 @@ const PITCH_X0 = 180, PITCH_Y0 = 106, PITCH_X1 = PITCH_X0 + 900, PITCH_Y1 = H - 
 const PITCH_W  = PITCH_X1 - PITCH_X0, PITCH_H = PITCH_Y1 - PITCH_Y0;
 const PITCH_CY = (PITCH_Y0 + PITCH_Y1) / 2;
 const HALF_X   = (PITCH_X0 + PITCH_X1) / 2;
-const GOAL_H   = 140;
+const GOAL_H   = 168; // 140 * 1.2 — widened to balance the new goalkeepers below
 const GOAL_Y0  = PITCH_Y0 + (PITCH_H - GOAL_H) / 2;
 const GOAL_Y1  = GOAL_Y0 + GOAL_H;
 const NET_DEPTH = 22;
 
 const PLAYER_R = 28, CPU_R = 24, BALL_R = 13;
+const GK_R = 22;
+const GK_MARGIN_X = 34;   // how far in front of the goal line each keeper patrols
+const GK_BASE_SPEED = 1.1; // px/frame — the CPU keeper's fixed patrol speed
 const PLAYER_MAX_SPEED = 6.6;
 const BALL_FRICTION = 0.994;
 const WALL_BOUNCE = 0.85;
@@ -398,6 +401,7 @@ let fxPlayerMaxSpeed = PLAYER_MAX_SPEED;
 let fxPlayerR = PLAYER_R;
 let fxPaddleHitBase = PADDLE_HIT_BASE_SPEED;
 let fxPowerShotSpeed = POWER_SHOT_SPEED;
+let fxGkPlayerSpeed = GK_BASE_SPEED; // player-side keeper's patrol speed, scales with Defence
 let matchFramesTotal = MATCH_DURATIONS[matchDurationIdx] * 60;
 let matchFramesLeft = matchFramesTotal;
 let scoreHome = 0, scoreAway = 0;
@@ -412,10 +416,15 @@ let shootReadyFrame = -Infinity; // frameCount after which a new press is accept
 let shotMessage = '';
 let shotMessageTimer = 0;
 let ballStuckFrames = 0; // consecutive low-speed frames while pinned against a paddle (corner-jam safety valve)
-let cpuContactFrames = 0; // consecutive frames the CPU has stayed in contact with the ball (dribble guard)
 
 const player = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
-const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false };
+const cpu    = { x: 0, y: 0, vx: 0, vy: 0, touching: false, contactFrames: 0 };
+// Automatic goalkeepers, one per goal. Neither is directly controlled —
+// they patrol vertically across the goal mouth on their own (see
+// updateGoalkeepers()). contactFrames feeds the same "force a real kick
+// after sustained contact" guard as the outfield CPU, generalized below.
+const gkPlayer = { x: 0, y: 0, vx: 0, vy: 0, touching: false, contactFrames: 0, dir: 1 };
+const gkCPU    = { x: 0, y: 0, vx: 0, vy: 0, touching: false, contactFrames: 0, dir: 1 };
 const ball   = { x: 0, y: 0, vx: 0, vy: 0, spin: 0 };
 const held = { up: false, down: false, left: false, right: false };
 let stickX = 0, stickY = 0; // analog joystick tilt, each axis in [-1, 1]
@@ -423,6 +432,8 @@ let stickX = 0, stickY = 0; // analog joystick tilt, each axis in [-1, 1]
 function homePositions() {
   player.x = PITCH_X0 + PITCH_W * 0.22; player.y = PITCH_CY; player.vx = 0; player.vy = 0;
   cpu.x    = PITCH_X1 - PITCH_W * 0.22; cpu.y    = PITCH_CY; cpu.vx = 0; cpu.vy = 0;
+  gkPlayer.x = PITCH_X0 + GK_MARGIN_X; gkPlayer.y = PITCH_CY; gkPlayer.dir = 1;
+  gkCPU.x    = PITCH_X1 - GK_MARGIN_X; gkCPU.y    = PITCH_CY; gkCPU.dir = 1;
 }
 function centerBall(dir) {
   ball.x = HALF_X; ball.y = PITCH_CY;
@@ -675,13 +686,14 @@ function resolvePaddleHit(entity, radius) {
     // paddle also parking at its target) reads as everything freezing solid
     // in the corner. Sustained overlap just gets separated positionally and
     // lets normal wall restitution/friction bleed the energy off.
-    // Exception: the CPU re-targets the ball's position every frame, so if
-    // it stays in sustained contact (rather than a clean one-frame touch)
-    // it can end up shepherding the ball along as it advances — reading as
-    // an illegal dribble. Force a real kick after a couple of contact
-    // frames so touching the CPU is always a single decisive hit.
-    const cpuDribbling = entity === cpu && entity.touching && cpuContactFrames >= 2;
-    if (!entity.touching || cpuDribbling) {
+    // Exception: every non-player paddle (the outfield CPU, and now both
+    // automatic keepers) re-targets or re-patrols on its own regardless of
+    // the ball, so sustained contact (rather than a clean one-frame touch)
+    // can end up shepherding the ball along as it moves — reading as an
+    // illegal dribble/carry. Force a real kick after a couple of contact
+    // frames so touching any of them is always a single decisive hit.
+    const sustainedAiContact = entity !== player && entity.touching && entity.contactFrames >= 2;
+    if (!entity.touching || sustainedAiContact) {
       const curSpeed = Math.hypot(ball.vx, ball.vy);
       let speed = Math.max(entity === player ? fxPaddleHitBase : PADDLE_HIT_BASE_SPEED, curSpeed);
       let isPowerShot = false;
@@ -702,15 +714,33 @@ function resolvePaddleHit(entity, radius) {
       } else {
         addParticles(ball.x, ball.y, '#FFE9A8', 6, 3);
       }
-      if (entity === cpu) cpuContactFrames = 0;
-    } else if (entity === cpu) {
-      cpuContactFrames++;
+      if (entity !== player) entity.contactFrames = 0;
+    } else if (entity !== player) {
+      entity.contactFrames++;
     }
     entity.touching = true;
   } else {
     entity.touching = false;
-    if (entity === cpu) cpuContactFrames = 0;
+    if (entity !== player) entity.contactFrames = 0;
   }
+}
+
+// ─── GOALKEEPERS ──────────────────────────────────────────────
+// Neither keeper is player-controlled — both patrol the goal mouth on
+// their own. The CPU's keeper is a fixed, "slow" baseline; the player's
+// keeper's speed instead scales with the active player's Defence stat
+// (see applyPlayerStats()), so investing in Defence makes your own net
+// better-guarded rather than making the opposing AI tougher.
+function patrolGK(gk, speed) {
+  const topY = GOAL_Y0 + GK_R + 4, bottomY = GOAL_Y1 - GK_R - 4;
+  gk.vy = gk.dir * speed;
+  gk.y += gk.vy;
+  if (gk.y <= topY) { gk.y = topY; gk.dir = 1; }
+  else if (gk.y >= bottomY) { gk.y = bottomY; gk.dir = -1; }
+}
+function updateGoalkeepers() {
+  patrolGK(gkCPU, GK_BASE_SPEED);
+  patrolGK(gkPlayer, fxGkPlayerSpeed);
 }
 
 function updateBall() {
@@ -726,6 +756,8 @@ function updateBall() {
   // frame — a permanent freeze whenever the ball got trapped in a corner.)
   resolvePaddleHit(player, fxPlayerR);
   resolvePaddleHit(cpu, CPU_R);
+  resolvePaddleHit(gkPlayer, GK_R);
+  resolvePaddleHit(gkCPU, GK_R);
 
   if (ball.y - BALL_R < PITCH_Y0) { ball.y = PITCH_Y0 + BALL_R; ball.vy = -ball.vy * WALL_BOUNCE; }
   if (ball.y + BALL_R > PITCH_Y1) { ball.y = PITCH_Y1 - BALL_R; ball.vy = -ball.vy * WALL_BOUNCE; }
@@ -748,7 +780,7 @@ function updateBall() {
   // near-zero speed while pinned and force an escape after a short grace
   // period, well before it reads as the game having stalled.
   const ballSpeed = Math.hypot(ball.vx, ball.vy);
-  if (ballSpeed < 0.6 && (player.touching || cpu.touching)) {
+  if (ballSpeed < 0.6 && (player.touching || cpu.touching || gkPlayer.touching || gkCPU.touching)) {
     ballStuckFrames++;
     if (ballStuckFrames > 24) {
       // Escapes at full BALL_MAX_SPEED, well above any CPU_LEVELS maxSpeed —
@@ -1496,6 +1528,8 @@ function draw() {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   drawPitch();
+  drawMokuFace(gkPlayer.x, gkPlayer.y, GK_R, '#3DA890', '#E8D5B0', 0);
+  drawMokuFace(gkCPU.x, gkCPU.y, GK_R, '#D9A62E', '#F0DFBC', 0);
   drawMokumoku(player.x, player.y, fxPlayerR, 0);
   drawMokuFace(cpu.x, cpu.y, CPU_R, '#3D7DD8', '#F0DFBC', 0);
   drawBall();
@@ -1545,6 +1579,7 @@ function update() {
     frameCount++;
     updatePlayer();
     updateCPU();
+    updateGoalkeepers();
     updateBall();
     matchFramesLeft--;
     if (matchFramesLeft % 15 === 0) updateTimeDisplay();
@@ -1576,6 +1611,7 @@ function applyPlayerStats() {
   fxPaddleHitBase = PADDLE_HIT_BASE_SPEED * (1 + (sh - 1) * 0.02);
   fxPowerShotSpeed = POWER_SHOT_SPEED * statMult(sh);
   fxPlayerR = PLAYER_R + (def - 1) * 0.5;
+  fxGkPlayerSpeed = GK_BASE_SPEED * statMult(def);
 }
 function startMatch() {
   state = 'PLAYING';
@@ -1586,8 +1622,10 @@ function startMatch() {
   particles = [];
   shakeX = 0; shakeY = 0; flashAlpha = 0;
   frameCount = 0; shootPressFrame = -Infinity; shootReadyFrame = -Infinity;
-  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0; cpuContactFrames = 0;
-  player.touching = false; cpu.touching = false;
+  shotMessage = ''; shotMessageTimer = 0; ballStuckFrames = 0;
+  player.touching = false; cpu.touching = false; cpu.contactFrames = 0;
+  gkPlayer.touching = false; gkPlayer.contactFrames = 0;
+  gkCPU.touching = false; gkCPU.contactFrames = 0;
   homePositions();
   centerBall(Math.random() < 0.5 ? -1 : 1);
   updateHUD();
