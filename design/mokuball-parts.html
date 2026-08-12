@@ -1,0 +1,598 @@
+<title>Mokuball Parts Sheet</title>
+<style>
+  :root{
+    --ink:#EFEBFF; --ink-dim:#9E97BE; --ink-faint:#6B6488;
+    --bg:#0B0814; --panel:#120D20; --line:#241B3C;
+    --hi:#B98CFF; --lo:#4B2E7A;
+    --amber:#FFC94A; --teal:#5FE3C0; --rose:#FF5C7A; --lime:#6BE06B;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -5%, rgba(185,140,255,.10), transparent 60%),
+      var(--bg);
+    color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    padding:clamp(28px,5vw,64px) clamp(18px,4vw,48px) 90px;
+    line-height:1.6;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--hi); margin-bottom:14px;
+  }
+  h1{
+    font-size:clamp(30px,5.4vw,52px); font-weight:800; letter-spacing:-.02em;
+    line-height:1.05; text-wrap:balance; margin-bottom:14px;
+  }
+  h1 em{font-style:normal;color:var(--hi)}
+  .lede{font-size:clamp(14px,1.6vw,16.5px);color:var(--ink-dim);max-width:62ch}
+  .lede strong{color:var(--ink);font-weight:600}
+
+  h2{
+    font-size:12px; font-family:var(--mono); letter-spacing:.18em;
+    text-transform:uppercase; color:var(--ink-faint);
+    padding-bottom:10px; border-bottom:1px solid var(--line);
+    margin:56px 0 22px; display:flex; align-items:baseline; gap:12px;
+  }
+  h2 span{color:var(--hi)}
+
+  .note{font-size:13.5px;color:var(--ink-dim);max-width:70ch;margin-bottom:22px}
+  .note code{font-family:var(--mono);font-size:12.5px;color:var(--hi)}
+
+  /* palette */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px}
+  .sw{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .sw .chip{height:56px}
+  .sw .meta{padding:9px 11px}
+  .sw .nm{font-size:12px;font-weight:700}
+  .sw .hx{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.04em}
+
+  /* parts grid */
+  .parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:14px}
+  .part{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px 14px 12px; display:flex; flex-direction:column; gap:10px;
+  }
+  .part canvas{
+    width:100%; height:auto; display:block; border-radius:8px;
+    background:linear-gradient(168deg,#171130,#0C0818);
+  }
+  .part .lbl{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .part .nm{font-size:13px;font-weight:700;letter-spacing:.01em}
+  .part .ref{font-family:var(--mono);font-size:10.5px;color:var(--hi)}
+  .part .st{font-size:11.5px;color:var(--ink-faint);font-family:var(--mono);letter-spacing:.03em}
+
+  /* cabinet */
+  .cab{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px}
+  .cab canvas{width:100%;height:auto;display:block;border-radius:10px}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  td.was{color:var(--ink-faint)}
+  td.now{color:var(--ink)}
+  .tw{overflow-x:auto}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Mokuball · Art Direction v1</div>
+  <h1>Solid-state era,<br><em>1980s</em> playfield parts</h1>
+  <p class="lede">Every part below is drawn with the same canvas code that will run in the game — this sheet
+  <strong>is</strong> the implementation, not a mockup of it. Geometry (where parts sit) stays exactly as tested;
+  only material, lighting and form change. Approve or redline the parts, then I re-skin the table.</p>
+
+  <h2>01 <span>/</span> Palette</h2>
+  <p class="note">The accent pair <code>#B98CFF / #4B2E7A</code> is locked by the series spec. Everything else is
+  support: four insert-lamp colours (the 80s cabinet used coloured translucent inserts, not neon outlines) plus
+  chrome, wood and the playfield ground.</p>
+  <div class="swatches" id="swatches"></div>
+
+  <h2>02 <span>/</span> Materials</h2>
+  <p class="note">The current build renders every object as a glowing outline, so wood, steel, plastic and rubber
+  all read identically. These are the five surfaces that need to look different from each other.</p>
+  <div class="parts" id="materials"></div>
+
+  <h2>03 <span>/</span> Playfield parts</h2>
+  <p class="note">Each part is shown in its resting state and its active state, since the active state is what sells
+  the machine as electro-mechanical. Numbers match the reference diagram.</p>
+  <div class="parts" id="parts"></div>
+
+  <h2>04 <span>/</span> Cabinet &amp; score display</h2>
+  <p class="note">The single biggest gain: the game currently floats a playfield in space. A real machine is a
+  backbox with a score display, a playfield, and an apron across the bottom. This frame does most of the work of
+  reading as “an actual machine”.</p>
+  <div class="cab"><canvas id="cabinet" width="1120" height="470"></canvas></div>
+
+  <h2>05 <span>/</span> What changes</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Element</th><th>Now</th><th>Proposed</th></tr></thead>
+    <tbody>
+      <tr><td>Slingshot</td><td class="was">Wireframe triangle outline</td><td class="now">Two chrome posts with a stretched rubber band and a screened plastic face</td></tr>
+      <tr><td>Bumper</td><td class="was">Flat glowing circle</td><td class="now">Chrome ring, translucent cap with hot-spot, skirt, lamp under the cap</td></tr>
+      <tr><td>Lane / objective marks</td><td class="was">Literal text “RAMP”, “KICK”</td><td class="now">Screened arrows and flush lamp inserts — no debug text on the playfield</td></tr>
+      <tr><td>Rails</td><td class="was">Uniform brown stroke</td><td class="now">Chrome ball-guides on the playfield, wood only on the cabinet sides</td></tr>
+      <tr><td>Depth</td><td class="was">Single rotateX on a flat canvas</td><td class="now">Parts get drop shadows and a fake height offset so posts and bumpers stand proud</td></tr>
+      <tr><td>Score</td><td class="was">Rounded pill, system font</td><td class="now">Seven-segment display in the backbox, with the pills removed</td></tr>
+      <tr><td>Score popups</td><td class="was">Overlap and clip each other</td><td class="now">Queued, offset per hit, and faded on a shared stack</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var C = {
+    hi:'#B98CFF', lo:'#4B2E7A',
+    amber:'#FFC94A', teal:'#5FE3C0', rose:'#FF5C7A', lime:'#6BE06B',
+    ink:'#EFEBFF'
+  };
+
+  // ---------- palette ----------
+  var PAL = [
+    ['Accent hi','#B98CFF','locked'], ['Accent lo','#4B2E7A','locked'],
+    ['Insert amber','#FFC94A',''], ['Insert teal','#5FE3C0',''],
+    ['Insert rose','#FF5C7A',''], ['Insert lime','#6BE06B',''],
+    ['Playfield','#16112A',''], ['Playfield deep','#0C0818',''],
+    ['Chrome hi','#F2F4FF',''], ['Chrome mid','#9AA0BD',''],
+    ['Chrome low','#4A4E63',''], ['Cabinet wood','#8A5C33','']
+  ];
+  var swEl = document.getElementById('swatches');
+  PAL.forEach(function (p) {
+    var d = document.createElement('div');
+    d.className = 'sw';
+    d.innerHTML = '<div class="chip" style="background:' + p[1] + '"></div>' +
+      '<div class="meta"><div class="nm">' + p[0] + '</div><div class="hx">' + p[1].toUpperCase() +
+      (p[2] ? ' · ' + p[2] : '') + '</div></div>';
+    swEl.appendChild(d);
+  });
+
+  // ---------- canvas helper ----------
+  function card(host, name, ref, state, w, h, draw) {
+    var d = document.createElement('div');
+    d.className = 'part';
+    d.innerHTML = '<canvas width="' + (w * 2) + '" height="' + (h * 2) + '"></canvas>' +
+      '<div class="lbl"><span class="nm">' + name + '</span><span class="ref">' + ref + '</span></div>' +
+      '<div class="st">' + state + '</div>';
+    host.appendChild(d);
+    var cv = d.querySelector('canvas');
+    var ctx = cv.getContext('2d');
+    ctx.scale(2, 2);
+    draw(ctx, w, h);
+  }
+
+  // ---------- shared part painters ----------
+  function chromeGrad(ctx, x, y, r) {
+    var g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    g.addColorStop(0, '#F2F4FF'); g.addColorStop(.45, '#9AA0BD'); g.addColorStop(1, '#4A4E63');
+    return g;
+  }
+  function post(ctx, x, y, r, ringColor) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = chromeGrad(ctx, x, y, r); ctx.fill();
+    ctx.restore();
+    if (ringColor) {
+      ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, 7);
+      ctx.strokeStyle = ringColor; ctx.lineWidth = 3.5; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x - r * .3, y - r * .3, r * .34, 0, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill();
+  }
+  // flush translucent lamp insert
+  function insert(ctx, x, y, w, h, color, lit, shape) {
+    ctx.save();
+    ctx.beginPath();
+    if (shape === 'arrow') {
+      ctx.moveTo(x, y - h / 2); ctx.lineTo(x + w / 2, y + h / 2); ctx.lineTo(x - w / 2, y + h / 2); ctx.closePath();
+    } else if (shape === 'round') {
+      ctx.arc(x, y, w / 2, 0, 7);
+    } else {
+      ctx.rect(x - w / 2, y - h / 2, w, h);
+    }
+    if (lit) {
+      ctx.shadowColor = color; ctx.shadowBlur = 18;
+      ctx.fillStyle = color; ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,.055)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function pfBase(ctx, w, h) {
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#191233'); g.addColorStop(1, '#0C0818');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // faint screened-art hatch, the way 80s playfields were silkscreened
+    ctx.strokeStyle = 'rgba(185,140,255,.06)'; ctx.lineWidth = 1;
+    for (var i = -h; i < w; i += 11) { ctx.beginPath(); ctx.moveTo(i, h); ctx.lineTo(i + h, 0); ctx.stroke(); }
+  }
+
+  // ---------- 02 materials ----------
+  var matHost = document.getElementById('materials');
+  card(matHost, 'Playfield', 'surface', 'silkscreened, matte', 180, 120, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    ctx.strokeStyle = 'rgba(239,235,255,.22)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(w / 2, h / 2 + 16, 34, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(185,140,255,.5)';
+    ctx.font = '700 10px ui-monospace,monospace'; ctx.textAlign = 'center';
+    ctx.fillText('SHOOT AGAIN', w / 2, h / 2 + 34);
+  });
+  card(matHost, 'Chrome', 'steel', 'ball guide / posts', 180, 120, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(24, 84); ctx.quadraticCurveTo(w / 2, 24, w - 24, 84); ctx.stroke();
+    var g = ctx.createLinearGradient(0, 20, 0, 90);
+    g.addColorStop(0, '#F2F4FF'); g.addColorStop(.5, '#9AA0BD'); g.addColorStop(1, '#4A4E63');
+    ctx.strokeStyle = g; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(24, 82); ctx.quadraticCurveTo(w / 2, 22, w - 24, 82); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(26, 79); ctx.quadraticCurveTo(w / 2, 20, w - 26, 79); ctx.stroke();
+  });
+  card(matHost, 'Plastic', 'translucent', 'bumper caps / slings', 180, 120, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    [[C.amber, 46], [C.teal, 92], [C.rose, 138]].forEach(function (p) {
+      var g = ctx.createRadialGradient(p[1] - 8, 44, 2, p[1], 56, 30);
+      g.addColorStop(0, 'rgba(255,255,255,.95)');
+      g.addColorStop(.35, p[0]);
+      g.addColorStop(1, 'rgba(0,0,0,.35)');
+      ctx.beginPath(); ctx.arc(p[1], 58, 26, 0, 7); ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.stroke();
+    });
+  });
+  card(matHost, 'Rubber', 'ring / band', 'posts and flippers', 180, 120, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    post(ctx, 58, 60, 9, '#EFEBFF');
+    post(ctx, 124, 60, 9, C.hi);
+    ctx.font = '600 9px ui-monospace,monospace'; ctx.fillStyle = 'rgba(239,235,255,.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText('WHITE', 58, 92); ctx.fillText('ACCENT', 124, 92);
+  });
+  card(matHost, 'Lamp insert', 'flush lamp', 'unlit / lit pair', 180, 120, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    insert(ctx, 46, 46, 26, 26, C.amber, false, 'round');
+    insert(ctx, 46, 46, 26, 26, C.amber, false, 'round');
+    insert(ctx, 134, 46, 26, 26, C.amber, true, 'round');
+    insert(ctx, 46, 88, 24, 22, C.teal, false, 'arrow');
+    insert(ctx, 134, 88, 24, 22, C.teal, true, 'arrow');
+  });
+
+  // ---------- 03 playfield parts ----------
+  var host = document.getElementById('parts');
+
+  function bumper(ctx, cx, cy, r, hit) {
+    // skirt shadow on the playfield
+    ctx.beginPath(); ctx.ellipse(cx, cy + r * .5, r * 1.25, r * .5, 0, 0, 7);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fill();
+    // chrome base ring
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.12, 0, 7);
+    ctx.strokeStyle = chromeGrad(ctx, cx, cy, r); ctx.lineWidth = 5; ctx.stroke();
+    // translucent cap, lit from within
+    var g = ctx.createRadialGradient(cx - r * .35, cy - r * .4, 2, cx, cy, r);
+    g.addColorStop(0, '#FFFFFF');
+    g.addColorStop(hit ? .5 : .3, C.amber);
+    g.addColorStop(1, hit ? '#FFE9A8' : '#7A5410');
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+    if (hit) { ctx.shadowColor = 'rgba(255,201,74,.9)'; ctx.shadowBlur = 26; }
+    ctx.fillStyle = g; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+    // cap hot-spot
+    ctx.beginPath(); ctx.arc(cx - r * .3, cy - r * .34, r * .26, 0, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill();
+  }
+  card(host, 'Pop bumper', '(26)', 'idle  ·  hit', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h); bumper(ctx, 58, 64, 26, false); bumper(ctx, 140, 64, 26, true);
+  });
+
+  function slingshot(ctx, x, y, flip, fired) {
+    var s = flip ? -1 : 1;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, 1);
+    // screened plastic face
+    ctx.beginPath();
+    ctx.moveTo(-4, -30); ctx.lineTo(48, 12); ctx.lineTo(-10, 26); ctx.closePath();
+    ctx.fillStyle = fired ? 'rgba(185,140,255,.55)' : 'rgba(75,46,122,.55)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.stroke();
+    // rubber band stretched between two posts (the actual kicker face)
+    ctx.beginPath();
+    ctx.moveTo(-2, -32); ctx.lineTo(46, 12);
+    ctx.strokeStyle = fired ? '#FFFFFF' : '#EFEBFF';
+    ctx.lineWidth = fired ? 6 : 4.5;
+    if (fired) { ctx.shadowColor = 'rgba(255,255,255,.8)'; ctx.shadowBlur = 14; }
+    ctx.stroke(); ctx.shadowBlur = 0;
+    post(ctx, -2, -32, 7, null);
+    post(ctx, 46, 12, 7, null);
+    ctx.restore();
+  }
+  card(host, 'Slingshot', '(29)', 'idle  ·  fired', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h); slingshot(ctx, 30, 62, false, false); slingshot(ctx, 168, 62, true, true);
+  });
+
+  card(host, 'Drop target', '(21)', 'up  ·  dropped', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    // up: a card standing proud of the playfield
+    function up(x) {
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(x - 17, 52, 34, 26);
+      var g = ctx.createLinearGradient(0, 34, 0, 70);
+      g.addColorStop(0, '#8CF2D8'); g.addColorStop(1, '#2FA98C');
+      ctx.fillStyle = g; ctx.fillRect(x - 17, 34, 34, 34);
+      ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 1.2; ctx.strokeRect(x - 17, 34, 34, 34);
+      ctx.fillStyle = 'rgba(6,40,32,.85)'; ctx.font = '800 15px var(--sans),sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('M', x, 51);
+    }
+    up(52);
+    // dropped: flush slot in the playfield
+    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(126, 62, 34, 7);
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1; ctx.strokeRect(126, 62, 34, 7);
+    insert(ctx, 143, 88, 20, 18, C.teal, false, 'arrow');
+    insert(ctx, 52, 88, 20, 18, C.teal, true, 'arrow');
+  });
+
+  card(host, 'Standup target', '(22)', 'idle  ·  hit', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    function st(x, hit) {
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 8, 40, 16, 46);
+      var g = ctx.createLinearGradient(x - 8, 0, x + 8, 0);
+      g.addColorStop(0, hit ? '#FFFFFF' : '#FF8FAC'); g.addColorStop(1, hit ? '#FFC2D2' : '#B03350');
+      ctx.fillStyle = g; ctx.fillRect(x - 8, 34, 16, 46);
+      if (hit) { ctx.shadowColor = 'rgba(255,92,122,.9)'; ctx.shadowBlur = 20; ctx.fillRect(x - 8, 34, 16, 46); ctx.shadowBlur = 0; }
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.1; ctx.strokeRect(x - 8, 34, 16, 46);
+    }
+    st(60, false); st(138, true);
+  });
+
+  card(host, 'Rollover lane', '(19)', 'unlit  ·  lit', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    // chrome lane guides with a rollover wire between them
+    [34, 98, 162].forEach(function (x) {
+      ctx.strokeStyle = chromeGrad(ctx, x, 60, 30); ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x - 22, 26); ctx.lineTo(x - 22, 96); ctx.stroke();
+    });
+    insert(ctx, 34, 62, 22, 20, C.amber, false, 'arrow');
+    insert(ctx, 98, 62, 22, 20, C.amber, true, 'arrow');
+    insert(ctx, 162, 62, 22, 20, C.amber, false, 'arrow');
+  });
+
+  card(host, 'Spinner', '(20)', 'at rest  ·  spinning', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    function spin(cx, squash) {
+      ctx.strokeStyle = chromeGrad(ctx, cx, 62, 26); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx - 22, 34); ctx.lineTo(cx - 22, 90); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 22, 34); ctx.lineTo(cx + 22, 90); ctx.stroke();
+      var g = ctx.createLinearGradient(cx - 20, 0, cx + 20, 0);
+      g.addColorStop(0, '#4A4E63'); g.addColorStop(.5, '#F2F4FF'); g.addColorStop(1, '#4A4E63');
+      ctx.save(); ctx.translate(cx, 62); ctx.scale(squash, 1);
+      ctx.fillStyle = g; ctx.fillRect(-20, -22, 40, 44);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1; ctx.strokeRect(-20, -22, 40, 44);
+      ctx.restore();
+    }
+    spin(52, 1); spin(140, .22);
+  });
+
+  card(host, 'Kick-out hole', '(28)', 'empty  ·  ball captured', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    function saucer(cx, withBall) {
+      ctx.beginPath(); ctx.arc(cx, 62, 22, 0, 7);
+      var g = ctx.createRadialGradient(cx, 62, 2, cx, 62, 22);
+      g.addColorStop(0, '#000'); g.addColorStop(1, '#1A1230');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, 62, 22, 0, 7);
+      ctx.strokeStyle = chromeGrad(ctx, cx, 62, 22); ctx.lineWidth = 4; ctx.stroke();
+      if (withBall) {
+        var bg = ctx.createRadialGradient(cx - 4, 57, 1, cx, 62, 12);
+        bg.addColorStop(0, '#fff'); bg.addColorStop(.5, '#D5D8EA'); bg.addColorStop(1, '#6B6F85');
+        ctx.beginPath(); ctx.arc(cx, 62, 12, 0, 7); ctx.fillStyle = bg; ctx.fill();
+      }
+      insert(ctx, cx, 100, 22, 20, C.rose, withBall, 'arrow');
+    }
+    saucer(52, false); saucer(140, true);
+  });
+
+  card(host, 'Flipper', '(30)', 'rest  ·  fired', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    function flip(px, py, ang) {
+      var L = 62;
+      var tx = px + Math.cos(ang) * L, ty = py + Math.sin(ang) * L;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 19;
+      ctx.beginPath(); ctx.moveTo(px, py + 3); ctx.lineTo(tx, ty + 3); ctx.stroke();
+      var g = ctx.createLinearGradient(px, py, tx, ty);
+      g.addColorStop(0, '#EFEBFF'); g.addColorStop(1, '#B98CFF');
+      ctx.strokeStyle = g; ctx.lineWidth = 16;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty); ctx.stroke();
+      // rubber edge
+      ctx.strokeStyle = 'rgba(75,46,122,.9)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(px, py - 6); ctx.lineTo(tx, ty - 6); ctx.stroke();
+      post(ctx, px, py, 7, null);
+    }
+    flip(34, 44, 0.62);      // rest: tip down-inward
+    flip(122, 84, -0.55);    // fired: tip up-outward
+  });
+
+  card(host, 'Ball & post', '(—)', 'chrome ball, rubber post', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    var cx = 62, cy = 62;
+    ctx.beginPath(); ctx.ellipse(cx, cy + 18, 18, 6, 0, 0, 7);
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fill();
+    var g = ctx.createRadialGradient(cx - 6, cy - 7, 1, cx, cy, 18);
+    g.addColorStop(0, '#FFFFFF'); g.addColorStop(.42, '#D5D8EA'); g.addColorStop(1, '#5B5F76');
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, 7); ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 5, cy + 7, 5, 0, 7);
+    ctx.fillStyle = 'rgba(185,140,255,.35)'; ctx.fill();
+    post(ctx, 148, 62, 11, '#EFEBFF');
+  });
+
+  card(host, 'Ramp entry', '(27)', 'wire habitrail mouth', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    ctx.lineCap = 'round';
+    for (var k = 0; k < 2; k++) {
+      var off = k ? 13 : -13;
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(30 + off, 104); ctx.quadraticCurveTo(96 + off, 16, 168 + off, 74); ctx.stroke();
+      ctx.strokeStyle = chromeGrad(ctx, 96, 60, 70); ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(30 + off, 101); ctx.quadraticCurveTo(96 + off, 13, 168 + off, 71); ctx.stroke();
+    }
+    insert(ctx, 34, 112, 22, 18, C.hi, true, 'arrow');
+  });
+
+  card(host, 'Kickback', '(25)', 'armed  ·  spent', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    function kb(cx, armed) {
+      ctx.strokeStyle = chromeGrad(ctx, cx, 60, 30); ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx - 20, 26); ctx.lineTo(cx - 20, 100); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + 20, 26); ctx.lineTo(cx + 20, 100); ctx.stroke();
+      // the kicker plunger head at the foot of the lane
+      ctx.fillStyle = armed ? '#5FE3C0' : '#3A3550';
+      ctx.fillRect(cx - 14, 92, 28, 9);
+      insert(ctx, cx, 62, 24, 22, C.lime, armed, 'arrow');
+    }
+    kb(52, true); kb(140, false);
+  });
+
+  card(host, 'Apron mark', '(—)', 'screened playfield art', 196, 130, function (ctx, w, h) {
+    pfBase(ctx, w, h);
+    ctx.strokeStyle = 'rgba(239,235,255,.3)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(24, 40); ctx.lineTo(w - 24, 40); ctx.stroke();
+    ctx.fillStyle = 'rgba(239,235,255,.8)';
+    ctx.font = '800 15px ui-monospace,monospace'; ctx.textAlign = 'center';
+    ctx.fillText('MOKUBALL', w / 2, 66);
+    ctx.fillStyle = 'rgba(185,140,255,.75)';
+    ctx.font = '700 9px ui-monospace,monospace';
+    ctx.fillText('WORLD  1  ·  おうちのにわ', w / 2, 84);
+    ctx.strokeStyle = 'rgba(239,235,255,.3)';
+    ctx.beginPath(); ctx.moveTo(24, 98); ctx.lineTo(w - 24, 98); ctx.stroke();
+  });
+
+  // ---------- 04 cabinet ----------
+  (function () {
+    var cv = document.getElementById('cabinet');
+    var ctx = cv.getContext('2d');
+    var W = 1120, H = 470;
+
+    // seven-segment digit renderer — this is the score display in the backbox
+    var SEG = {
+      0:[1,1,1,1,1,1,0], 1:[0,1,1,0,0,0,0], 2:[1,1,0,1,1,0,1], 3:[1,1,1,1,0,0,1],
+      4:[0,1,1,0,0,1,1], 5:[1,0,1,1,0,1,1], 6:[1,0,1,1,1,1,1], 7:[1,1,1,0,0,0,0],
+      8:[1,1,1,1,1,1,1], 9:[1,1,1,1,0,1,1]
+    };
+    function digit(ctx, x, y, w, h, n, color) {
+      var t = Math.max(3, w * .17), on = SEG[n] || SEG[8];
+      var segs = [
+        [x + t, y, w - 2 * t, t],                      // top
+        [x + w - t, y + t, t, h / 2 - 1.5 * t],        // top right
+        [x + w - t, y + h / 2 + .5 * t, t, h / 2 - 1.5 * t], // bottom right
+        [x + t, y + h - t, w - 2 * t, t],              // bottom
+        [x, y + h / 2 + .5 * t, t, h / 2 - 1.5 * t],   // bottom left
+        [x, y + t, t, h / 2 - 1.5 * t],                // top left
+        [x + t, y + h / 2 - .5 * t, w - 2 * t, t]      // middle
+      ];
+      segs.forEach(function (s, i) {
+        ctx.fillStyle = on[i] ? color : 'rgba(255,255,255,.045)';
+        if (on[i]) { ctx.shadowColor = color; ctx.shadowBlur = 14; }
+        ctx.fillRect(s[0], s[1], s[2], s[3]);
+        ctx.shadowBlur = 0;
+      });
+    }
+    function segText(ctx, str, x, y, dw, dh, gap, color) {
+      for (var i = 0; i < str.length; i++) {
+        var ch = str[i];
+        if (ch !== ' ') digit(ctx, x + i * (dw + gap), y, dw, dh, parseInt(ch, 10), color);
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ---- backbox ----
+    var bx = 150, by = 12, bw = 820, bh = 190;
+    ctx.fillStyle = '#0A0714';
+    ctx.fillRect(bx - 12, by, bw + 24, bh + 16);
+    var wood = ctx.createLinearGradient(bx, by, bx, by + bh);
+    wood.addColorStop(0, '#8A5C33'); wood.addColorStop(1, '#5C3B1F');
+    ctx.fillStyle = wood;
+    ctx.fillRect(bx - 12, by, 12, bh + 16);
+    ctx.fillRect(bx + bw, by, 12, bh + 16);
+
+    // backglass art
+    var bg = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+    bg.addColorStop(0, '#241546'); bg.addColorStop(.55, '#3A1F6B'); bg.addColorStop(1, '#160E2C');
+    ctx.fillStyle = bg; ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = 'rgba(185,140,255,.5)'; ctx.lineWidth = 2;
+    ctx.strokeRect(bx + 8, by + 8, bw - 16, bh - 16);
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#EFEBFF';
+    ctx.font = '800 54px -apple-system,"Segoe UI",Roboto,sans-serif';
+    ctx.fillText('MOKU', bx + bw / 2 - 78, by + 78);
+    ctx.fillStyle = C.hi;
+    ctx.fillText('BALL', bx + bw / 2 + 82, by + 78);
+    ctx.fillStyle = 'rgba(239,235,255,.55)';
+    ctx.font = '700 12px ui-monospace,monospace';
+    ctx.fillText('S O L I D   S T A T E   ·   5   W O R L D S', bx + bw / 2, by + 102);
+
+    // score display panel
+    var sp = { x: bx + 150, y: by + 118, w: 520, h: 56 };
+    ctx.fillStyle = '#07050E'; ctx.fillRect(sp.x, sp.y, sp.w, sp.h);
+    ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 1;
+    ctx.strokeRect(sp.x, sp.y, sp.w, sp.h);
+    segText(ctx, '028390', sp.x + 22, sp.y + 12, 32, 34, 11, C.amber);
+    segText(ctx, '1', sp.x + 330, sp.y + 12, 32, 34, 11, C.teal);
+    segText(ctx, '3', sp.x + 420, sp.y + 12, 32, 34, 11, C.hi);
+    ctx.fillStyle = 'rgba(239,235,255,.4)';
+    ctx.font = '700 8px ui-monospace,monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('SCORE', sp.x + 22, sp.y + 60);
+    ctx.fillText('BALL', sp.x + 330, sp.y + 60);
+    ctx.fillText('WORLD', sp.x + 420, sp.y + 60);
+
+    // ---- playfield body ----
+    var py0 = by + bh + 26;
+    var px0 = 96, pw = bw + 108, ph = H - py0 - 14;
+    ctx.fillStyle = wood;
+    ctx.fillRect(px0 - 16, py0, 16, ph);
+    ctx.fillRect(px0 + pw, py0, 16, ph);
+    var pf = ctx.createLinearGradient(0, py0, 0, py0 + ph);
+    pf.addColorStop(0, '#191233'); pf.addColorStop(1, '#0B0716');
+    ctx.fillStyle = pf; ctx.fillRect(px0, py0, pw, ph);
+    ctx.strokeStyle = 'rgba(185,140,255,.06)'; ctx.lineWidth = 1;
+    for (var i = -ph; i < pw; i += 13) {
+      ctx.beginPath(); ctx.moveTo(px0 + i, py0 + ph); ctx.lineTo(px0 + i + ph, py0); ctx.stroke();
+    }
+
+    // a few parts in situ, to show them on the real ground
+    bumper(ctx, px0 + 250, py0 + 62, 24, false);
+    bumper(ctx, px0 + 340, py0 + 62, 24, true);
+    slingshot(ctx, px0 + 400, py0 + 120, false, false);
+    slingshot(ctx, px0 + 620, py0 + 120, true, false);
+    insert(ctx, px0 + 150, py0 + 40, 24, 22, C.amber, true, 'arrow');
+    insert(ctx, px0 + 190, py0 + 40, 24, 22, C.amber, false, 'arrow');
+    insert(ctx, px0 + 230, py0 + 40, 24, 22, C.amber, false, 'arrow');
+    post(ctx, px0 + 700, py0 + 70, 10, '#EFEBFF');
+
+    // apron across the bottom
+    var ay = py0 + ph - 46;
+    var ap = ctx.createLinearGradient(0, ay, 0, ay + 46);
+    ap.addColorStop(0, '#2A2038'); ap.addColorStop(1, '#15101F');
+    ctx.fillStyle = ap; ctx.fillRect(px0, ay, pw, 46);
+    ctx.strokeStyle = chromeGrad(ctx, px0, ay, pw); ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(px0, ay); ctx.lineTo(px0 + pw, ay); ctx.stroke();
+    ctx.fillStyle = 'rgba(239,235,255,.75)';
+    ctx.font = '800 13px ui-monospace,monospace'; ctx.textAlign = 'center';
+    ctx.fillText('M O K U B A L L', px0 + pw / 2, ay + 29);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(239,235,255,.35)';
+    ctx.font = '700 9px ui-monospace,monospace';
+    ctx.fillText('TILT', px0 + 24, ay + 29);
+    ctx.textAlign = 'right';
+    ctx.fillText('MOKUMOKU SERIES', px0 + pw - 24, ay + 29);
+  })();
+})();
+</script>
