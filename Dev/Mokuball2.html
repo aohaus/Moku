@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Mokuball</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  background:
+    radial-gradient(circle at 22% 16%, rgba(185,140,255,0.14), transparent 46%),
+    linear-gradient(165deg, #0d0a17 0%, #1b1330 55%, #0a0812 100%);
+  color: #EDEEF6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+}
+:root { --hi: #B98CFF; --lo: #4B2E7A; }
+
+/* ---------- rotate-to-landscape gate ---------- */
+#rotate-hint {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #0a0812;
+  flex-direction: column; align-items: center; justify-content: center;
+  color: #EDEEF6; font-size: 15px; font-weight: 700; gap: 16px; text-align: center;
+  padding: 20px;
+}
+#rotate-hint span { font-size: 52px; display: inline-block; animation: spin 1.5s ease-in-out infinite alternate; }
+@keyframes spin { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+#rotate-hint p { color: rgba(237,238,246,0.6); font-size: 12.5px; font-weight: 600; max-width: 260px; line-height: 1.6; }
+
+/* ---------- shared frame / hub link (Moku series design system) ---------- */
+#title-frame {
+  display: block;
+  position: fixed; inset: 14px;
+  border: 3px solid var(--hi);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#title-frame::after {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid var(--lo);
+  border-radius: 8px;
+}
+#hub-link {
+  display: block;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  z-index: 6;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--hi);
+  text-decoration: none;
+  animation: hubLinkPulse 2.2s ease-in-out infinite;
+}
+@keyframes hubLinkPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+#buildInfo {
+  display: block;
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  left: calc(env(safe-area-inset-left, 0px) + 18px);
+  z-index: 6;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.28);
+  pointer-events: none;
+}
+body.playing #hub-link,
+body.playing #buildInfo { display: none; }
+
+@media (max-width: 900px) and (orientation: portrait) {
+  #rotate-hint { display: flex; }
+  #title-frame, #hub-link, #buildInfo, #wrapper { display: none !important; }
+}
+
+/* ---------- table wrapper ---------- */
+#wrapper {
+  position: relative;
+  width: 100vw;
+  max-width: min(1180px, calc(100vh * 1.78));
+  aspect-ratio: 960 / 540;
+}
+#tableSkin {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(165deg, #150f22 0%, #1c1330 60%, #0f0a1a 100%);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(185,140,255,0.18);
+  perspective: 720px;
+  perspective-origin: 50% 6%;
+}
+canvas#c {
+  display: block;
+  width: 100%; height: 100%;
+  transform: rotateX(20deg) scale(1.045);
+  transform-origin: 50% 100%;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  z-index: 15;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 0;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+#hud .stageName {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  color: var(--hi);
+  background: rgba(10,8,18,0.5);
+  padding: 5px 10px; border-radius: 999px;
+}
+#hud .right { display: flex; align-items: center; gap: 8px; }
+#hud .score {
+  font-size: 15px; font-weight: 800; color: #EDEEF6;
+  background: rgba(10,8,18,0.5);
+  padding: 5px 12px; border-radius: 999px;
+}
+#hud .balls {
+  font-size: 12px; font-weight: 800; color: #FFC94A;
+  background: rgba(10,8,18,0.5);
+  padding: 5px 10px; border-radius: 999px;
+  white-space: nowrap;
+}
+#pauseBtn {
+  pointer-events: auto;
+  appearance: none; border: none; cursor: pointer;
+  background: rgba(10,8,18,0.5);
+  color: #EDEEF6;
+  width: 28px; height: 28px; border-radius: 50%;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#objRow {
+  position: absolute; top: 40px; left: 0; right: 0;
+  z-index: 15;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  pointer-events: none;
+}
+#objRow .obj {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em;
+  color: rgba(237,238,246,0.65);
+  background: rgba(10,8,18,0.4);
+  padding: 3px 9px; border-radius: 999px;
+}
+#objRow .obj b { color: var(--hi); font-weight: 800; }
+.nudgeRow { display: flex; gap: 3px; align-items: center; }
+.nudgePip { width: 5px; height: 5px; border-radius: 50%; background: var(--hi); box-shadow: 0 0 5px rgba(185,140,255,0.7); }
+.nudgePip.used { background: rgba(255,255,255,0.16); box-shadow: none; }
+
+/* ---------- control zones (untransformed, cover full wrapper) ---------- */
+#controls {
+  position: absolute; inset: 0;
+  z-index: 12;
+  display: flex;
+}
+#controls .zone { flex: 1 1 0; height: 100%; }
+#controls .zone.center { flex: 0.9 1 0; }
+.zone:active { background: rgba(185,140,255,0.05); }
+
+/* ---------- screens (title / stage select / result / pause) ---------- */
+.screen {
+  position: absolute; inset: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 22px 28px;
+  background: radial-gradient(circle at 50% 20%, rgba(185,140,255,0.08), transparent 55%), rgba(9,7,15,0.94);
+  border-radius: 16px;
+}
+.screen.active { display: flex; }
+
+#titleBall {
+  width: clamp(84px, 15vw, 120px); height: clamp(84px, 15vw, 120px);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 12px 24px rgba(0,0,0,0.5), 0 0 26px rgba(185,140,255,0.35);
+  animation: ballFloat 3.2s ease-in-out infinite;
+}
+@keyframes ballFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+#titleLogo {
+  font-weight: 800; letter-spacing: 0.02em;
+  font-size: clamp(24px, 5vw, 36px);
+  line-height: 1.15;
+  text-shadow: 0 0 22px rgba(185,140,255,0.4);
+}
+#titleLogo span { color: var(--hi); }
+#titleSub {
+  font-size: clamp(10px, 1.4vw, 12.5px);
+  font-weight: 700; letter-spacing: 0.06em;
+  color: rgba(237,238,246,0.6);
+}
+#titleMenu { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.menuItem {
+  font-weight: 800; font-size: clamp(13px, 2vw, 16px);
+  padding: 6px 16px;
+  color: rgba(237,238,246,0.5);
+  cursor: pointer;
+}
+.menuItem.sel { color: var(--hi); text-shadow: 0 0 14px rgba(185,140,255,0.55); }
+.menuItem.sel::before { content: '▸ '; }
+#titleFooterTag {
+  margin-top: 16px; padding-top: 10px; width: min(300px, 90%);
+  border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 9px; letter-spacing: 0.05em; color: rgba(237,238,246,0.4);
+}
+
+.screenTitle { font-size: clamp(16px, 2.6vw, 20px); font-weight: 800; }
+.screenSub { font-size: 11px; color: rgba(237,238,246,0.55); margin-bottom: 4px; }
+
+#stageList {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  max-width: 92%;
+  margin-top: 4px;
+}
+.stageItem {
+  width: 108px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+}
+.stageItem.sel { border-color: var(--hi); box-shadow: 0 0 0 1px var(--hi), 0 0 16px rgba(185,140,255,0.35); }
+.stageItem .num { font-size: 9px; font-weight: 800; letter-spacing: 0.06em; color: rgba(237,238,246,0.4); }
+.stageItem.sel .num { color: var(--hi); }
+.stageItem .nm { font-size: 12px; font-weight: 700; margin-top: 2px; line-height: 1.3; min-height: 2.6em; }
+.stageItem .st { font-size: 10px; margin-top: 4px; color: var(--hi); letter-spacing: 0.06em; }
+.stageItem.locked { opacity: 0.35; cursor: default; }
+.stageItem.locked .st { color: rgba(237,238,246,0.3); }
+
+#resultTitle { font-size: clamp(20px, 3.4vw, 28px); font-weight: 800; }
+#resultDesc { font-size: 12px; color: rgba(237,238,246,0.6); line-height: 1.6; }
+#resultScore { font-size: clamp(20px, 3vw, 26px); font-weight: 800; color: var(--hi); font-variant-numeric: tabular-nums; margin: 2px 0; }
+
+.textLink { font-weight: 800; font-size: 12.5px; color: rgba(237,238,246,0.55); padding: 6px 0; cursor: pointer; }
+.textLink.active { color: var(--hi); text-shadow: 0 0 10px rgba(185,140,255,0.5); }
+</style>
+</head>
+<body>
+<div id="rotate-hint"><span>📱</span><p>Mokuballは横向きプレイです。<br>端末を横向きにしてください。</p></div>
+<div id="title-frame"></div>
+<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
+<div id="buildInfo">v1.1.0 · Moku Face · Aug 13, 2026</div>
+
+<div id="wrapper">
+  <div id="tableSkin"><canvas id="c"></canvas></div>
+
+  <div id="hud" style="visibility:hidden">
+    <div class="stageName" id="hudStage">1 · おうちのにわ</div>
+    <div class="right">
+      <div class="score" id="hudScore">0</div>
+      <div class="balls" id="hudBalls">🦉 x1</div>
+      <button id="pauseBtn" type="button" aria-label="Pause">⏸</button>
+    </div>
+  </div>
+  <div id="objRow" style="visibility:hidden">
+    <div class="obj">🌍 <b id="objGate">0/3</b></div>
+    <div class="nudgeRow" id="nudgeRow"></div>
+  </div>
+
+  <div id="controls">
+    <div class="zone left" id="zoneLeft"></div>
+    <div class="zone center" id="zoneCenter"></div>
+    <div class="zone right" id="zoneRight"></div>
+  </div>
+
+  <section class="screen active" id="titleScreen">
+    <canvas id="titleBall" width="200" height="200"></canvas>
+    <h1 id="titleLogo">MOKU<span>BALL</span></h1>
+    <p id="titleSub">せかいをめぐる たびのピンボール</p>
+    <nav id="titleMenu">
+      <div class="menuItem sel" data-action="continue">たびにでる</div>
+      <div class="menuItem" data-action="select">せかいをえらぶ</div>
+    </nav>
+    <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
+  </section>
+
+  <section class="screen" id="stageSelectScreen">
+    <h2 class="screenTitle">せかいをえらぶ</h2>
+    <p class="screenSub">クリアするとつぎの せかいへ すすめる</p>
+    <div id="stageList"></div>
+    <div class="textLink" id="backFromSelect" style="margin-top:8px;">◀ もどる</div>
+  </section>
+
+  <section class="screen" id="resultScreen">
+    <h1 id="resultTitle">STAGE CLEAR</h1>
+    <p id="resultDesc"></p>
+    <div id="resultScore">0</div>
+    <nav id="resultMenu" style="margin-top:6px; display:flex; flex-direction:column; align-items:center; gap:2px;"></nav>
+  </section>
+
+  <section class="screen" id="pauseScreen">
+    <h2 class="screenTitle">ポーズ</h2>
+    <nav id="pauseMenu" style="display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:8px;">
+      <div class="menuItem sel" data-action="resume">つづける</div>
+      <div class="menuItem" data-action="restart">さいしょから</div>
+      <div class="menuItem" data-action="quit">タイトルへ</div>
+    </nav>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var GAME_ID = 'mokuball';
+  var SAVE_KEY = 'moku:' + GAME_ID + ':progress';
+
+  // ---------- stage config ----------
+  var STAGES = [
+    { name: 'おうちのにわ',       scoreTarget: 3500,  gateTarget: 3, extraBallAt: 10 },
+    { name: 'まちかどアーケード', scoreTarget: 6000,  gateTarget: 4, extraBallAt: 14 },
+    { name: 'しんりんのこみち',   scoreTarget: 9500,  gateTarget: 4, extraBallAt: 16 },
+    { name: 'みなとのよる',       scoreTarget: 13500, gateTarget: 5, extraBallAt: 18 },
+    { name: 'ほしめぐりのとう',   scoreTarget: 18000, gateTarget: 6, extraBallAt: 22 }
+  ];
+
+  // ---------- save data ----------
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && data.gameId === GAME_ID) return data;
+      }
+    } catch (e) {}
+    return { version: 1, gameId: GAME_ID, unlockedStage: 1, stageBest: {}, highScore: 0, updatedAt: '' };
+  }
+  var progress = loadProgress();
+  function saveProgress() {
+    progress.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) {}
+  }
+
+  // ---------- canvas ----------
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var W = 960, H = 540;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.scale(DPR, DPR);
+
+  // ---------- table geometry ----------
+  // Landscape-adapted layout of a real single-flipper-pair table: a domed
+  // main field (bumpers up top, flippers guarding the bottom gap) plus a
+  // walled-off shooter lane along the right edge that auto-plunges the
+  // ball up into the field, matching the anatomy of a real machine
+  // (backglass/playfield/shooter-lane/inlane-outlane/slingshot) without
+  // adding a third control — only L/R flippers + center nudge.
+  var CX = 480;
+  var PF_BOTTOM = 505;
+  var DRAIN_Y = 530;
+
+  var BALL_R = 11;
+
+  // Rest angle points DOWN-AND-INWARD (tips nearly meet, narrow "centre
+  // drain" gap — the classic risk of not flipping in time) and active
+  // angle swings UP-AND-OUTWARD (the actual batting motion). Mirrored for
+  // the right side of each pair via mirrorAngle().
+  var REST_L = 0.70, ACT_L = -0.60;
+  function mirrorAngle(a) { return Math.PI - a; }
+  function mirrorPt(p) { return { x: 2 * CX - p.x, y: p.y }; }
+
+  // All flippers share just the two buttons (side: -1 = left button,
+  // +1 = right button) — no new controls. Multiple flippers replace what
+  // the previous build did with passive guide walls: the upper pair lets
+  // the player actively bat an incoming ball toward the bumpers instead of
+  // a funnel railroading it there. The wing pair (Moku's wings) mounts
+  // right against the outer wall on each side, low-percentage contact but
+  // real payoff — batting a ball that's already rolling down the wall
+  // back UP into play instead of letting it slide straight to the drain.
+  // Replaces the old single left-side guard flipper, which sat inboard
+  // near the slingshot rather than the wall itself and rarely saw the
+  // ball at all.
+  var FLIPPERS = [
+    // Main pair = Moku's green bow tie.  Geometry stays close to the proven
+    // gameplay layout; a slightly wider pair makes the bow-tie silhouette
+    // read more clearly without closing the centre drain.
+    { id: 'mainL', side: -1, piv: { x: 398, y: 450 }, flen: 84, frad: 10, rest: REST_L, active: ACT_L, act: 0 },
+    { id: 'mainR', side: 1, piv: { x: 562, y: 450 }, flen: 84, frad: 10, rest: mirrorAngle(REST_L), active: mirrorAngle(ACT_L), act: 0 },
+    // Upper pair = Moku's angry eyebrows. Shorter and higher than before so
+    // they frame the eye bumpers instead of visually colliding with them.
+    { id: 'upperL', side: -1, piv: { x: 404, y: 210 }, flen: 72, frad: 7, rest: 0.58, active: -0.55, act: 0 },
+    { id: 'upperR', side: 1, piv: { x: 556, y: 210 }, flen: 72, frad: 7, rest: mirrorAngle(0.58), active: mirrorAngle(-0.55), act: 0 },
+    // Angles picked so REST lies flush along each wall's own slope (the
+    // flipper stays out of the way at rest) and ACTIVE swings it up and
+    // inward. RW isn't a mirror of LW (the shooter lane eats the right
+    // side's upper half), so wingR's numbers are its own, not mirrorAngle()
+    // of wingL's — verified separately against RW's actual geometry.
+    // Positioned at each OUTLANE's mouth, not just "near the wall" — the
+    // first placement sat up by the ramp/bumpers, nowhere close to where
+    // a draining ball actually travels, so pressing the button never did
+    // anything for a ball already headed for the drain. The outlane
+    // channel itself is only ~1.5 ball-widths wide (too tight to put a
+    // flipper inside without recreating the POST-style pinch bug), so
+    // these sit right where the channel opens into the main field
+    // instead, sweeping across that gap.
+    { id: 'wingL', side: -1, piv: { x: 280, y: 390 }, flen: 20, frad: 8, rest: 0.80, active: 0, act: 0 },
+    { id: 'wingR', side: 1, piv: { x: 680, y: 385 }, flen: 24, frad: 8, rest: 2.30, active: 3.00, act: 0 }
+  ];
+  function mirrorPoly(pts) { return pts.map(mirrorPt); }
+
+  // Outer boundary. Each side funnels down into that side's OUTLANE, which
+  // drains. The right side mirrors the left except above y=250, where a
+  // rectangular gap (x 870-940) lets the shooter lane feed the ball in —
+  // no diagonal wall spans that gap, so the ball doesn't have to out-race
+  // a moving boundary on the way into the field.
+  // Widened to use the landscape canvas properly — the previous field only
+  // used about 640px of a 960px-wide canvas, leaving the sides cramped and
+  // giving the ball little room to scatter before committing to an outlane.
+  // The right wall stays tied to the shooter lane's position; only the left
+  // wall moves out, which also biases the extra room toward where the ball
+  // needs it most (it always enters from the right).
+  var LW = [{ x: 60, y: 45 }, { x: 60, y: 250 }, { x: 292, y: 430 }, { x: 306, y: DRAIN_Y }];
+  var RW = [{ x: 800, y: 250 }, { x: 668, y: 430 }, { x: 654, y: DRAIN_Y }];
+  var TW = [{ x: 60, y: 45 }, { x: 260, y: 15 }, { x: 610, y: 18 }, { x: 800, y: 45 }];
+
+  // (31) shooter lane: walled-off strip along the right edge (800-866) the
+  // ball launches up through, curving left into the field through the gap.
+  var LANE_DIVIDER = [{ x: 800, y: 250 }, { x: 800, y: PF_BOTTOM }];
+  var LANE_OUTER = [{ x: 800, y: 45 }, { x: 866, y: 55 }, { x: 866, y: PF_BOTTOM }];
+  var LANE_FLOOR = [{ x: 866, y: PF_BOTTOM }, { x: 800, y: PF_BOTTOM }];
+
+  // (23)(24) return lane / outlane. This wedge is the divider between the
+  // two: its top edge is the INLANE floor — a ball landing on it rolls
+  // straight down onto the flipper — while its outer edge is the inner
+  // wall of the OUTLANE, which runs past it to the drain. Outlane mouth is
+  // now roughly 1.5 ball-widths (was 2x that), a deliberate narrowing.
+  var LEFT_WEDGE = [{ x: 318, y: 404 }, { x: 398, y: 450 }, { x: 392, y: PF_BOTTOM }, { x: 330, y: PF_BOTTOM }];
+  var RIGHT_WEDGE = mirrorPoly(LEFT_WEDGE);
+
+  // Rubber posts. Real playfields are dense with these; without them a ball
+  // that reaches a side wall just slides all the way down it into the
+  // outlane, untouched. These sit in the side approaches to break that up.
+  // Verified numerically (not by hand) against the actual collision math
+  // used at runtime — closestOnSeg/circle-circle distance minus ball
+  // radius, post radius and wall/sling thickness — because several
+  // earlier rounds of hand-measured positions left a pocket narrower than
+  // a ball's diameter against the nearby SLINGSHOT or RAMP (not just the
+  // outer wall, which is the only thing the first pass checked), and the
+  // ball would wedge into it and Tilt out. POST2 also needed a genuine
+  // SIDE check, not just a distance one: it was 29px clear of the LW
+  // *line* by distance alone, but that line is finite and the post was
+  // actually sitting past its end, outside the playfield entirely, which
+  // pure distance-to-segment can't catch on its own.
+  var POSTS = [
+    { x: 200, y: 300, r: 10 }, { x: 254, y: 350, r: 10 },
+    { x: 728, y: 262, r: 10 }, { x: 600, y: 320, r: 10 }
+  ];
+
+  // No funnel walls here on purpose — passive guide rails were railroading
+  // the ball to the bumpers, which killed the unpredictable-bounce feel
+  // that's the actual fun of pinball. The upper flipper pair (see FLIPPERS
+  // above) does that job instead, through the player's own skill.
+
+  function polySegs(pts) {
+    var segs = [];
+    for (var i = 0; i < pts.length - 1; i++) segs.push([pts[i], pts[i + 1]]);
+    return segs;
+  }
+  function polySegsClosed(pts) { return polySegs(pts.concat([pts[0]])); }
+
+  // LANE_FLOOR is drawn (it closes the lane visually) but is deliberately
+  // not collidable — a ball that comes back down the lane is caught by the
+  // re-plunge check in update() instead.
+  var WALLS = polySegs(RW).concat(polySegs(LW)).concat(polySegs(TW))
+    .concat(polySegs(LANE_DIVIDER)).concat(polySegs(LANE_OUTER))
+    .concat(polySegsClosed(LEFT_WEDGE)).concat(polySegsClosed(RIGHT_WEDGE));
+
+  // (29) slingshots, sitting above each flipper at the inlane/outlane
+  // split. The long UPPER-INNER edge is the kicker face: a ball dropping
+  // toward the flipper hits it and is thrown back up and toward the centre
+  // of the table. (The previous build's wedges faced the wrong way, which
+  // is what punted the ball back into the shooter lane.)
+  // Shorter than the first pass, and shifted outboard of the flipper
+  // (away from centre) rather than sitting directly above it — otherwise
+  // a ball leaving the flipper immediately clips the sling's underside
+  // and bounces straight back down.
+  // Raised 40px from the first pass: its own back edge physically
+  // overlapped the WEDGE's inlane-floor edge (a real collider crossing,
+  // not just a tight fit) right where they sit closest, which is exactly
+  // the kind of pinch that traps the ball. Verified against the wedge,
+  // the outer wall AND the ramp — moving it clear of one had twice pushed
+  // it into another, so all three get checked together now.
+  var LEFT_SLING_PTS = [{ x: 300, y: 332 }, { x: 288, y: 370 }, { x: 366, y: 366 }];
+  var RIGHT_SLING_PTS = mirrorPoly(LEFT_SLING_PTS);
+
+  // Builds a slingshot: all three edges are solid, but only the kicker
+  // face (edge index 2, the long playfield-facing one) adds the pop. Each
+  // face carries its own outward normal so the kick pushes the ball away
+  // from the actual surface rather than radially from the triangle.
+  function buildSling(pts) {
+    var cx = (pts[0].x + pts[1].x + pts[2].x) / 3;
+    var cy = (pts[0].y + pts[1].y + pts[2].y) / 3;
+    var obj = { pts: pts, flash: 0 };
+    obj.faces = [[0, 1], [1, 2], [2, 0]].map(function (e, i) {
+      var a = pts[e[0]], b = pts[e[1]];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len, ny = dx / len;
+      var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }
+      return { a: a, b: b, nx: nx, ny: ny, kick: i === 2, owner: obj };
+    });
+    return obj;
+  }
+  var SLINGS = [buildSling(LEFT_SLING_PTS), buildSling(RIGHT_SLING_PTS)];
+
+  // Classic flow: gate feeds a CENTRED bumper nest, the nest spits the
+  // ball down the middle at the flippers. Pulled the whole nest up so
+  // there's real open space between the bumpers and the flippers —
+  // needed as a "shot lane", not just filler.
+  var GATE = { x: 480, y: 185, r: 26 };
+  // (26) bumpers — a tight triangular nest, dead centre. The eyes (top
+  // pair) can't move up much further: the upper flippers' resting body
+  // already passes within a few px of them at y=282, a hard ceiling set
+  // by an earlier bug where they overlapped outright. The nose (bottom)
+  // has real room though, since it sits further from the upper flippers'
+  // pivots — pulled it up 35px on its own, which is what actually buys
+  // the requested distance from the MAIN flippers below (the nose was
+  // the closest of the three to them, so it's the one that mattered).
+  var BUMPER_BASE = [
+    // Two large pop bumpers form Moku's eyes; the orange bumper below is the
+    // beak/nose.  Their collision behaviour is unchanged.
+    { x: 423, y: 282, r: 25 },
+    { x: 537, y: 282, r: 25 },
+    { x: 480, y: 326, r: 19 }
+  ];
+  var BUMPER_EXTRA = { x: 200, y: 270, r: 18 }; // stage 4-5 add a fourth bumper
+
+  // (19) top lanes — rollovers along the top dome, crossed right after
+  // the ball clears the shooter-lane gap
+  var TOP_LANES = [{ x: 300, y: 75, r: 15 }, { x: 480, y: 65, r: 15 }, { x: 660, y: 75, r: 15 }];
+  // (20) spinner — free-spinning gate, scores by how fast the ball passes
+  var SPINNER = { x: 115, y: 175, r: 20 };
+  // (21) drop targets — a bank sitting directly above the gate, in the
+  // ball's very first moments in the field. Which targets are still up
+  // changes where an incoming ball deflects, not just how much it scores —
+  // knock the whole bank down for a bonus, then it resets. Wide/short
+  // (landscape) tabs in a row, not tall/narrow ones.
+  var DROP_TARGETS = [
+    { x: 440, y: 128, hw: 15, hh: 6 },
+    { x: 480, y: 128, hw: 15, hh: 6 },
+    { x: 520, y: 128, hw: 15, hh: 6 }
+  ];
+  // (22) standup targets — tiled edge-to-edge along the whole curved top
+  // frame (not a few spaced out), Moku's rust-orange "feather" colour.
+  // Generated from the TW curve itself rather than hand-placed, so each
+  // one tracks the dome's actual slope. Flush against the wall on purpose
+  // (not just close to it): a gap narrower than a ball is exactly the
+  // kind of pocket that trapped the ball at the POSTS earlier, so every
+  // one sits with its outer edge right at the wall's own centreline
+  // instead of floating a few px clear of it. TOP_LANES below them are
+  // non-solid rollovers (no collision), so no clearance check is needed
+  // against them.
+  function twY(x) {
+    for (var twi = 0; twi < TW.length - 1; twi++) {
+      var ta = TW[twi], tb = TW[twi + 1];
+      if (x >= ta.x && x <= tb.x) return ta.y + (tb.y - ta.y) * (x - ta.x) / (tb.x - ta.x);
+    }
+    return TW[TW.length - 1].y;
+  }
+  var STANDUPS = (function () {
+    // Keep the orange feather targets only around the temples.  The previous
+    // continuous row across the full dome read like Breakout bricks and hid
+    // the character face.  These remain real collidable/scoreable targets.
+    var HW = 7, HH = 7, list = [];
+    var xs = [105, 126, 147, 168, 189, 210, 231, 729, 750, 771];
+    xs.forEach(function (sx) {
+      list.push({ x: sx, y: Math.round(twY(sx) + HH + 2), hw: HW, hh: HH });
+    });
+    return list;
+  })();
+  // (28) kick-out hole — swallows the ball, then spits it back out
+  var HOLE = { x: 108, y: 252, r: 17 };
+  // (27) ramp lane — a left-flipper skill shot. The left flipper's active
+  // tip fires up-and-right (toward roughly x=650-700 by the time it's
+  // risen this far), so the mouth sits on that natural arc instead of off
+  // to a side the flipper never actually throws the ball toward.
+  var RAMP_ENTRY = { x: 645, y: 258, r: 27 };
+  // Shortened from a long loop back down to the flippers: that route ran
+  // its back half straight through the only space also available to the
+  // right slingshot AND the outer wall at once — no position for either
+  // one satisfied both without crossing the ramp's own collision tube.
+  // A tight hook that turns back right after the apex sidesteps the
+  // pinch entirely while still playing as a real captured skill shot.
+  var RAMP_PATH = [
+    { x: 645, y: 258 }, { x: 706, y: 290 }, { x: 690, y: 310 }
+  ];
+  // The drawn ramp tube had no collision of its own, so a ball could drift
+  // into its visual interior without ever being captured by RAMP_ENTRY —
+  // it looked walled-in but physically wasn't. These flank the path on
+  // both sides from the SECOND point on (the first segment, the entry
+  // mouth, stays open so proximity-based capture still works normally).
+  var RAMP_WALLS = (function () {
+    var HALF_W = 15, segs = [];
+    for (var i = 1; i < RAMP_PATH.length - 1; i++) {
+      var a = RAMP_PATH[i], b = RAMP_PATH[i + 1];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len * HALF_W, ny = dx / len * HALF_W;
+      segs.push([{ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }]);
+      segs.push([{ x: a.x - nx, y: a.y - ny }, { x: b.x - nx, y: b.y - ny }]);
+    }
+    return segs;
+  })();
+  WALLS = WALLS.concat(RAMP_WALLS);
+  // (25) kickback — one free save per ball, on EACH outlane
+  var KICKBACK_L = { x: 308, y: 496 };
+  var KICKBACK_R = mirrorPt(KICKBACK_L);
+
+  // (32) flat rail — a straight steel guide (unlike every other wall here,
+  // which follows the dome's curve) bridging the gap left of the gate.
+  // Gives a ball that drifts left after the gate a real chance to
+  // continue on toward the spinner/hole combo instead of only ever
+  // dropping straight into the bumper nest.
+  var FLAT_RAIL = [{ x: 270, y: 130 }, { x: 170, y: 180 }];
+  WALLS.push(FLAT_RAIL);
+
+  // (33) diverter — a motorised flap just under the gate that swings
+  // between two angles on a timer, alternately favouring the left or
+  // right side of the bumper nest. Same collision helper as a flipper
+  // (collideFlipper) but with no button — its angle is time-driven, not
+  // player-driven, so it changes what a repeated shot does over a game
+  // instead of what a single shot does.
+  var DIVERTER = { piv: { x: 480, y: 225 }, len: 32, angleA: 2.3, angleB: 0.84, period: 150, frad: 6 };
+  var diverterT = 0;
+  function diverterAngle() { return (Math.floor(diverterT / DIVERTER.period) % 2 === 0) ? DIVERTER.angleA : DIVERTER.angleB; }
+  function diverterTip() {
+    var a = diverterAngle();
+    return { x: DIVERTER.piv.x + Math.cos(a) * DIVERTER.len, y: DIVERTER.piv.y + Math.sin(a) * DIVERTER.len };
+  }
+
+  // (34) rollover buttons — flush, non-solid pads in each inlane, right
+  // where the wedge's floor feeds the ball toward its flipper. Light
+  // both on the same ball for a bonus, same "collect the set" shape as
+  // the top lanes.
+  var ROLLOVERS = [{ x: 374, y: 436 }, { x: 586, y: 436 }];
+
+  var BUMPER_POINTS = 100;
+  var GATE_POINTS = 250;
+  var SLING_POINTS = 30;
+  var LANE_POINTS = 60, LANE_SET_BONUS = 500;
+  var SPINNER_POINTS = 20;
+  var DROP_POINTS = 120, DROP_BANK_BONUS = 600;
+  var STANDUP_POINTS = 80;
+  var HOLE_POINTS = 350;
+  var RAMP_POINTS = 400;
+  var KICKBACK_POINTS = 100;
+  var DIVERTER_POINTS = 40;
+  var ROLLOVER_POINTS = 150, ROLLOVER_BONUS = 500;
+  var NUDGE_MAX = 6;
+
+  // ---------- state ----------
+  var STATE = 'TITLE'; // TITLE | STAGE_SELECT | SERVE | PLAY | RESULT | PAUSE
+  var curStage = 1;
+  var score = 0;
+  var ballsRemaining = 1;
+  var gateHits = 0;
+  var gateCooldown = 0;
+  var bumperPops = 0;
+  var extraBallAwarded = false;
+  var nudgeCount = 0;
+  var tilted = false;
+  var shakeT = 0, shakeMag = 0;
+  var flashPops = []; // transient score popups {x,y,txt,t}
+
+  function zeroArray(n) { var a = []; for (var zi = 0; zi < n; zi++) a.push(0); return a; }
+
+  // per-ball playfield object state
+  var laneLit = [false, false, false];
+  var dropDown = [false, false, false];
+  var dropResetT = 0;
+  var standupCool = zeroArray(STANDUPS.length);
+  var rolloverLit = [false, false];
+  var diverterCool = 0;
+  var spinnerCool = 0, spinnerSpin = 0;
+  var kickbackArmedL = true;
+  var kickbackArmedR = true;
+  var holdKind = null; // null | 'hole' | 'ramp' — ball captured, own motion
+  var holdT = 0, rampT = 0;
+  var holeCool = 0; // blocks re-capture while the ball is leaving the hole
+  var rampCool = 0; // blocks re-capture while the ball is leaving the ramp
+  var stallFrames = 0; // drives the ball-search nudge
+  var ballSaveT = 0;   // grace period at the start of each ball
+
+  var ball = null;
+  var leftHeld = false, rightHeld = false;
+
+  function stageConf(n) { return STAGES[n - 1]; }
+  function bumpersForStage(n) {
+    return n >= 4 ? BUMPER_BASE.concat([BUMPER_EXTRA]) : BUMPER_BASE;
+  }
+
+  // ---------- physics helpers ----------
+  function closestOnSeg(px, py, ax, ay, bx, by) {
+    var vx = bx - ax, vy = by - ay;
+    var wx = px - ax, wy = py - ay;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return { x: ax + vx * t, y: ay + vy * t };
+  }
+
+  function collideCircleSeg(b, ax, ay, bx, by, thickness) {
+    var cp = closestOnSeg(b.x, b.y, ax, ay, bx, by);
+    var dx = b.x - cp.x, dy = b.y - cp.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = b.r + thickness;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      b.x += nx * overlap; b.y += ny * overlap;
+      var vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) {
+        var REST = 0.5;
+        b.vx -= (1 + REST) * vn * nx;
+        b.vy -= (1 + REST) * vn * ny;
+        b.vx *= 0.985; b.vy *= 0.985;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function collideCircleCircle(b, ox, oy, or_, pop) {
+    var dx = b.x - ox, dy = b.y - oy;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = b.r + or_;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      b.x += nx * overlap; b.y += ny * overlap;
+      var vn = b.vx * nx + b.vy * ny;
+      var REST = 0.65;
+      if (vn < 0) { b.vx -= (1 + REST) * vn * nx; b.vy -= (1 + REST) * vn * ny; }
+      if (pop) { b.vx += nx * pop; b.vy += ny * pop; }
+      return true;
+    }
+    return false;
+  }
+
+  // Axis-aligned rect (centre + half-extents) vs ball, used by the drop
+  // and standup targets. Falls back to least-penetration push-out when the
+  // ball's centre ends up inside the rect.
+  function collideCircleRect(b, rx, ry, hw, hh) {
+    var nx2 = Math.max(rx - hw, Math.min(b.x, rx + hw));
+    var ny2 = Math.max(ry - hh, Math.min(b.y, ry + hh));
+    var dx = b.x - nx2, dy = b.y - ny2;
+    var d2 = dx * dx + dy * dy;
+    if (d2 >= b.r * b.r) return false;
+    var nx, ny, overlap;
+    var d = Math.sqrt(d2);
+    if (d > 0.0001) {
+      nx = dx / d; ny = dy / d; overlap = b.r - d;
+    } else {
+      var px = hw + b.r - Math.abs(b.x - rx);
+      var py = hh + b.r - Math.abs(b.y - ry);
+      if (px < py) { nx = b.x < rx ? -1 : 1; ny = 0; overlap = px; }
+      else { nx = 0; ny = b.y < ry ? -1 : 1; overlap = py; }
+    }
+    b.x += nx * overlap; b.y += ny * overlap;
+    var vn = b.vx * nx + b.vy * ny;
+    if (vn < 0) {
+      var REST = 0.55;
+      b.vx -= (1 + REST) * vn * nx;
+      b.vy -= (1 + REST) * vn * ny;
+    }
+    return true;
+  }
+
+  // Position along a polyline at t in 0..1 — drives the ramp ride.
+  function pathPoint(path, t) {
+    var seg = Math.max(0, Math.min(1, t)) * (path.length - 1);
+    var i = Math.min(path.length - 2, Math.floor(seg));
+    var f = seg - i;
+    return {
+      x: path[i].x + (path[i + 1].x - path[i].x) * f,
+      y: path[i].y + (path[i + 1].y - path[i].y) * f
+    };
+  }
+
+  function flipperAngle(f) {
+    return f.rest + (f.active - f.rest) * f.act;
+  }
+  function flipperTip(f) {
+    var ang = flipperAngle(f);
+    return { x: f.piv.x + Math.cos(ang) * f.flen, y: f.piv.y + Math.sin(ang) * f.flen };
+  }
+  function collideFlipper(f) {
+    if (!ball) return;
+    var tip = flipperTip(f);
+    var cp = closestOnSeg(ball.x, ball.y, f.piv.x, f.piv.y, tip.x, tip.y);
+    var dx = ball.x - cp.x, dy = ball.y - cp.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var minDist = ball.r + f.frad;
+    if (dist < minDist && dist > 0.0001) {
+      var nx = dx / dist, ny = dy / dist;
+      var overlap = minDist - dist;
+      ball.x += nx * overlap; ball.y += ny * overlap;
+      var vn = ball.vx * nx + ball.vy * ny;
+      var REST = 0.55;
+      if (vn < 0) { ball.vx -= (1 + REST) * vn * nx; ball.vy -= (1 + REST) * vn * ny; }
+      var held = f.side < 0 ? leftHeld : rightHeld;
+      if (held && f.act < 0.92) {
+        var dpiv = Math.sqrt((cp.x - f.piv.x) * (cp.x - f.piv.x) + (cp.y - f.piv.y) * (cp.y - f.piv.y));
+        var kick = (dpiv / f.flen) * 15;
+        ball.vx += nx * kick;
+        ball.vy += ny * kick - 2;
+      }
+    }
+  }
+
+  // ---------- game flow ----------
+  function goTitle() {
+    STATE = 'TITLE';
+    document.body.classList.remove('playing');
+    showScreen('titleScreen');
+    hudVisible(false);
+  }
+  function goStageSelect() {
+    STATE = 'STAGE_SELECT';
+    document.body.classList.remove('playing');
+    buildStageList();
+    showScreen('stageSelectScreen');
+    hudVisible(false);
+  }
+  function startStage(n) {
+    curStage = n;
+    score = 0;
+    ballsRemaining = 1;
+    gateHits = 0;
+    bumperPops = 0;
+    extraBallAwarded = false;
+    STATE = 'PLAY';
+    document.body.classList.add('playing');
+    showScreen(null);
+    hudVisible(true);
+    serveBall();
+    updateHud();
+  }
+  function serveBall() {
+    // auto-plunge: starts at the foot of the shooter lane and launches
+    // itself up and left, curving into the main field through the gap
+    // above the lane divider — no plunger control needed.
+    // Slight plunger variance, so no two balls run the identical line.
+    ball = { x: 833, y: 485, vx: 0, vy: -(12.8 + Math.random() * 0.6), r: BALL_R, laneKicked: false };
+    // gateHits / bumperPops / extraBallAwarded are STAGE-level progress and
+    // are reset in startStage() — only the per-ball state is cleared here.
+    gateCooldown = 0;
+    nudgeCount = 0;
+    tilted = false;
+    FLIPPERS.forEach(function (f) { f.act = 0; });
+    laneLit = [false, false, false];
+    dropDown = [false, false, false];
+    dropResetT = 0;
+    standupCool = zeroArray(STANDUPS.length);
+    rolloverLit = [false, false];
+    diverterCool = 0;
+    spinnerCool = 0; spinnerSpin = 0;
+    kickbackArmedL = true;
+    kickbackArmedR = true;
+    holdKind = null; holdT = 0; rampT = 0; holeCool = 0; rampCool = 0; stallFrames = 0;
+    ballSaveT = 780; // ~13s of ball save, as on a real machine
+    updateHud();
+  }
+  // A ball that drifts back down the shooter lane is not a lost ball on a
+  // real machine — it just sits in the lane until it's plunged again.
+  function replunge() {
+    ball.x = 833; ball.y = 485;
+    ball.vx = 0; ball.vy = -(12.8 + Math.random() * 0.6);
+    ball.laneKicked = false;
+    addPop(831, 430, 'RE-PLUNGE');
+  }
+  function loseBall() {
+    if (ballSaveT > 0) {
+      serveBall();
+      ballSaveT = 0; // one save per ball
+      addPop(CX, 300, 'BALL SAVED');
+      return;
+    }
+    ballsRemaining--;
+    if (ballsRemaining > 0) {
+      serveBall();
+    } else {
+      failStage();
+    }
+  }
+  function clearCondition() {
+    var conf = stageConf(curStage);
+    return score >= conf.scoreTarget && gateHits >= conf.gateTarget;
+  }
+  function clearStage() {
+    STATE = 'RESULT';
+    document.body.classList.remove('playing');
+    var best = progress.stageBest[curStage] || 0;
+    if (score > best) progress.stageBest[curStage] = score;
+    if (score > progress.highScore) progress.highScore = score;
+    if (curStage === progress.unlockedStage && curStage < STAGES.length) {
+      progress.unlockedStage = curStage + 1;
+    } else if (curStage === progress.unlockedStage && curStage === STAGES.length) {
+      progress.unlockedStage = curStage; // all clear, stays at max
+    }
+    saveProgress();
+    var isLast = curStage >= STAGES.length;
+    showResult(true, isLast);
+    hudVisible(false);
+  }
+  function failStage() {
+    STATE = 'RESULT';
+    document.body.classList.remove('playing');
+    var best = progress.stageBest[curStage] || 0;
+    if (score > best) progress.stageBest[curStage] = score;
+    if (score > progress.highScore) progress.highScore = score;
+    saveProgress();
+    showResult(false, false);
+    hudVisible(false);
+  }
+
+  // ---------- update ----------
+  var GRAV = 0.22;
+  function update() {
+    if (STATE !== 'PLAY' || !ball) return;
+
+    // Captured states drive the ball themselves — no gravity, no walls.
+    if (holdKind === 'hole') {
+      ball.x = HOLE.x; ball.y = HOLE.y;
+      if (--holdT <= 0) {
+        holdKind = null;
+        // Eject clear of the saucer and hold the sensor off, or the ball
+        // is still inside the capture radius next frame and gets swallowed
+        // again immediately — an infinite kick-out loop paying out points.
+        ball.y = HOLE.y - (HOLE.r + ball.r + 3);
+        ball.vx = 2.4; ball.vy = -12.5;
+        holeCool = 40;
+        addPop(HOLE.x, HOLE.y - 40, 'KICK OUT!');
+      }
+      tickEffects();
+      return;
+    }
+    if (holdKind === 'ramp') {
+      rampT++;
+      var rt = rampT / 46;
+      if (rt >= 1) {
+        var end = RAMP_PATH[RAMP_PATH.length - 1];
+        ball.x = end.x; ball.y = end.y;
+        ball.vx = -3; ball.vy = 3.5; // fed back down toward the bumper nest
+        holdKind = null;
+        rampCool = 45;
+      } else {
+        var rp = pathPoint(RAMP_PATH, rt);
+        ball.x = rp.x; ball.y = rp.y;
+      }
+      tickEffects();
+      return;
+    }
+
+    FLIPPERS.forEach(function (f) {
+      var held = f.side < 0 ? leftHeld : rightHeld;
+      if (held && !tilted) f.act = Math.min(1, f.act + 0.28);
+      else f.act = Math.max(0, f.act - 0.16);
+    });
+
+    ball.vy += GRAV;
+    ball.vx *= 0.999;
+
+    // shooter-lane exit curve: launches straight up the lane, then this
+    // one-time guide-rail kick curves it left into the field once it has
+    // cleared the lane's lower section (mirrors the curved rail a real
+    // machine uses to route the plunger lane into the playfield).
+    if (!ball.laneKicked && ball.x > 740 && ball.y < 140) {
+      ball.vx -= 3.5 + Math.random() * 4.0;
+      ball.laneKicked = true;
+    }
+
+    var speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    var MAXSPD = 17;
+    if (speed > MAXSPD) { ball.vx *= MAXSPD / speed; ball.vy *= MAXSPD / speed; }
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    for (var i = 0; i < WALLS.length; i++) {
+      collideCircleSeg(ball, WALLS[i][0].x, WALLS[i][0].y, WALLS[i][1].x, WALLS[i][1].y, 4);
+    }
+    // (29) slingshots — every face is solid, but only the kicker face pops
+    // the ball, and it pops along that face's own outward normal.
+    for (var s = 0; s < SLINGS.length; s++) {
+      var faces = SLINGS[s].faces;
+      for (var fi = 0; fi < faces.length; fi++) {
+        var f = faces[fi];
+        if (!collideCircleSeg(ball, f.a.x, f.a.y, f.b.x, f.b.y, 3)) continue;
+        if (!f.kick) continue;
+        var kick = 8.5 + Math.random() * 6;
+        ball.vx += f.nx * kick + (Math.random() - 0.5) * 2.5;
+        ball.vy += f.ny * kick + (Math.random() - 0.5) * 2.5;
+        f.owner.flash = 10;
+        score += SLING_POINTS;
+        addPop((f.a.x + f.b.x) / 2, (f.a.y + f.b.y) / 2 - 16, 'TWANG');
+        updateHud();
+      }
+    }
+    for (var pi = 0; pi < POSTS.length; pi++) {
+      var po = POSTS[pi];
+      if (collideCircleCircle(ball, po.x, po.y, po.r, 1.4)) po.flash = 8;
+    }
+    var bumpers = bumpersForStage(curStage);
+    bumpers.forEach(function (bmp) {
+      var hit = collideCircleCircle(ball, bmp.x, bmp.y, bmp.r, 4.8 + Math.random() * 2.6);
+      if (hit) {
+        score += BUMPER_POINTS;
+        bumperPops++;
+        addPop(bmp.x, bmp.y, '+' + BUMPER_POINTS);
+        bmp.flash = 10;
+        ball.vx += (Math.random() - 0.5) * 2.4;
+        ball.vy += (Math.random() - 0.5) * 2.4;
+        if (!extraBallAwarded && bumperPops >= stageConf(curStage).extraBallAt) {
+          extraBallAwarded = true;
+          ballsRemaining++;
+          addPop(bmp.x, bmp.y - 30, 'EXTRA BALL!');
+        }
+        updateHud();
+      }
+    });
+    if (gateCooldown > 0) gateCooldown--;
+    var gd = Math.sqrt((ball.x - GATE.x) * (ball.x - GATE.x) + (ball.y - GATE.y) * (ball.y - GATE.y));
+    if (gd < ball.r + GATE.r && gateCooldown === 0) {
+      var nx = (ball.x - GATE.x) / (gd || 1), ny = (ball.y - GATE.y) / (gd || 1);
+      ball.vx += nx * 2; ball.vy += ny * 2 - 1.5;
+      gateHits++;
+      gateCooldown = 24;
+      score += GATE_POINTS;
+      addPop(GATE.x, GATE.y, '+' + GATE_POINTS);
+      updateHud();
+    }
+
+    // (19) top lanes — rollovers, no collision; light all three for a bonus
+    for (var li = 0; li < TOP_LANES.length; li++) {
+      var ln = TOP_LANES[li];
+      if (laneLit[li]) continue;
+      if (Math.sqrt((ball.x - ln.x) * (ball.x - ln.x) + (ball.y - ln.y) * (ball.y - ln.y)) >= ball.r + ln.r) continue;
+      laneLit[li] = true;
+      score += LANE_POINTS;
+      addPop(ln.x, ln.y - 18, '+' + LANE_POINTS);
+      if (laneLit[0] && laneLit[1] && laneLit[2]) {
+        score += LANE_SET_BONUS;
+        addPop(CX, 88, 'LANES COMPLETE +' + LANE_SET_BONUS);
+        laneLit = [false, false, false];
+      }
+      updateHud();
+    }
+
+    // (34) rollover buttons — flush pads in each inlane, no collision
+    for (var ri = 0; ri < ROLLOVERS.length; ri++) {
+      var rv = ROLLOVERS[ri];
+      if (rolloverLit[ri]) continue;
+      if (Math.sqrt((ball.x - rv.x) * (ball.x - rv.x) + (ball.y - rv.y) * (ball.y - rv.y)) >= ball.r + 10) continue;
+      rolloverLit[ri] = true;
+      score += ROLLOVER_POINTS;
+      addPop(rv.x, rv.y - 18, '+' + ROLLOVER_POINTS);
+      if (rolloverLit[0] && rolloverLit[1]) {
+        score += ROLLOVER_BONUS;
+        addPop(CX, 420, 'INLANES LIT +' + ROLLOVER_BONUS);
+        rolloverLit = [false, false];
+      }
+      updateHud();
+    }
+
+    // (20) spinner — pass-through gate, scores by how fast it's hit
+    var spd2 = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    if (spinnerCool === 0 &&
+        Math.sqrt((ball.x - SPINNER.x) * (ball.x - SPINNER.x) + (ball.y - SPINNER.y) * (ball.y - SPINNER.y)) < ball.r + SPINNER.r) {
+      var spins = Math.max(1, Math.round(spd2 * 0.9));
+      score += spins * SPINNER_POINTS;
+      spinnerSpin = 28;
+      spinnerCool = 18;
+      addPop(SPINNER.x, SPINNER.y - 24, 'SPIN x' + spins);
+      updateHud();
+    }
+
+    // (21) drop targets
+    for (var di = 0; di < DROP_TARGETS.length; di++) {
+      var dt = DROP_TARGETS[di];
+      if (dropDown[di]) continue;
+      if (!collideCircleRect(ball, dt.x, dt.y, dt.hw, dt.hh)) continue;
+      dropDown[di] = true;
+      dt.flash = 12;
+      score += DROP_POINTS;
+      addPop(dt.x, dt.y - 20, '+' + DROP_POINTS);
+      if (dropDown[0] && dropDown[1] && dropDown[2]) {
+        score += DROP_BANK_BONUS;
+        addPop(480, 100, 'BANK DOWN +' + DROP_BANK_BONUS);
+        if (!kickbackArmedL || !kickbackArmedR) {
+          kickbackArmedL = true; kickbackArmedR = true;
+          addPop(CX, 470, 'KICKBACKS RELIT');
+        }
+        dropResetT = 100; // targets pop back up after a moment
+      }
+      updateHud();
+    }
+
+    // (22) standup targets — solid, stay up, score on every hit (unlike
+    // drop targets, they never go down)
+    for (var si = 0; si < STANDUPS.length; si++) {
+      var st = STANDUPS[si];
+      if (!collideCircleRect(ball, st.x, st.y, st.hw, st.hh)) continue;
+      if (standupCool[si] > 0) continue;
+      standupCool[si] = 14;
+      st.flash = 10;
+      score += STANDUP_POINTS;
+      addPop(st.x, st.y + 22, '+' + STANDUP_POINTS);
+      updateHud();
+    }
+
+    // (27) ramp lane — needs to be entered with upward momentum. Guarded by
+    // rampCool the same way the kick-out hole is: the ramp was shortened
+    // (see RAMP_PATH below) to fit the space next to the slingshot/outer
+    // wall, which puts its release point only ~70px from RAMP_ENTRY —
+    // close enough that a ball bouncing off the nearby post/sling/wall
+    // could re-enter the capture radius within a frame or two of being
+    // released, re-awarding RAMP_POINTS on a loop. holeCool exists for
+    // exactly this failure mode at the other captured feature.
+    if (rampCool === 0 &&
+        Math.sqrt((ball.x - RAMP_ENTRY.x) * (ball.x - RAMP_ENTRY.x) + (ball.y - RAMP_ENTRY.y) * (ball.y - RAMP_ENTRY.y)) < RAMP_ENTRY.r &&
+        ball.vy < 6) {
+      holdKind = 'ramp'; rampT = 0;
+      ball.vx = 0; ball.vy = 0;
+      score += RAMP_POINTS;
+      addPop(RAMP_ENTRY.x, RAMP_ENTRY.y - 26, 'RAMP +' + RAMP_POINTS);
+      updateHud();
+      tickEffects();
+      return;
+    }
+
+    // (28) kick-out hole — swallows the ball, ejects it a beat later
+    if (holeCool === 0 &&
+        Math.sqrt((ball.x - HOLE.x) * (ball.x - HOLE.x) + (ball.y - HOLE.y) * (ball.y - HOLE.y)) < HOLE.r * 0.8) {
+      holdKind = 'hole'; holdT = 52;
+      ball.vx = 0; ball.vy = 0;
+      score += HOLE_POINTS;
+      addPop(HOLE.x, HOLE.y - 26, '+' + HOLE_POINTS);
+      updateHud();
+      tickEffects();
+      return;
+    }
+
+    FLIPPERS.forEach(collideFlipper);
+
+    // (33) diverter — a plain moving wall, not a flipper: no button, no
+    // aimed kick. Its hinge end never moves between angle states, so a
+    // ball arriving dead level with the pivot can settle into an exact
+    // vertical bounce loop directly on top of it — a plain push-out
+    // resolves the overlap to precisely the collision radius every time,
+    // and once it's no longer strictly overlapping, gravity's per-frame
+    // pull is small enough that the loop just repeats forever in exact
+    // floating-point lockstep. Randomising the collision radius itself
+    // (same trick the bumpers already use, not just a post-hoc velocity
+    // nudge) means the resting distance can never stay exactly put two
+    // frames running, which is what actually breaks the cycle.
+    diverterT++;
+    var dTip = diverterTip();
+    if (collideCircleSeg(ball, DIVERTER.piv.x, DIVERTER.piv.y, dTip.x, dTip.y, DIVERTER.frad + Math.random() * 3)) {
+      ball.vx += (Math.random() - 0.5) * 3;
+      if (diverterCool === 0) {
+        diverterCool = 20;
+        score += DIVERTER_POINTS;
+        addPop(DIVERTER.piv.x, DIVERTER.piv.y - 20, '+' + DIVERTER_POINTS);
+        updateHud();
+      }
+    }
+
+    if (clearCondition()) { clearStage(); return; }
+
+    // (31) back down the shooter lane — re-plunge instead of losing the ball
+    if (ball.x > 808 && ball.y > 470 && ball.vy > 0) {
+      replunge();
+      tickEffects();
+      return;
+    }
+
+    // (25) kickback — one free save per ball, on EACH outlane
+    if (kickbackArmedL && ball.y > 478 && ball.x > 296 && ball.x < 332) {
+      kickbackArmedL = false;
+      ball.vy = -(11.5 + Math.random() * 4.5); ball.vx = 3.0 + Math.random() * 4.0;
+      score += KICKBACK_POINTS;
+      addPop(ball.x, ball.y - 30, 'KICKBACK!');
+      updateHud();
+    }
+    if (kickbackArmedR && ball.y > 478 && ball.x > 628 && ball.x < 664) {
+      kickbackArmedR = false;
+      ball.vy = -(11.5 + Math.random() * 4.5); ball.vx = -(3.0 + Math.random() * 4.0);
+      score += KICKBACK_POINTS;
+      addPop(ball.x, ball.y - 30, 'KICKBACK!');
+      updateHud();
+    }
+
+    // Ball search. A real machine hunts for a ball that has stopped moving
+    // rather than hanging forever; this guarantees no permanent stall.
+    if (Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) < 2.5) stallFrames++;
+    else stallFrames = 0;
+    if (stallFrames > 110) {
+      stallFrames = 0;
+      ball.vx += (Math.random() - 0.5) * 9;
+      ball.vy -= 5 + Math.random() * 4;
+      shakeT = 10; shakeMag = 6;
+      addPop(ball.x, ball.y - 26, 'BALL SEARCH');
+    }
+
+    if (ball.y > DRAIN_Y) { loseBall(); return; }
+
+    tickEffects();
+  }
+
+  function tickEffects() {
+    if (shakeT > 0) shakeT--;
+    if (spinnerCool > 0) spinnerCool--;
+    if (spinnerSpin > 0) spinnerSpin--;
+    if (holeCool > 0) holeCool--;
+    if (rampCool > 0) rampCool--;
+    if (diverterCool > 0) diverterCool--;
+    if (ballSaveT > 0) ballSaveT--;
+    if (dropResetT > 0) {
+      dropResetT--;
+      if (dropResetT === 0) dropDown = [false, false, false];
+    }
+    for (var sci = 0; sci < standupCool.length; sci++) if (standupCool[sci] > 0) standupCool[sci]--;
+    flashPops.forEach(function (p) { p.t--; p.y -= 0.6; });
+    flashPops = flashPops.filter(function (p) { return p.t > 0; });
+    bumpersForStage(curStage).forEach(function (b) { if (b.flash > 0) b.flash--; });
+    DROP_TARGETS.forEach(function (t) { if (t.flash > 0) t.flash--; });
+    STANDUPS.forEach(function (t) { if (t.flash > 0) t.flash--; });
+    SLINGS.forEach(function (s) { if (s.flash > 0) s.flash--; });
+    POSTS.forEach(function (p) { if (p.flash > 0) p.flash--; });
+  }
+
+  function addPop(x, y, txt) { flashPops.push({ x: x, y: y, txt: txt, t: 46 }); }
+
+  function nudge() {
+    if (STATE !== 'PLAY' || !ball) return;
+    if (tilted) return;
+    nudgeCount++;
+    if (nudgeCount > NUDGE_MAX) {
+      tilted = true;
+      leftHeld = false; rightHeld = false;
+      addPop(CX, 260, 'TILT');
+      renderNudgeRow();
+      return;
+    }
+    ball.vx += (Math.random() - 0.5) * 3.4;
+    ball.vy -= 1.2;
+    shakeT = 8; shakeMag = 5;
+    renderNudgeRow();
+  }
+
+  // ---------- draw ----------
+  function drawTable() {
+    ctx.clearRect(0, 0, W, H);
+    var ox = 0, oy = 0;
+    if (shakeT > 0) {
+      ox = (Math.random() - 0.5) * shakeMag;
+      oy = (Math.random() - 0.5) * shakeMag;
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    // playfield base
+    var grd = ctx.createLinearGradient(0, 0, 0, H);
+    grd.addColorStop(0, '#1e1530');
+    grd.addColorStop(1, '#120c1e');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    // shooter lane tint, so it visually reads as its own channel
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(800, 40, 66, PF_BOTTOM - 40);
+
+    // wood-tone rail border following the wall polylines. TW (the dome)
+    // is traced as a smoothed curve through its points rather than
+    // straight segments — collision still uses the straight polyline
+    // underneath, but it sits close enough to the curve that the two
+    // don't visibly diverge. Gives the top of the table a rounder,
+    // more head-like silhouette to go with the face bumpers below.
+    function tracePathSmooth(ctx, pts) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length - 1; i++) {
+        var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      }
+      var last = pts[pts.length - 1];
+      ctx.lineTo(last.x, last.y);
+    }
+    // LW/RW get the same smoothed-curve treatment as TW now — the outer
+    // boundary was kinked hard at the point where each side's straight
+    // upper wall meets its diagonal outlane run, which is a large share
+    // of why the frame read as an angular, warped shape instead of a
+    // single rounded body. Collision still uses the straight polyline
+    // (moving it risked reopening every post/sling/ramp clearance this
+    // session already fixed), but visually it now reads as one continuous
+    // curve from the dome down into each outlane, closer to Moku's own
+    // round silhouette. The shooter lane stays straight on purpose — a
+    // real machine's lane guide is a straight metal rail, not a curve.
+    var CURVED_RAILS = [RW, LW];
+    var STRAIGHT_RAILS = [LANE_DIVIDER, LANE_OUTER, LANE_FLOOR];
+    ctx.strokeStyle = '#7a5230';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    CURVED_RAILS.forEach(function (pts) { ctx.beginPath(); tracePathSmooth(ctx, pts); ctx.stroke(); });
+    STRAIGHT_RAILS.forEach(function (pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    });
+    ctx.beginPath(); tracePathSmooth(ctx, TW); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 2;
+    CURVED_RAILS.forEach(function (pts) { ctx.beginPath(); tracePathSmooth(ctx, pts); ctx.stroke(); });
+    STRAIGHT_RAILS.forEach(function (pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    });
+    ctx.beginPath(); tracePathSmooth(ctx, TW); ctx.stroke();
+
+    function tracePoly(pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+    }
+
+    // (27) ramp lane — drawn as a raised translucent channel
+    ctx.save();
+    ctx.strokeStyle = 'rgba(185,140,255,0.20)';
+    ctx.lineWidth = 26;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(RAMP_PATH[0].x, RAMP_PATH[0].y);
+    for (var rpi = 1; rpi < RAMP_PATH.length; rpi++) ctx.lineTo(RAMP_PATH[rpi].x, RAMP_PATH[rpi].y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(185,140,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    // ramp entry mouth
+    ctx.beginPath();
+    ctx.arc(RAMP_ENTRY.x, RAMP_ENTRY.y, RAMP_ENTRY.r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#B98CFF';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(185,140,255,0.75)';
+    ctx.font = '800 9px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('RAMP', RAMP_ENTRY.x, RAMP_ENTRY.y);
+
+    // (32) flat rail — plain brushed steel, deliberately unlike every
+    // curved wood-and-glow wall on the rest of the table so it reads as
+    // its own kind of part
+    ctx.beginPath();
+    ctx.moveTo(FLAT_RAIL[0].x, FLAT_RAIL[0].y);
+    ctx.lineTo(FLAT_RAIL[1].x, FLAT_RAIL[1].y);
+    ctx.strokeStyle = '#C7CCDA';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // (23)(24) inlane / outlane divider wedges
+    [LEFT_WEDGE, RIGHT_WEDGE].forEach(function (pts) {
+      tracePoly(pts);
+      ctx.fillStyle = 'rgba(122,82,48,0.55)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    // (29) slingshots
+    SLINGS.forEach(function (sl) {
+      tracePoly(sl.pts);
+      ctx.fillStyle = sl.flash > 0 ? 'rgba(185,140,255,0.5)' : 'rgba(185,140,255,0.16)';
+      ctx.fill();
+      ctx.strokeStyle = '#B98CFF';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(185,140,255,0.6)';
+      ctx.shadowBlur = sl.flash > 0 ? 20 : 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
+    // (19) top lanes — rollover arrows, filled once lit
+    TOP_LANES.forEach(function (ln, i) {
+      ctx.beginPath();
+      ctx.arc(ln.x, ln.y, ln.r, 0, Math.PI * 2);
+      ctx.fillStyle = laneLit[i] ? 'rgba(255,201,74,0.75)' : 'rgba(255,255,255,0.07)';
+      ctx.fill();
+      ctx.strokeStyle = laneLit[i] ? '#FFC94A' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = laneLit[i] ? '#2b1d05' : 'rgba(255,255,255,0.45)';
+      ctx.font = '800 12px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('▲', ln.x, ln.y + 1);
+    });
+
+    // (34) rollover buttons — flush pads, no collision, just light up
+    ROLLOVERS.forEach(function (rv, i) {
+      ctx.beginPath();
+      ctx.arc(rv.x, rv.y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = rolloverLit[i] ? 'rgba(95,227,192,0.8)' : 'rgba(255,255,255,0.1)';
+      ctx.fill();
+      ctx.strokeStyle = rolloverLit[i] ? '#5FE3C0' : 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    // (20) spinner — a bar that whips around when the ball passes through
+    ctx.save();
+    ctx.translate(SPINNER.x, SPINNER.y);
+    ctx.rotate(spinnerSpin * 0.55);
+    ctx.strokeStyle = spinnerSpin > 0 ? '#FFC94A' : 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, -SPINNER.r * 0.8);
+    ctx.lineTo(0, SPINNER.r * 0.8);
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(SPINNER.x, SPINNER.y, SPINNER.r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // (21) drop targets — hidden while knocked down
+    DROP_TARGETS.forEach(function (t, i) {
+      if (dropDown[i]) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(t.x - t.hw, t.y + t.hh);
+        ctx.lineTo(t.x + t.hw, t.y + t.hh);
+        ctx.stroke();
+        return;
+      }
+      ctx.fillStyle = t.flash > 0 ? '#FFF3D0' : '#5FE3C0';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // (22) standup targets — Moku's rust-orange feather colour
+    STANDUPS.forEach(function (t) {
+      var g = ctx.createLinearGradient(t.x, t.y - t.hh, t.x, t.y + t.hh);
+      if (t.flash > 0) { g.addColorStop(0, '#FFE3B8'); g.addColorStop(1, '#FFC085'); }
+      else { g.addColorStop(0, '#E8894A'); g.addColorStop(1, '#B3541C'); }
+      ctx.fillStyle = g;
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(211,110,50,' + (t.flash > 0 ? 0.9 : 0.5) + ')';
+      ctx.shadowBlur = t.flash > 0 ? 18 : 8;
+      ctx.beginPath();
+      ctx.rect(t.x - t.hw, t.y - t.hh, t.hw * 2, t.hh * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    });
+
+    // (28) kick-out hole
+    ctx.beginPath();
+    ctx.arc(HOLE.x, HOLE.y, HOLE.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#07050d';
+    ctx.fill();
+    ctx.strokeStyle = '#FFC94A';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(255,201,74,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // rubber posts
+    POSTS.forEach(function (p) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3.5, 0, Math.PI * 2);
+      ctx.strokeStyle = p.flash > 0 ? '#FFFFFF' : '#EFEBFF';
+      ctx.lineWidth = 3.5; ctx.stroke();
+      var pg = ctx.createLinearGradient(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r);
+      pg.addColorStop(0, '#F2F4FF'); pg.addColorStop(0.45, '#9AA0BD'); pg.addColorStop(1, '#4A4E63');
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = pg; ctx.fill();
+    });
+
+    // (25) kickback — lit while it still has a save left
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [[KICKBACK_L, kickbackArmedL], [KICKBACK_R, kickbackArmedR]].forEach(function (kb) {
+      var pos = kb[0], armed = kb[1];
+      ctx.fillStyle = armed ? '#5FE3C0' : 'rgba(255,255,255,0.18)';
+      ctx.font = '800 14px sans-serif';
+      ctx.fillText('▲', pos.x, pos.y);
+      ctx.font = '700 7px sans-serif';
+      ctx.fillText('KICK', pos.x, pos.y + 11);
+    });
+
+    // world gate
+    ctx.beginPath();
+    ctx.arc(GATE.x, GATE.y, GATE.r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#B98CFF';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = 'rgba(185,140,255,0.8)';
+    ctx.shadowBlur = 16;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = '22px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🌍', GATE.x, GATE.y + 1);
+
+    // (33) diverter — a motorised flap, drawn in the table's accent teal
+    // so it doesn't get lost among the mostly-violet gate/sling glow
+    (function () {
+      var dTip2 = diverterTip();
+      ctx.beginPath();
+      ctx.moveTo(DIVERTER.piv.x, DIVERTER.piv.y);
+      ctx.lineTo(dTip2.x, dTip2.y);
+      ctx.strokeStyle = '#5FE3C0';
+      ctx.lineWidth = DIVERTER.frad * 2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(95,227,192,0.7)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(DIVERTER.piv.x, DIVERTER.piv.y, DIVERTER.frad * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = '#EDEEF6';
+      ctx.fill();
+    })();
+
+    // bumpers — the core three double as Moku's face (the mini-flippers
+    // above already read as eyebrows): the top pair are eyes, the bottom
+    // one a nose. Shapes/colours match the reference Moku app icon —
+    // plain solid-black eyes with a single highlight dot (no iris ring),
+    // and a simple rust-orange oval nose (no beak). The stage 4-5 bonus
+    // bumper keeps the plain look, since it isn't part of the face.
+    function drawEyeBumper(bmp) {
+      var glow = bmp.flash > 0 ? 1 : 0.5;
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r, 0, Math.PI * 2);
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, '#FFFFFF');
+      g.addColorStop(1, '#E7E1F7');
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(185,140,255,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 26 : 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(75,46,122,0.55)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      var pupilR = bmp.r * (bmp.flash > 0 ? 0.70 : 0.66);
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, pupilR, 0, Math.PI * 2);
+      ctx.fillStyle = '#161018';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bmp.x - bmp.r * 0.22, bmp.y - bmp.r * 0.24, bmp.r * 0.16, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fill();
+    }
+    function drawNoseBumper(bmp) {
+      var glow = bmp.flash > 0 ? 1 : 0.55;
+      ctx.beginPath();
+      ctx.ellipse(bmp.x, bmp.y, bmp.r * 0.95, bmp.r * 0.76, 0, 0, Math.PI * 2);
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.25, bmp.y - bmp.r * 0.25, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, '#E8894A');
+      g.addColorStop(1, '#B3541C');
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(211,110,50,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 24 : 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(120,60,20,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(bmp.x - bmp.r * 0.25, bmp.y - bmp.r * 0.3, bmp.r * 0.22, bmp.r * 0.14, -0.4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fill();
+    }
+    bumpersForStage(curStage).forEach(function (bmp) {
+      if (bmp === BUMPER_BASE[0] || bmp === BUMPER_BASE[1]) { drawEyeBumper(bmp); return; }
+      if (bmp === BUMPER_BASE[2]) { drawNoseBumper(bmp); return; }
+      var glow = bmp.flash > 0 ? 1 : 0.55;
+      var g = ctx.createRadialGradient(bmp.x - bmp.r * 0.3, bmp.y - bmp.r * 0.3, 2, bmp.x, bmp.y, bmp.r);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)');
+      g.addColorStop(0.3, '#FFC94A');
+      g.addColorStop(1, '#8A6218');
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.shadowColor = 'rgba(255,201,74,' + glow + ')';
+      ctx.shadowBlur = bmp.flash > 0 ? 26 : 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(bmp.x, bmp.y, bmp.r * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fill();
+    });
+
+    // flippers — each pair reads as a different part of Moku's face.
+    // Upper pair = eyebrows (dark brown). Main pair = Moku's bow tie
+    // (teal green). The wing flippers aren't part of the face, so they keep
+    // the table's violet accent.
+    FLIPPERS.forEach(function (f) {
+      var piv = f.piv;
+      var tip = flipperTip(f);
+      var isMain = f.id === 'mainL' || f.id === 'mainR';
+      var isUpper = f.id === 'upperL' || f.id === 'upperR';
+      var grad = ctx.createLinearGradient(piv.x, piv.y, tip.x, tip.y);
+      var shadowColor;
+      if (isMain) {
+        // Moku bow-tie tone
+        grad.addColorStop(0, '#5FE3C0');
+        grad.addColorStop(1, '#2E8F6D');
+        shadowColor = 'rgba(95,227,192,0.65)';
+      } else if (isUpper) {
+        grad.addColorStop(0, '#8A5A34');
+        grad.addColorStop(1, '#3B2415');
+        shadowColor = 'rgba(138,90,52,0.65)';
+      } else {
+        grad.addColorStop(0, '#B98CFF');
+        grad.addColorStop(1, '#4B2E7A');
+        shadowColor = 'rgba(185,140,255,0.7)';
+      }
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = f.frad * 2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = shadowColor;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(piv.x, piv.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(piv.x, piv.y, f.frad * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = '#EDEEF6';
+      ctx.fill();
+    });
+
+    // Bow-tie knot: a non-colliding playfield insert visually joins the two
+    // functional main flippers into one unmistakable Moku bow tie.
+    (function () {
+      var knotY = 478;
+      var kg = ctx.createRadialGradient(CX - 4, knotY - 4, 2, CX, knotY, 15);
+      kg.addColorStop(0, '#7AF0D0');
+      kg.addColorStop(1, '#2A7868');
+      ctx.beginPath();
+      ctx.arc(CX, knotY, 12, 0, Math.PI * 2);
+      ctx.fillStyle = kg;
+      ctx.shadowColor = 'rgba(95,227,192,0.7)';
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    })();
+
+    // Small cheek rings reuse the pinball-post visual language rather than
+    // drawing a literal character illustration. They are intentionally faint.
+    [{x:342,y:352},{x:618,y:352}].forEach(function (ch) {
+      ctx.beginPath();
+      ctx.arc(ch.x, ch.y, 29, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(185,140,255,0.16)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+
+    // ball
+    if (ball) {
+      var bg = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 1, ball.x, ball.y, ball.r);
+      bg.addColorStop(0, '#ffffff');
+      bg.addColorStop(0.45, '#d8d8e6');
+      bg.addColorStop(1, '#6d6d82');
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = bg;
+      ctx.shadowColor = 'rgba(185,140,255,0.5)';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🦉', ball.x, ball.y + 1);
+    }
+
+    // score popups
+    flashPops.forEach(function (p) {
+      ctx.globalAlpha = Math.max(0, p.t / 46);
+      ctx.fillStyle = '#EDEEF6';
+      ctx.font = '800 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.txt, p.x, p.y);
+      ctx.globalAlpha = 1;
+    });
+
+    if (tilted) {
+      ctx.fillStyle = 'rgba(255, 90, 90, 0.85)';
+      ctx.font = '800 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('TILT', CX, 300);
+    }
+
+    ctx.restore();
+  }
+
+  // ---------- HUD ----------
+  function hudVisible(v) {
+    document.getElementById('hud').style.visibility = v ? 'visible' : 'hidden';
+    document.getElementById('objRow').style.visibility = v ? 'visible' : 'hidden';
+  }
+  function updateHud() {
+    var conf = stageConf(curStage);
+    document.getElementById('hudStage').textContent = curStage + ' · ' + conf.name;
+    document.getElementById('hudScore').textContent = score.toLocaleString();
+    document.getElementById('hudBalls').textContent = '🦉 x' + ballsRemaining;
+    document.getElementById('objGate').textContent = gateHits + '/' + conf.gateTarget;
+    renderNudgeRow();
+  }
+  function renderNudgeRow() {
+    var row = document.getElementById('nudgeRow');
+    row.innerHTML = '';
+    for (var i = 0; i < NUDGE_MAX; i++) {
+      var pip = document.createElement('div');
+      pip.className = 'nudgePip' + (i < nudgeCount ? ' used' : '');
+      row.appendChild(pip);
+    }
+  }
+
+  // ---------- screens ----------
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    if (id) document.getElementById(id).classList.add('active');
+  }
+  function buildStageList() {
+    var list = document.getElementById('stageList');
+    list.innerHTML = '';
+    STAGES.forEach(function (conf, idx) {
+      var n = idx + 1;
+      var locked = n > progress.unlockedStage;
+      var el = document.createElement('div');
+      el.className = 'stageItem' + (locked ? ' locked' : '') + (n === stageSelSel ? ' sel' : '');
+      el.dataset.stage = n;
+      var best = progress.stageBest[n];
+      el.innerHTML =
+        '<div class="num">STAGE ' + n + '</div>' +
+        '<div class="nm">' + (locked ? '？？？？' : conf.name) + '</div>' +
+        '<div class="st">' + (locked ? '🔒 LOCKED' : (best ? 'BEST ' + best.toLocaleString() : 'NEW')) + '</div>';
+      if (!locked) el.addEventListener('click', function () { chooseStage(n); });
+      list.appendChild(el);
+    });
+  }
+  function chooseStage(n) {
+    if (n > progress.unlockedStage) return;
+    startStage(n);
+  }
+  var stageSelSel = 1;
+
+  function showResult(cleared, isLast) {
+    document.getElementById('resultTitle').textContent = cleared ? (isLast ? 'ALL WORLDS CLEAR!' : 'STAGE CLEAR') : 'GAME OVER';
+    document.getElementById('resultTitle').style.color = cleared ? '#B98CFF' : '#EDEEF6';
+    document.getElementById('resultDesc').textContent = cleared
+      ? (isLast ? 'すべての せかいを めぐり おえた！' : '🌍 ゲートを ' + gateHits + '回 くぐった')
+      : 'ボールが なくなった。もう一度 ちょうせん！';
+    document.getElementById('resultScore').textContent = score.toLocaleString();
+    var menu = document.getElementById('resultMenu');
+    menu.innerHTML = '';
+    var items = [];
+    if (cleared && !isLast) items.push({ label: 'つぎの せかいへ', action: function () { startStage(curStage + 1); } });
+    items.push({ label: 'もう一度', action: function () { startStage(curStage); } });
+    items.push({ label: 'せかいをえらぶ', action: goStageSelect });
+    items.push({ label: 'タイトルへ', action: goTitle });
+    items.forEach(function (it, i) {
+      var el = document.createElement('div');
+      el.className = 'menuItem' + (i === 0 ? ' sel' : '');
+      el.textContent = it.label;
+      el.addEventListener('click', it.action);
+      menu.appendChild(el);
+    });
+    resultSel = 0;
+    resultActions = items.map(function (it) { return it.action; });
+    STATE = 'RESULT';
+    showScreen('resultScreen');
+  }
+  var resultSel = 0, resultActions = [];
+
+  function pause() {
+    if (STATE !== 'PLAY') return;
+    STATE = 'PAUSE';
+    leftHeld = false; rightHeld = false;
+    showScreen('pauseScreen');
+    pauseSel = 0;
+    refreshPauseSel();
+  }
+  var pauseSel = 0;
+  function refreshPauseSel() {
+    var items = document.querySelectorAll('#pauseMenu .menuItem');
+    items.forEach(function (el, i) { el.classList.toggle('sel', i === pauseSel); });
+  }
+  document.querySelectorAll('#pauseMenu .menuItem').forEach(function (el, i) {
+    el.addEventListener('click', function () { pauseSel = i; runPauseAction(); });
+  });
+  function runPauseAction() {
+    var action = ['resume', 'restart', 'quit'][pauseSel];
+    if (action === 'resume') { STATE = 'PLAY'; showScreen(null); }
+    else if (action === 'restart') { startStage(curStage); }
+    else { goTitle(); }
+  }
+
+  // ---------- title menu ----------
+  var titleSel = 0;
+  function refreshTitleSel() {
+    document.querySelectorAll('#titleMenu .menuItem').forEach(function (el, i) { el.classList.toggle('sel', i === titleSel); });
+  }
+  document.querySelectorAll('#titleMenu .menuItem').forEach(function (el, i) {
+    el.addEventListener('click', function () { titleSel = i; runTitleAction(); });
+  });
+  function runTitleAction() {
+    var action = document.querySelectorAll('#titleMenu .menuItem')[titleSel].dataset.action;
+    if (action === 'continue') startStage(progress.unlockedStage);
+    else goStageSelect();
+  }
+  document.getElementById('backFromSelect').addEventListener('click', goTitle);
+
+  // ---------- input ----------
+  function bindHold(el, onDown, onUp) {
+    el.addEventListener('mousedown', function (e) { e.preventDefault(); onDown(); });
+    el.addEventListener('mouseup', onUp);
+    el.addEventListener('mouseleave', onUp);
+    el.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(); }, { passive: false });
+    el.addEventListener('touchend', function (e) { e.preventDefault(); onUp(); }, { passive: false });
+    el.addEventListener('touchcancel', onUp);
+  }
+  bindHold(document.getElementById('zoneLeft'), function () { leftHeld = true; }, function () { leftHeld = false; });
+  bindHold(document.getElementById('zoneRight'), function () { rightHeld = true; }, function () { rightHeld = false; });
+  document.getElementById('zoneCenter').addEventListener('mousedown', nudge);
+  document.getElementById('zoneCenter').addEventListener('touchstart', function (e) { e.preventDefault(); nudge(); }, { passive: false });
+  document.getElementById('pauseBtn').addEventListener('click', pause);
+
+  document.addEventListener('keydown', function (e) {
+    if (STATE === 'TITLE') {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        titleSel = titleSel === 0 ? 1 : 0;
+        refreshTitleSel();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        runTitleAction();
+      }
+      return;
+    }
+    if (STATE === 'STAGE_SELECT') {
+      if (e.key === 'ArrowRight') { stageSelSel = Math.min(STAGES.length, stageSelSel + 1); buildStageList(); }
+      else if (e.key === 'ArrowLeft') { stageSelSel = Math.max(1, stageSelSel - 1); buildStageList(); }
+      else if (e.key === 'Enter' || e.key === ' ') { chooseStage(stageSelSel); }
+      return;
+    }
+    if (STATE === 'RESULT') {
+      if (e.key === 'ArrowUp') { resultSel = (resultSel + resultActions.length - 1) % resultActions.length; refreshResultSel(); }
+      else if (e.key === 'ArrowDown') { resultSel = (resultSel + 1) % resultActions.length; refreshResultSel(); }
+      else if (e.key === 'Enter' || e.key === ' ') { resultActions[resultSel](); }
+      return;
+    }
+    if (STATE === 'PAUSE') {
+      if (e.key === 'ArrowUp') { pauseSel = (pauseSel + 2) % 3; refreshPauseSel(); }
+      else if (e.key === 'ArrowDown') { pauseSel = (pauseSel + 1) % 3; refreshPauseSel(); }
+      else if (e.key === 'Enter' || e.key === ' ') { runPauseAction(); }
+      else if (e.key === 'Escape') { STATE = 'PLAY'; showScreen(null); }
+      return;
+    }
+    if (STATE === 'PLAY') {
+      if (e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') leftHeld = true;
+      else if (e.key === 'ArrowRight' || e.key === '/' || e.key === 'm' || e.key === 'M') rightHeld = true;
+      else if (e.key === 'ArrowDown' || e.key === ' ') nudge();
+      else if (e.key === 'Escape') pause();
+    }
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') leftHeld = false;
+    else if (e.key === 'ArrowRight' || e.key === '/' || e.key === 'm' || e.key === 'M') rightHeld = false;
+  });
+  function refreshResultSel() {
+    document.querySelectorAll('#resultMenu .menuItem').forEach(function (el, i) { el.classList.toggle('sel', i === resultSel); });
+  }
+
+  // Ported from shiri-of-moku.html's drawMokumoku() (itself ported from
+  // angry-mokumoku.html) so the title screen shows the same character as
+  // the rest of the series instead of a generic owl emoji.
+  function drawMokumoku(ctx, x, y, r, angle, mood) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle || 0);
+    mood = mood || 'neutral';
+
+    ctx.fillStyle = mood === 'super-angry' ? '#D48060' : '#C8956A';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    var bodyShade = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+    bodyShade.addColorStop(0, 'rgba(255,255,255,0.15)');
+    bodyShade.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = bodyShade;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#E8D5B0';
+    ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.66, r * 0.76, 0, 0, Math.PI * 2); ctx.fill();
+
+    var eyeH = mood === 'super-angry' ? r * 0.145 : mood === 'angry' ? r * 0.175 : r * 0.235;
+    var eyeW = r * 0.19;
+
+    ctx.fillStyle = '#151515';
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.14, eyeW, eyeH, -0.08, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(r * 0.32, -r * 0.14, eyeW, eyeH, 0.08, 0, Math.PI * 2); ctx.stroke();
+
+    if (mood === 'angry' || mood === 'super-angry') {
+      var slope = mood === 'super-angry' ? r * 0.16 : r * 0.10;
+      ctx.strokeStyle = '#4A1800';
+      ctx.lineWidth = mood === 'super-angry' ? r * 0.09 : r * 0.07;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.52, -r * 0.36 - slope); ctx.lineTo(-r * 0.14, -r * 0.36 + slope * 0.3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.14, -r * 0.36 + slope * 0.3); ctx.lineTo(r * 0.52, -r * 0.36 - slope); ctx.stroke();
+    }
+
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(-r * 0.27, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.37, -r * 0.2, r * 0.065, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = mood === 'super-angry' ? '#C87818' : '#E89230';
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.02, r * 0.24, r * 0.115, 0, 0, Math.PI * 2); ctx.fill();
+
+    if (mood === 'super-angry') {
+      ctx.fillStyle = '#2A1000';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.15, r * 0.115, r * 0.10, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.10, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.17, r * 0.115, r * 0.06, 0, 0, Math.PI); ctx.fill();
+    } else if (mood === 'angry') {
+      ctx.fillStyle = '#5A2800';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.14, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.09, r * 0.115, r * 0.075, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, r * 0.155, r * 0.105, r * 0.055, 0, 0, Math.PI); ctx.fill();
+    } else {
+      ctx.fillStyle = '#D07818';
+      ctx.beginPath(); ctx.ellipse(0, r * 0.12, r * 0.115, r * 0.135, 0, 0, Math.PI); ctx.fill();
+    }
+
+    ctx.fillStyle = '#3DA890';
+    ctx.beginPath(); ctx.ellipse(-r * 0.28, r * 0.47, r * 0.24, r * 0.13, -0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.28, r * 0.47, r * 0.24, r * 0.13, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2A7868';
+    ctx.beginPath(); ctx.arc(0, r * 0.47, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2A7868'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-r * 0.04, r * 0.47); ctx.lineTo(-r * 0.48, r * 0.45); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.04, r * 0.47); ctx.lineTo(r * 0.48, r * 0.45); ctx.stroke();
+
+    ctx.fillStyle = '#E89230';
+    ctx.beginPath(); ctx.ellipse(-r * 0.26, r * 0.88, r * 0.13, r * 0.08, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(r * 0.26, r * 0.88, r * 0.13, r * 0.08, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#C06810'; ctx.lineWidth = 1.2;
+    [-r * 0.26, r * 0.26].forEach(function (fx) {
+      ctx.beginPath(); ctx.moveTo(fx - r * 0.07, r * 0.9); ctx.lineTo(fx - r * 0.15, r * 0.96); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx, r * 0.92); ctx.lineTo(fx, r * 1.0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx + r * 0.07, r * 0.9); ctx.lineTo(fx + r * 0.15, r * 0.96); ctx.stroke();
+    });
+
+    ctx.restore();
+  }
+  (function () {
+    var tb = document.getElementById('titleBall');
+    if (!tb) return;
+    var tbCtx = tb.getContext('2d');
+    drawMokumoku(tbCtx, tb.width / 2, tb.height / 2 + 6, tb.width * 0.42, 0, 'neutral');
+  })();
+
+  // ---------- loop ----------
+  function loop() {
+    update();
+    drawTable();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  refreshTitleSel();
+})();
+</script>
+</body>
+</html>
