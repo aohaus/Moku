@@ -53,7 +53,18 @@ GET {proxyBaseUrl}?gameId=<gameId>&action=submit&name=<name>&score=<n>&seconds=<
 ```
 
 `gameId`が`GAME_KEYS`に登録されていない場合は404、`score`が不正なら400を返す。
-`GET`以外のメソッドは405で拒否する。
+`GET`以外のメソッドは405で拒否する。名前(`name`)は20文字を超えると切り詰められる(`MAX_NAME_LEN`)ため、
+Dreamlo管理画面から手動で削除する際は、切り詰められた後の実際の名前を指定すること。
+
+## CORSの設定に関する注意(ハマりどころ)
+
+- `ALLOWED_ORIGIN`環境変数は**パスを含めない**(`https://aohaus.github.io`のようにscheme+hostのみ)。
+  ブラウザが送る`Origin`ヘッダーは常にパス無しなので、`https://aohaus.github.io/Moku/`のような
+  パス付きの値を設定すると絶対に一致せずCORSエラーになる。
+- API GatewayでAPIを作成した際、**API側にも「CORS」設定画面が別途存在する**(左メニューの「CORS」)。
+  ここで何らかの設定(空でも)が入っていると、API GatewayがLambdaの返すCORSヘッダーを無視して
+  上書き/除去してしまう(コンソールにもその旨の警告文が表示される)。このプロジェクトではLambda側の
+  `corsHeaders()`だけで完結させる設計のため、**API Gateway側のCORS設定は「Clear」で未設定のままにする**。
 
 ## コスト
 
