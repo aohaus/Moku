@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Moku Series — HTTPS proxy in front of Dreamlo (which only serves plain HTTP).
+  A single Lambda behind a Function URL, so game pages served over HTTPS
+  (e.g. GitHub Pages) can call it without hitting mixed-content blocking.
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      CORS origin allowed to call this proxy (e.g. https://aohaus.github.io).
+      Use "*" during development only.
+
+Resources:
+  DreamloProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: src/proxy.handler
+      CodeUri: .
+      Timeout: 5
+      MemorySize: 128
+      Environment:
+        Variables:
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - !Ref AllowedOrigin
+          AllowMethods:
+            - GET
+
+Outputs:
+  ProxyUrl:
+    Description: >
+      HTTPS base URL for the Dreamlo proxy. Use it exactly like dreamlo.com's
+      own URLs, e.g. {ProxyUrl}lb/{publicCode}/json
+    Value: !GetAtt DreamloProxyFunctionUrl.FunctionUrl
