@@ -57,6 +57,36 @@ canvas {
   max-height: min(900px, calc(100vh - 16px));
   max-height: min(900px, calc(100dvh - 16px));
 }
+/* #wrapper centers the canvas with flex and can be larger than the
+   canvas's own rendered box, so this shrink-wraps to the canvas's
+   actual size (a plain replaced-element box, like <img>) — the only
+   reliable anchor for positioning #titleMascotImg with percentages
+   that track the canvas's internal 1260x574 coordinate space. */
+#canvasBox {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+/* Title-screen hero mascot: the real illustrated artwork (see
+   brand/mokumoku-hero.png), not the canvas-drawn drawMokumoku() used
+   throughout actual gameplay (player, profile preview, etc.). Owl was
+   centered at roughly (630, 235) with r=42 in the 1260x574 canvas. */
+#titleMascotImg {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 41%;
+  width: 11%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 26px rgba(255,201,74,0.4));
+  animation: titleMascotBob 3.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes titleMascotBob {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-8px); }
+}
 #hud {
   position: absolute; top: 0; left: 0; right: 0;
   padding: 12px 14px;
@@ -246,10 +276,13 @@ canvas {
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
 <button id="lang-toggle" type="button">EN</button>
-<div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
+<div id="buildInfo">v1.1.0 · Updated Aug 14, 2026</div>
 <div id="game-layout">
   <div id="wrapper">
-    <canvas id="c"></canvas>
+    <div id="canvasBox">
+      <canvas id="c"></canvas>
+      <img id="titleMascotImg" src="brand/mokumoku-hero.png" alt="">
+    </div>
     <div id="hud" style="visibility:hidden">
       <div id="score-display">0 - 0</div>
       <div id="time-display">1:00</div>
@@ -1018,10 +1051,10 @@ function drawTitleScreen() {
   ctx.fillText('M O K U M O K U   K I C K', W/2, 145);
   ctx.restore();
 
-  // Mokumoku mascot with idle sparkles — same bob/tilt idle as its
-  // appearance on angry-mokumoku.html's own title screen.
+  // Idle sparkles around the mascot — the mascot itself now lives in
+  // the #titleMascotImg HTML overlay (the real illustrated artwork),
+  // not drawn on canvas.
   const bob = Math.sin(titleFrame * 0.05) * 6;
-  const tilt = Math.sin(titleFrame * 0.028) * 0.07;
   const mascotY = 235 + bob;
   const sparkT = (titleFrame * 0.04) % (Math.PI * 2);
   [[W/2-95,mascotY-45],[W/2+100,mascotY-35],[W/2-80,mascotY+55],[W/2+85,mascotY+50]].forEach(([sx,sy],i) => {
@@ -1034,7 +1067,6 @@ function drawTitleScreen() {
     ctx.fillText('✦', sx, sy);
     ctx.restore();
   });
-  drawMokumoku(W/2, mascotY, 42, tilt);
 
   ctx.save();
   ctx.textAlign = 'center';
@@ -1812,6 +1844,7 @@ function startMatch() {
   document.getElementById('hub-link').style.display = 'none';
   document.getElementById('lang-toggle').style.display = 'none';
   document.getElementById('buildInfo').style.display = 'none';
+  document.getElementById('titleMascotImg').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 
@@ -1884,6 +1917,7 @@ function quitToTitle() {
   document.getElementById('hub-link').style.display = 'block';
   document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
+  document.getElementById('titleMascotImg').style.display = 'block';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 function quitToHome() {
@@ -1898,6 +1932,7 @@ function quitToHome() {
   document.getElementById('hub-link').style.display = 'block';
   document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
+  document.getElementById('titleMascotImg').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
 }
 function returnToProfile() {
@@ -1908,6 +1943,7 @@ function returnToProfile() {
   document.getElementById('hub-link').style.display = 'block';
   document.getElementById('lang-toggle').style.display = 'block';
   document.getElementById('buildInfo').style.display = 'block';
+  document.getElementById('titleMascotImg').style.display = 'none';
 }
 
 // ─── INPUT ────────────────────────────────────────────────────
@@ -1923,7 +1959,11 @@ function onDown(e) {
   e.preventDefault();
   const p = getPos(e);
   if (state === 'TITLE') {
-    if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) { state = 'HOME'; return; }
+    if (p.x >= W/2 - 85 && p.x <= W/2 + 85 && p.y >= 366 && p.y <= 414) {
+      state = 'HOME';
+      document.getElementById('titleMascotImg').style.display = 'none';
+      return;
+    }
     return;
   }
   if (state === 'HOME') {
