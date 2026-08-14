@@ -285,6 +285,7 @@
     opacity:0; transition:opacity .25s ease;
   }
   #ranksNameSavedTag.show{opacity:1;}
+  #ranksNameSavedTag.warn{color:var(--red);}
   #rankList{
     width:100%; max-width:320px; margin-top:14px;
     display:flex; flex-direction:column; gap:6px;
@@ -643,15 +644,34 @@
       listEl.appendChild(row);
     });
   }
+  async function verifyPlayerNameSaved(expected){
+    // persistSave() swallows storage errors (e.g. iOS Safari Private Browsing
+    // rejects localStorage writes) so a failed save wouldn't otherwise be
+    // visible. Read the value back so the UI can tell the truth.
+    try{
+      let raw;
+      if(hasClaudeStorage()){
+        const r = await window.storage.get(SAVE_KEY, false);
+        raw = r ? r.value : null;
+      } else {
+        raw = localStorage.getItem(SAVE_KEY);
+      }
+      if(!raw) return false;
+      return (JSON.parse(raw).playerName || null) === expected;
+    }catch(e){ return false; }
+  }
   let ranksNameSavedTimer = null;
-  document.getElementById("ranksNameSaveBtn").addEventListener("click", ()=>{
+  document.getElementById("ranksNameSaveBtn").addEventListener("click", async ()=>{
     const val = document.getElementById("ranksNameInput").value.trim().slice(0,12);
     save.playerName = val || null;
-    persistSave();
+    await persistSave();
+    const ok = await verifyPlayerNameSaved(save.playerName);
     const tag = document.getElementById("ranksNameSavedTag");
+    tag.textContent = ok ? "✓ Saved" : "⚠️ Couldn't save — try leaving Private Browsing mode";
+    tag.classList.toggle("warn", !ok);
     tag.classList.add("show");
     clearTimeout(ranksNameSavedTimer);
-    ranksNameSavedTimer = setTimeout(()=>tag.classList.remove("show"), 1600);
+    ranksNameSavedTimer = setTimeout(()=>tag.classList.remove("show"), ok ? 1600 : 4500);
   });
 
   async function loadSave(){
