@@ -1,4 +1,7 @@
-# Moku Scores API — デプロイ手順
+# Moku Scores API — デプロイ手順(自前ホスト版・将来の代替案)
+
+**現在の実装方針は Dreamlo(外部ホスト型サービス)です。** SPEC.md §6 および `shared/moku-scores.js` を参照。
+このディレクトリは、Dreamloで要件を満たせなくなった場合の移行先として残している自前ホスト版(AWS SAM)。
 
 AWS SAM CLI が必要 (`brew install aws-sam-cli` 等)。AWSアカウント/認証情報は設定済みであること。
 

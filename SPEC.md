@@ -102,16 +102,22 @@ Mokuball は実装済みだがハブ未公開(準備中)。
 Mokuシリーズ全体で使う軽量な共有バックエンド。§1の「外部通信なしでも起動できることを基本とする」方針を維持したまま、
 各タイトルが任意でランキング機能を追加できるようにするための共通規約。
 
-- **構成**: API Gateway (HTTP API) + Lambda + DynamoDB。実装は `backend/`(AWS SAMテンプレート)。
-  詳細な仕様・デプロイ手順は [`backend/API_SPEC.md`](backend/API_SPEC.md) / [`backend/README.md`](backend/README.md) を参照。
-- **通信タイミング(opt-in)**: 常時通信はしない。ゲーム側が明示的に呼ぶのは以下のみ。
-  - スコア確定時に `POST /scores` でベストスコアを送信
-  - ランキング画面を開いた時のみ `GET /scores` を呼ぶ
+- **現在の実装方針: Dreamlo(外部ホスト型リーダーボードサービス)**
+  - 自前インフラ不要、キー発行のみで使える無料サービス。開発工数を抑えるため採用。
+  - クライアント側ヘルパー: [`shared/moku-scores.js`](shared/moku-scores.js)(`MokuScores.configure/submit/fetchTop`)。
+  - **注意**: Dreamlo側の正確なURL仕様(エンドポイント形式など)は、実際にリーダーボードを作成した際にダッシュボードに表示されるものを必ず確認すること。仕様が変わっている可能性がある。
+  - 外部サービス依存のため、可用性・改ざん耐性はコントロール外。数百人規模のカジュアル用途と割り切る。
+- **将来の代替/拡張案: 自前ホスト(API Gateway + Lambda + DynamoDB)**
+  - 実装済みテンプレートが `backend/`(AWS SAM)にある。仕様は [`backend/API_SPEC.md`](backend/API_SPEC.md) / デプロイ手順は [`backend/README.md`](backend/README.md)。
+  - Dreamloで要件を満たせなくなった場合(改ざん対策、独自ロジック、コスト等)の移行先として保持。
+- **通信タイミング(opt-in、Dreamlo/自前どちらの実装でも共通)**: 常時通信はしない。ゲーム側が明示的に呼ぶのは以下のみ。
+  - スコア確定時にベストスコアを送信
+  - ランキング画面を開いた時のみ取得を呼ぶ
   - 通信失敗時もローカルの `localStorage` 記録(§2)を正とし、プレイ継続に影響させない。
 - **認証**: なし。デバイスごとのUUIDを`localStorage`の`moku:deviceId`(全ゲーム共通、ゲームIDのnamespaceを付けない)に保存し、プレイヤーキーとして使う。ログイン・アカウント機能は導入しない。
-- **保持データ**: `gameId` + `deviceId` ごとに自己ベスト1件のみ(スコア履歴は持たない)。
+- **保持データ**: `gameId` + `deviceId` ごとに自己ベスト1件を想定(スコア履歴は持たない)。
 - **`gameId`**: ファイル名(拡張子なし、`kebab-case`)と一致させる。例: `angry-moku-battle-royal`。
-- **新規タイトルがランキングを実装する場合**: `backend/API_SPEC.md` のリクエスト/レスポンス形式にそのまま従う(エンドポイント・スキーマの変更は本セクションと合わせて更新する)。
+- **新規タイトルがランキングを実装する場合**: `shared/moku-scores.js` をそのまま`<script>`で読み込み、`MokuScores.configure()`にDreamloのpublic/private keyを渡して使う。
 
 ## 未決事項 / 次に決めること
 
