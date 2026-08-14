@@ -86,7 +86,19 @@ body.on-title #buildInfo { display: block; }
 
 /* ---------- title screen ---------- */
 #titleScreen { align-items: center; justify-content: center; text-align: center; gap: 16px; }
-#titleFace { width: clamp(120px, 34vw, 160px); height: clamp(120px, 34vw, 160px); }
+#titleFace {
+  width: clamp(120px, 34vw, 160px);
+  height: clamp(120px, 34vw, 160px);
+  object-fit: cover;
+  object-position: center 30%;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 30px rgba(255,107,74,0.4));
+  animation: titleFaceBob 3.2s ease-in-out infinite;
+}
+@keyframes titleFaceBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
 #titleLogo {
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -278,17 +290,17 @@ body.on-title #buildInfo { display: block; }
 <body class="on-title">
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
+<div id="buildInfo">v1.1.0 · Updated Aug 14, 2026</div>
 <div id="app">
 
   <!-- TITLE SCREEN -->
   <section class="screen active" id="titleScreen">
-    <canvas id="titleFace" width="200" height="200"></canvas>
+    <img id="titleFace" src="brand/mokumoku-hero.png" alt="Mokumoku">
     <h1 id="titleLogo">SHIRI <span>OF MOKU</span></h1>
-    <p id="titleSub">モヨを怒(おこ)らせずに話(はな)しきれ</p>
+    <p id="titleSub">Talk with Moku without making him angry</p>
     <nav id="titleMenu">
-      <button class="titleMenuItem" id="btnGoStageSelect">▶ クイズモード</button>
-      <button class="titleMenuItem" id="btnGoChill">▶ のんびりモード</button>
+      <button class="titleMenuItem" id="btnGoStageSelect">▶ Quiz Mode</button>
+      <button class="titleMenuItem" id="btnGoChill">▶ Chill Mode</button>
     </nav>
     <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬&nbsp; M O K U M O K U &nbsp;S E R I E S</div>
   </section>
@@ -581,9 +593,9 @@ body.on-title #buildInfo { display: block; }
     drawMokumoku(ctx, w / 2, h / 2 + 6, w * 0.36, 0, moodFor(anger));
   }
 
-  var titleFace = document.getElementById('titleFace');
+  // #titleFace is now the static #titleFace <img> (the real illustrated
+  // artwork) — only #mokuFace (the in-chat reactive face) is canvas-drawn.
   var mokuFace = document.getElementById('mokuFace');
-  drawFace(titleFace, 0);
 
   function flashFace(kind) {
     var wrap = document.getElementById('faceWrap');
