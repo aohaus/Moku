@@ -190,6 +190,8 @@ canvas#c {
 #titleBall {
   width: clamp(84px, 15vw, 120px); height: clamp(84px, 15vw, 120px);
   border-radius: 50%;
+  object-fit: cover;
+  object-position: center 30%;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 12px 24px rgba(0,0,0,0.5), 0 0 26px rgba(185,140,255,0.35);
   animation: ballFloat 3.2s ease-in-out infinite;
 }
@@ -254,10 +256,10 @@ canvas#c {
 </style>
 </head>
 <body>
-<div id="rotate-hint"><span>📱</span><p>Mokuballは横向きプレイです。<br>端末を横向きにしてください。</p></div>
+<div id="rotate-hint"><span>📱</span><p>Mokuball is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.0.0 · Updated Aug 11, 2026</div>
+<div id="buildInfo">v1.1.0 · Updated Aug 14, 2026</div>
 
 <div id="wrapper">
   <div id="tableSkin"><canvas id="c"></canvas></div>
@@ -282,12 +284,12 @@ canvas#c {
   </div>
 
   <section class="screen active" id="titleScreen">
-    <canvas id="titleBall" width="200" height="200"></canvas>
+    <img id="titleBall" src="brand/mokumoku-hero.png" alt="Mokumoku">
     <h1 id="titleLogo">MOKU<span>BALL</span></h1>
-    <p id="titleSub">せかいをめぐる たびのピンボール</p>
+    <p id="titleSub">A pinball journey around the world</p>
     <nav id="titleMenu">
-      <div class="menuItem sel" data-action="continue">たびにでる</div>
-      <div class="menuItem" data-action="select">せかいをえらぶ</div>
+      <div class="menuItem sel" data-action="continue">Start Journey</div>
+      <div class="menuItem" data-action="select">Select World</div>
     </nav>
     <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
   </section>
@@ -1958,12 +1960,8 @@ canvas#c {
 
     ctx.restore();
   }
-  (function () {
-    var tb = document.getElementById('titleBall');
-    if (!tb) return;
-    var tbCtx = tb.getContext('2d');
-    drawMokumoku(tbCtx, tb.width / 2, tb.height / 2 + 6, tb.width * 0.42, 0, 'neutral');
-  })();
+  // #titleBall is now the static #titleBall <img> (the real illustrated
+  // artwork) instead of a canvas drawn with drawMokumoku().
 
   // ---------- loop ----------
   function loop() {
