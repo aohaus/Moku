@@ -134,13 +134,32 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
   min-height: 100dvh;
 }
 header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.owl {
+.owl-badge {
+  position: relative;
   width: clamp(72px, 12vw, 100px);
   height: clamp(72px, 12vw, 100px);
   border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 0deg, #7C3AED, #3B82F6, #22D3EE, #22C55E, #EAB308, #F97316, #EF4444, #EC4899, #7C3AED);
   animation: bob 3.2s ease-in-out infinite;
   filter: drop-shadow(0 0 18px rgba(255,255,255,0.15));
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
+  flex: none;
+}
+.owl-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #1a1228;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.owl-inner img {
+  width: 122%;
+  height: 122%;
+  object-fit: cover;
+  object-position: center 30%;
 }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 h1 {
@@ -466,7 +485,11 @@ footer {
 <div id="celestialLayer"><div id="celestialBody"></div></div>
 <div class="wrap">
   <header>
-    <img class="owl" src="icons/icon-512.png" alt="Mokumoku">
+    <div class="owl-badge">
+      <div class="owl-inner">
+        <img src="brand/mokumoku-hero.png" alt="Mokumoku">
+      </div>
+    </div>
     <h1>Moku Series</h1>
     <p>Pick a game to play · 9 titles planned (5 live now)</p>
     <div id="skyMeta">
