@@ -182,25 +182,47 @@ header p {
   flex-wrap: wrap;
   justify-content: center;
 }
-#dashboardLink {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
-  color: #EDEEF6;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 9px 18px;
-  border-radius: 999px;
-  text-decoration: none;
-  transition: background .15s ease, transform .15s ease, border-color .15s ease;
+#statsTable {
+  width: 100%;
+  display: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 18px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
 }
-#dashboardLink:hover, #dashboardLink:focus-visible {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.3);
+#statsTable.has-stats { display: grid; }
+@media (max-width: 700px) {
+  #statsTable { grid-template-columns: repeat(2, 1fr); }
 }
-#dashboardLink:active { transform: translateY(1px); }
+@media (max-width: 460px) {
+  #statsTable { grid-template-columns: 1fr; }
+}
+.stat-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.stat-line:nth-last-child(-n+3) { border-bottom: none; }
+@media (max-width: 700px) { .stat-line:nth-last-child(-n+3) { border-bottom: 1px solid rgba(255,255,255,0.06); } .stat-line:nth-last-child(-n+2) { border-bottom: none; } }
+@media (max-width: 460px) { .stat-line { border-bottom: 1px solid rgba(255,255,255,0.06) !important; } .stat-line:last-child { border-bottom: none !important; } }
+.stat-line .g-name {
+  color: rgba(237,238,246,0.55);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-line .g-val {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 #a2hsBtn {
   appearance: none;
   border: 1px solid rgba(255,255,255,0.16);
@@ -460,9 +482,10 @@ footer {
     </div>
     <div class="header-actions">
       <button id="a2hsBtn" type="button">📲 Add to Home Screen</button>
-      <a id="dashboardLink" href="dashboard.html">📊 Dashboard (beta)</a>
     </div>
   </header>
+
+  <div id="statsTable"></div>
 
   <div class="cards">
     <a class="card am" href="angry-mokumoku.html">
@@ -693,6 +716,98 @@ footer {
     deferredPrompt.prompt();
     deferredPrompt.userChoice.finally(function () { deferredPrompt = null; });
   });
+})();
+
+(function () {
+  // Inline stats strip — formerly a separate dashboard.html page, now
+  // folded directly into the hub per the merged Home+Dashboard redesign.
+  // Reads each game's own localStorage save (see SPEC.md §2); never makes
+  // a network call. A row only renders once at least one game has data,
+  // and each game shows "—" for stats it doesn't have yet.
+  function readJSON(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function readInt(key) {
+    var n = parseInt(localStorage.getItem(key), 10);
+    return isNaN(n) ? null : n;
+  }
+
+  var GAMES = [
+    {
+      name: 'Angry Mokumoku',
+      read: function () {
+        var lvl = readInt('amoku-level');
+        return lvl && lvl > 0 ? 'Lv.' + Math.min(lvl, 30) + ' / 30' : null;
+      }
+    },
+    {
+      name: 'Moyomoyo',
+      read: function () {
+        var best = readInt('moyomoyo-best');
+        var quest = readInt('moyomoyo-quest-best');
+        if (!(best > 0) && !(quest > 0)) return null;
+        return 'Score ' + (best > 0 ? best.toLocaleString() : '—') +
+          ' · Quest ' + (quest > 0 ? quest.toLocaleString() : '—');
+      }
+    },
+    {
+      name: 'MK Mobile',
+      read: function () {
+        var p = readJSON('moku:mk-mobile:profile');
+        if (!p || !p.updatedAt) return null;
+        var s = (p.points || 0) + 'pt';
+        if (p.winStreak) s += ' · 🔥' + p.winStreak;
+        return s;
+      }
+    },
+    {
+      name: 'Angry Moku Battle Royal',
+      read: function () {
+        var s = readJSON('moku:save');
+        if (!s) return null;
+        return 'Lv.' + (s.level || 1) + ' / ' + (s.coins || 0) + ' coins';
+      }
+    },
+    {
+      name: 'Shiri of Moku',
+      read: function () {
+        var p = readJSON('moku:shiri-of-moku:progress');
+        if (!p || !p.updatedAt) return null;
+        return 'Stage ' + (p.unlockedStage || 1) + ' / 20';
+      }
+    },
+    {
+      name: 'Mokuball',
+      read: function () {
+        var p = readJSON('moku:mokuball:progress');
+        if (!p || !p.updatedAt) return null;
+        return 'Stage ' + (p.unlockedStage || 1) + ' / 5 · High ' + (p.highScore || 0).toLocaleString();
+      }
+    }
+  ];
+
+  var table = document.getElementById('statsTable');
+  var any = false;
+  GAMES.forEach(function (g) {
+    var val = null;
+    try { val = g.read(); } catch (e) { val = null; }
+    if (val) any = true;
+    var line = document.createElement('div');
+    line.className = 'stat-line';
+    var name = document.createElement('span');
+    name.className = 'g-name';
+    name.textContent = g.name;
+    var value = document.createElement('span');
+    value.className = 'g-val';
+    value.textContent = val || '—';
+    line.appendChild(name);
+    line.appendChild(value);
+    table.appendChild(line);
+  });
+  if (any) table.classList.add('has-stats');
 })();
 </script>
 </body>
