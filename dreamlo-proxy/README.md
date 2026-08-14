@@ -2,11 +2,15 @@
 
 Dreamloのスコア更新/取得URLは `http://` のみ(HTTPS化は有料)。
 GitHub Pages等のHTTPS配信ページから直接呼ぶとMixed Contentでブラウザにブロックされるため、
-Lambda 1関数でDreamloへの透過プロキシを立て、HTTPSの入口を用意する。
+Lambda 1関数でDreamloへの中継を立て、HTTPSの入口を用意する。
 
-ACMや独自ドメインは使わない。Lambda Function URLがデフォルトで
-`https://<random>.lambda-url.<region>.on.aws/` というHTTPSエンドポイントを無料で発行してくれるため、
-それをそのままクライアントから叩く。
+**重要: Dreamloのprivate code(スコア書き込み権限)はこのLambdaの環境変数にのみ保持し、
+クライアント(ゲームHTML)には一切渡さない。** ゲームHTMLは誰でもソースを閲覧できる公開ファイルなので、
+private codeをクライアント側の設定に渡すとランキングが自由に改ざんされてしまう。
+クライアントが送るのは `gameId` とスコアのみで、Dreamlo自体のURL構造・キーは意識しない。
+
+ACMや独自ドメインは使わない。Lambda Function URL(またはAPI Gateway HTTP API)が標準でHTTPSエンドポイントを
+無料発行してくれるため、それをそのままクライアントから叩く。
 
 ## デプロイ
 
@@ -18,19 +22,38 @@ sam deploy --guided
 
 `AllowedOrigin` パラメータにゲーム配信元(例: `https://aohaus.github.io`)を指定する。
 
-デプロイ完了後に出力される `ProxyUrl` を、`shared/moku-scores.js` の `configure({ proxyBaseUrl })` に渡す。
+**`GAME_KEYS` 環境変数(必須)**: `{ "<gameId>": { "public": "<dreamlo public code>", "private": "<dreamlo private code>" }, ... }` という形のJSON文字列。
+タイトルを追加するたびに、そのタイトル用のDreamloリーダーボードを作成し、このJSONにエントリを追加する
+(Lambdaコンソールなら「設定」→「環境変数」から編集、SAMなら`sam deploy --guided`のパラメータとして渡す)。
 
-## 使い方
+デプロイ完了後に出力される `ProxyUrl`(またはAPI GatewayのURL)を、`shared/moku-scores.js` の
+`configure({ proxyBaseUrl, gameId })` に渡す。
 
-プロキシはDreamlo自身のURL構造をそのまま踏襲する。ホスト部分だけ置き換えればよい。
+## API仕様
 
+プロキシ自身が薄いAPIを提供する(Dreamloの生URLはクライアントから直接は触らない)。
+
+### ランキング取得
 ```
-Dreamlo本来:  http://dreamlo.com/lb/{publicCode}/json
-プロキシ経由: https://<ProxyUrl>/lb/{publicCode}/json
+GET {proxyBaseUrl}?gameId=<gameId>&limit=<n>
+```
+```json
+{ "gameId": "angry-moku-battle-royal", "ranking": [
+  { "rank": 1, "playerName": "Moku#a1b2c3", "score": 12345, "level": 5, "date": "..." }
+] }
 ```
 
-`add` / `delete` / `clear` など、`/lb/...` から始まるDreamloのURLはすべて同様に使える。
-`/lb/` 以外のパスや `GET` 以外のメソッドは404/405で拒否する(オープンプロキシ化の防止)。
+### スコア送信
+```
+GET {proxyBaseUrl}?gameId=<gameId>&action=submit&name=<name>&score=<n>&seconds=<n>
+```
+`seconds`はレベル等の付加情報として流用可(Dreamloの仕様上のフィールド名がそのまま出ているだけ)。
+```json
+{ "submitted": true }
+```
+
+`gameId`が`GAME_KEYS`に登録されていない場合は404、`score`が不正なら400を返す。
+`GET`以外のメソッドは405で拒否する。
 
 ## コスト
 
@@ -43,10 +66,19 @@ Lambda Function URL(またはAPI Gateway)は呼び出し課金のみ。数百プ
 未対応だったため、`template.yaml`のFunction URLの代わりにAPI Gateway HTTP APIトリガーを使用)。
 
 - **Proxy base URL**: `https://juqg6nv21k.execute-api.ap-southeast-5.amazonaws.com/default/moku-dreamlo-proxy`
-- **Dreamlo public code**(スコア取得用、非機密): `6a7ee0c48f40bb13505af5d3`
-- **Dreamlo private code**(スコア送信用、機密情報): リポジトリには記載しない。クライアント実装セッションで別途共有すること。
+- **`gameId`**: `angry-moku-battle-royal`
+- Dreamloのpublic/private codeはLambdaの`GAME_KEYS`環境変数にのみ保持(リポジトリには記載しない)。
 
-コンソールでAPI Gatewayを使う場合、`event.rawPath` にステージ/リソースパスの接頭辞が付くため、
-`src/proxy.js` は `/lb/` という文字列をパス中のどこにあっても検出して転送する実装になっている
-(`rawPath.indexOf("/lb/")`)。SAMの`template.yaml`(Function URL版)を使う場合はこの接頭辞は付かないが、
-同じロジックで問題なく動作する。
+### ⚠️ 未反映の変更(要作業)
+
+`src/proxy.js`はこのREADME更新時点で「クライアントがprivate codeを直接渡す」設計から
+「`gameId`のみ送り、キーはLambda側で解決する」設計に修正された。**デプロイ済みのLambdaコードは
+まだ古い実装のまま**なので、以下の対応が必要:
+
+1. Lambdaコンソールの「Code」タブで`index.js`の中身を、リポジトリの最新版
+   (`dreamlo-proxy/src/proxy.js`)に丸ごと差し替えて「Deploy」
+2. 「設定」→「環境変数」に `GAME_KEYS` を追加:
+   ```json
+   {"angry-moku-battle-royal":{"public":"<Dreamlo public code>","private":"<Dreamlo private code>"}}
+   ```
+   (実際のコード値は、リポジトリではなくパスワードマネージャー等に保存済みのものを使用)

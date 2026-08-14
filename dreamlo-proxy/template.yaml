@@ -12,6 +12,13 @@ Parameters:
     Description: >
       CORS origin allowed to call this proxy (e.g. https://aohaus.github.io).
       Use "*" during development only.
+  GameKeys:
+    Type: String
+    Description: >
+      JSON map of gameId -> { "public": "...", "private": "..." } Dreamlo key
+      pairs, one entry per Moku title using the leaderboard. The private code
+      never leaves this Lambda — clients only ever send a gameId.
+      Example: {"angry-moku-battle-royal":{"public":"xxx","private":"yyy"}}
 
 Resources:
   DreamloProxyFunction:
@@ -25,6 +32,7 @@ Resources:
       Environment:
         Variables:
           ALLOWED_ORIGIN: !Ref AllowedOrigin
+          GAME_KEYS: !Ref GameKeys
       FunctionUrlConfig:
         AuthType: NONE
         Cors:
@@ -36,6 +44,6 @@ Resources:
 Outputs:
   ProxyUrl:
     Description: >
-      HTTPS base URL for the Dreamlo proxy. Use it exactly like dreamlo.com's
-      own URLs, e.g. {ProxyUrl}lb/{publicCode}/json
+      HTTPS base URL for the Dreamlo proxy. Clients call it as
+      {ProxyUrl}?gameId=<id>&... — see dreamlo-proxy/README.md for the API.
     Value: !GetAtt DreamloProxyFunctionUrl.FunctionUrl
