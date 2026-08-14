@@ -65,6 +65,10 @@ Mokuball は実装済みだがハブ未公開(準備中)。
     - Mokuball: `#B98CFF` / `#4B2E7A`(紫)
     - 追加タイトルは新規ペアを定義(既存と被らない色相を選ぶ)
 - **タイポグラフィ**: `-apple-system, "Segoe UI", Roboto, sans-serif`。見出しは `font-weight: 800`、字間 `0.01〜0.04em`。
+- **タイトル画面メニューの統一(2026-08-14〜)**: フォント**ファミリー**はゲームごとの世界観を尊重して統一しない(Angry MokumokuはCourier New、他はArial/システムフォントのままでよい)。ただし**サイズ・太さ・揃え方・行間**は統一する。
+  - HTML実装(Battle Royal / Shiri of Moku / Mokuball): `.titleMenuItem`(または相当クラス)は `font-size: 19px; font-weight: 800;` 固定値(`clamp()`にしない)、`padding: 8px 18px;`。コンテナは `margin-top: 10px; gap: 6px;` で中央揃え。
+  - canvas実装(Angry Mokumoku / Moyomoyo): タイトルロゴを基準にメニュー文字サイズを概ね0.38〜0.40倍にする(Angry Mokumoku: 50px→20px。Moyomoyo: 110px→43px)。太字・中央揃え・選択中はグロー+`▶ `プレフィックス、非選択は低コントラストという表現もこの2タイトルで共通。
+  - **MK Mobileは対象外**: 現状メニューがテキストリストではなくピルボタン(`▶ START`)のまま(§9の積み残しタスク)。テキストリスト化してから本項のサイズ統一を適用する。
 - **共通コンポーネント**
   - カード(`.card`): 角丸16px、2pxボーダー(アクセントカラー)、内側に1pxの縁取り、hoverで浮き上がる。
   - ロック中カード(`.card.soon`): 破線ボーダー、低コントラスト、非活性。
@@ -80,7 +84,7 @@ Mokuball は実装済みだがハブ未公開(準備中)。
 **この章は実装済みパターンに合わせて更新済み(2026-08-11)。** 当初案の丸ボタン(`.moku-back`)は採用されず、実際には全タイトルが以下の3点セット(HTML固定要素、canvas描画ではない)をタイトル画面にのみ表示する方式に収束している。
 
 - **`#title-frame`**: 画面全体を囲む二重線枠。`position: fixed; inset: 14px;` の外枠(3px, `var(--hi)`)+ `::after` による内枠(inset 5px, 1px, `var(--lo)`)。角丸10px/8px。全タイトル共通・固定値、変更しない。
-- **`#hub-link`**: 右上に固定配置する `<a href="index.html">🦉 Mokuシリーズ ▶</a>`。ゲームごとの `--hi` を文字色に使い、2.2sの緩いパルスアニメーションを掛ける。
+- **`#hub-link`**: 右上に固定配置する `<a href="index.html">🦉 Moku Series ▶</a>`(2026-08-14〜英語表記に統一)。ゲームごとの `--hi` を文字色に使い、2.2sの緩いパルスアニメーションを掛ける。
 - **`#buildInfo`**: 左下に固定配置するバージョン表記。詳細は5章。
 - **表示タイミング**: 3要素とも「タイトル画面でのみ表示」。`body.on-title` のようなクラス、または各ゲームの画面遷移関数内で `style.display` を直接切り替える方式のいずれでもよい。プレイ中は必ず非表示にする。
 - **実装例**: `angry-mokumoku.html` / `shiri-of-moku.html` / `mokuball.html` を参照。
