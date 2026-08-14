@@ -97,11 +97,35 @@ Mokuball は実装済みだがハブ未公開(準備中)。
 - **id**: `#buildInfo` で統一。
 - **バージョンの更新**: そのゲームに実質的な変更を加えたセッションが、`v<major>.<minor>.<patch>` を適宜インクリメントし、日付を更新する。運用ルールの詳細(何が minor/patch にあたるか等)は今のところ決めておらず、各セッションの裁量に委ねる。
 
+## 6. ゲーム記録集約API(共通ランキング基盤)
+
+Mokuシリーズ全体で使う軽量な共有バックエンド。§1の「外部通信なしでも起動できることを基本とする」方針を維持したまま、
+各タイトルが任意でランキング機能を追加できるようにするための共通規約。
+
+- **現在の実装方針: Dreamlo(外部ホスト型リーダーボードサービス) + HTTPSプロキシ**
+  - 自前インフラほぼ不要、キー発行のみで使える無料サービス。開発工数を抑えるため採用。
+  - タイトルごとに**別々のDreamloリーダーボード**(別々のpublic/private keyペア)を作成する。1リーダーボード共有にしない(下記の理由による)。
+  - Dreamloの無料枠は**1リーダーボードにつき上位25件まで**保持(それ以降は最下位が押し出される)。同名で再送すると高い方のスコアだけが残る(自己ベスト管理は不要、Dreamlo側で自動)。ランキング表示用途としてはこの挙動で十分。
+  - **⚠️ DreamloのURLは`http://`のみ**(HTTPS化は有料寄付が必要)。GitHub Pages等HTTPS配信のゲームから直接叩くとMixed Contentでブラウザにブロックされるため、`dreamlo-proxy/`(Lambda 1関数、HTTPS入口はFunction URLまたはAPI Gateway)経由で使う。ACMや独自ドメインは使わない。
+  - **private codeはクライアントに渡さない**。ゲームHTMLは誰でもソースを閲覧できる公開ファイルのため、Dreamloの書き込み用private codeをクライアント設定に含めるとランキングを自由に改ざんされる。`dreamlo-proxy`が`gameId → {public, private}`のマッピングをLambdaの環境変数(`GAME_KEYS`)として保持し、クライアントは`gameId`とスコアのみを送る(Dreamlo自体のURLやキーは一切意識しない)。仕様・デプロイ手順・**デプロイ済みのProxy base URL**は [`dreamlo-proxy/README.md`](dreamlo-proxy/README.md) を参照。
+  - クライアント側ヘルパー: [`shared/moku-scores.js`](shared/moku-scores.js)(`MokuScores.configure({ proxyBaseUrl, gameId })` / `submit` / `fetchTop`)。
+  - 外部サービス依存のため、可用性・改ざん耐性はコントロール外。数百人規模のカジュアル用途と割り切る。
+- **将来の代替/拡張案: 自前ホスト(API Gateway + Lambda + DynamoDB)**
+  - 実装済みテンプレートが `backend/`(AWS SAM)にある。仕様は [`backend/API_SPEC.md`](backend/API_SPEC.md) / デプロイ手順は [`backend/README.md`](backend/README.md)。
+  - Dreamloで要件を満たせなくなった場合(25件超の保持、改ざん対策、独自ロジック等)の移行先として保持。
+- **通信タイミング(opt-in、Dreamlo/自前どちらの実装でも共通)**: 常時通信はしない。ゲーム側が明示的に呼ぶのは以下のみ。
+  - スコア確定時にベストスコアを送信
+  - ランキング画面を開いた時のみ取得を呼ぶ
+  - 通信失敗時もローカルの `localStorage` 記録(§2)を正とし、プレイ継続に影響させない。
+- **認証**: なし。デバイスごとのUUIDを`localStorage`の`moku:deviceId`(全ゲーム共通、ゲームIDのnamespaceを付けない)に保存し、プレイヤーキーとして使う。ログイン・アカウント機能は導入しない。
+- **`gameId`**: ファイル名(拡張子なし、`kebab-case`)と一致させる。例: `angry-moku-battle-royal`。Dreamloのリーダーボード名にもこれを使う。
+- **新規タイトルがランキングを実装する場合**: そのタイトル専用のDreamloリーダーボードを作成し、`dreamlo-proxy`の`GAME_KEYS`環境変数にそのタイトルの`gameId`とpublic/private keyを追加する(要AWSコンソール/デプロイ操作)。クライアント側は`shared/moku-scores.js`を`<script>`で読み込み、`MokuScores.configure({ proxyBaseUrl, gameId })`を呼ぶだけでよく、Dreamloのキーには一切触れない。
+
 ## 未決事項 / 次に決めること
 
 - [ ] `shared/moku-ui.css`・`shared/moku-save.js` の実ファイルを作成するか
 - [x] 各ゲーム画面への「ポータルへ戻る」ボタンのデザイン(上記4章で決定)
-- [ ] 広告/課金/ランキングなど収益化まわりの共通化(今回は対象外)
+- [ ] 広告/課金など収益化まわりの共通化(引き続き対象外)。ランキングAPIは§6で仕様策定済み、実デプロイ・各ゲームへのクライアント実装は今後のセッションで対応
 - [ ] 残り6タイトルのアクセントカラー割り当てルール
 
 ## 開発履歴について

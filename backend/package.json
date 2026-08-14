@@ -1,0 +1,10 @@
+{
+  "name": "moku-scores-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Moku series shared game records API (Lambda handlers for AWS SAM).",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  }
+}

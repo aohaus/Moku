@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Moku Series — shared game records API.
+  API Gateway (HTTP API) + Lambda + DynamoDB, sized for Free Tier / a few hundred players.
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 5
+    MemorySize: 128
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref ScoresTable
+
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      CORS origin allowed to call this API (e.g. https://aohaus.github.io).
+      Use "*" during development only.
+
+Resources:
+  ScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: moku-scores
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: gameId
+          AttributeType: S
+        - AttributeName: deviceId
+          AttributeType: S
+        - AttributeName: scoreSort
+          AttributeType: S
+      KeySchema:
+        - AttributeName: gameId
+          KeyType: HASH
+        - AttributeName: deviceId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gameId-scoreSort-index
+          KeySchema:
+            - AttributeName: gameId
+              KeyType: HASH
+            - AttributeName: scoreSort
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  MokuScoresApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - content-type
+
+  SubmitScoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/submitScore.handler
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ScoresTable
+      Events:
+        Submit:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MokuScoresApi
+            Path: /scores
+            Method: POST
+
+  GetScoresFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/getScores.handler
+      CodeUri: .
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ScoresTable
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref MokuScoresApi
+            Path: /scores
+            Method: GET
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the Moku scores API
+    Value: !Sub "https://${MokuScoresApi}.execute-api.${AWS::Region}.amazonaws.com"
