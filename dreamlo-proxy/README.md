@@ -34,5 +34,19 @@ Dreamlo本来:  http://dreamlo.com/lb/{publicCode}/json
 
 ## コスト
 
-Lambda Function URLは呼び出し課金のみ。数百プレイヤー・スコア確認程度のアクセス量であれば
-AWS Free Tier内に収まる想定。
+Lambda Function URL(またはAPI Gateway)は呼び出し課金のみ。数百プレイヤー・スコア確認程度の
+アクセス量であればAWS Free Tier内に収まる想定。
+
+## デプロイ済み環境(Angry Moku Battle Royal用)
+
+2026-08-14、AWSコンソールから手動デプロイ済み(リージョン `ap-southeast-5` でLambda Function URLが
+未対応だったため、`template.yaml`のFunction URLの代わりにAPI Gateway HTTP APIトリガーを使用)。
+
+- **Proxy base URL**: `https://juqg6nv21k.execute-api.ap-southeast-5.amazonaws.com/default/moku-dreamlo-proxy`
+- **Dreamlo public code**(スコア取得用、非機密): `6a7ee0c48f40bb13505af5d3`
+- **Dreamlo private code**(スコア送信用、機密情報): リポジトリには記載しない。クライアント実装セッションで別途共有すること。
+
+コンソールでAPI Gatewayを使う場合、`event.rawPath` にステージ/リソースパスの接頭辞が付くため、
+`src/proxy.js` は `/lb/` という文字列をパス中のどこにあっても検出して転送する実装になっている
+(`rawPath.indexOf("/lb/")`)。SAMの`template.yaml`(Function URL版)を使う場合はこの接頭辞は付かないが、
+同じロジックで問題なく動作する。

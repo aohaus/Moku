@@ -106,7 +106,7 @@ Mokuシリーズ全体で使う軽量な共有バックエンド。§1の「外�
   - 自前インフラほぼ不要、キー発行のみで使える無料サービス。開発工数を抑えるため採用。
   - タイトルごとに**別々のDreamloリーダーボード**(別々のpublic/private keyペア)を作成する。1リーダーボード共有にしない(下記の理由による)。
   - Dreamloの無料枠は**1リーダーボードにつき上位25件まで**保持(それ以降は最下位が押し出される)。同名で再送すると高い方のスコアだけが残る(自己ベスト管理は不要、Dreamlo側で自動)。ランキング表示用途としてはこの挙動で十分。
-  - **⚠️ DreamloのURLは`http://`のみ**(HTTPS化は有料寄付が必要)。GitHub Pages等HTTPS配信のゲームから直接叩くとMixed Contentでブラウザにブロックされるため、`dreamlo-proxy/`(Lambda 1関数 + Function URL)でHTTPS化した上で使う。ACMや独自ドメインは使わない(Lambda Function URLが標準でHTTPSエンドポイントを無料発行する)。仕様・デプロイ手順は [`dreamlo-proxy/README.md`](dreamlo-proxy/README.md)。
+  - **⚠️ DreamloのURLは`http://`のみ**(HTTPS化は有料寄付が必要)。GitHub Pages等HTTPS配信のゲームから直接叩くとMixed Contentでブラウザにブロックされるため、`dreamlo-proxy/`(Lambda 1関数、HTTPS入口はFunction URLまたはAPI Gateway)でHTTPS化した上で使う。ACMや独自ドメインは使わない。仕様・デプロイ手順・**デプロイ済みのProxy base URL**は [`dreamlo-proxy/README.md`](dreamlo-proxy/README.md) を参照(private codeのみ非公開、クライアント実装時に別途共有)。
   - クライアント側ヘルパー: [`shared/moku-scores.js`](shared/moku-scores.js)(`MokuScores.configure({ proxyBaseUrl, publicKey, privateKey })` / `submit` / `fetchTop`)。
   - 外部サービス依存のため、可用性・改ざん耐性はコントロール外。数百人規模のカジュアル用途と割り切る。
 - **将来の代替/拡張案: 自前ホスト(API Gateway + Lambda + DynamoDB)**
