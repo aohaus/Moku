@@ -36,6 +36,27 @@ body {
   max-width: min(1366px, calc(100vh * 1.8));
 }
 canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
+/* Title-screen hero mascot: the real illustrated artwork (see
+   brand/mokumoku-hero.png), not the canvas-drawn drawMokumoku() used for
+   the in-game sling bird. Positioned as a % of #wrapper so it tracks the
+   canvas's internal 900x500 coordinate space (owl was centered at
+   450,210 with r=58) regardless of how much the canvas is scaled down. */
+#titleMascotImg {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 15%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 30px rgba(102,255,68,0.45));
+  animation: titleMascotBob 3.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes titleMascotBob {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-8px); }
+}
 #hud {
   position: absolute; top: 0; left: 0; right: 0;
   padding: 10px 16px;
@@ -151,15 +172,17 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
   #title-frame { display: none; }
   #hub-link { display: none !important; }
   #buildInfo { display: none !important; }
+  #titleMascotImg { display: none !important; }
 }
 </style>
 </head>
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
-<div id="buildInfo">v1.0.0 · Updated Aug 10, 2026</div>
+<div id="buildInfo">v1.1.0 · Updated Aug 14, 2026</div>
 <div id="wrapper">
   <canvas id="c"></canvas>
+  <img id="titleMascotImg" src="brand/mokumoku-hero.png" alt="">
   <div id="hud" style="visibility:hidden">
     <div id="score-display">Lv.1 | スコア: 0</div>
     <div id="target-display">⭐⭐⭐ = 1800pt</div>
@@ -3630,6 +3653,7 @@ function startFromTitle() {
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
   document.getElementById('buildInfo').style.display = 'none';
+  document.getElementById('titleMascotImg').style.display = 'none';
   setupLevel(currentLevel);
   resetBird();
   updateHUD();
@@ -3657,6 +3681,7 @@ function onDown(e) {
     document.getElementById('title-frame').style.display = 'block';
     document.getElementById('hub-link').style.display = 'block';
     document.getElementById('buildInfo').style.display = 'block';
+    document.getElementById('titleMascotImg').style.display = 'block';
     return;
   }
   if (state === 'TITLE') {
@@ -4110,10 +4135,9 @@ function drawTitleScreen() {
   // Cross-links to the sister games now live in the #hub-link HTML
   // element (single link to the series hub), not drawn on canvas.
 
-  // Owl character
-  const bob = Math.sin(titleFrame * 0.05) * 6;
-  const tilt = Math.sin(titleFrame * 0.028) * 0.07;
-  drawMokumoku(W/2, 210 + bob, 58, tilt, 'neutral');
+  // Owl character now lives in the #titleMascotImg HTML overlay (the
+  // real illustrated artwork), not drawn on canvas — see its show/hide
+  // wiring alongside #hub-link/#buildInfo.
 
   // Stars around owl
   const sparkT = (titleFrame * 0.04) % (Math.PI * 2);
