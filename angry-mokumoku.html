@@ -61,7 +61,24 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
   position: absolute; top: 0; left: 0; right: 0;
   padding: 10px 16px;
   display: flex; justify-content: space-between; align-items: center;
+  gap: 10px;
   pointer-events: none;
+}
+#hud-info {
+  display: flex; justify-content: space-between; align-items: center;
+  flex: 1;
+  gap: 8px;
+}
+#pause-btn {
+  pointer-events: all;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  width: 40px; height: 40px;
+  font-size: 17px;
+  cursor: pointer;
 }
 #score-display {
   background: rgba(0,0,0,0.45);
@@ -184,9 +201,12 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
   <canvas id="c"></canvas>
   <img id="titleMascotImg" src="brand/mokumoku-hero.png" alt="">
   <div id="hud" style="visibility:hidden">
-    <div id="score-display">Lv.1 | スコア: 0</div>
-    <div id="target-display">⭐⭐⭐ = 1800pt</div>
-    <div id="birds-display">🦉🦉🦉</div>
+    <div id="hud-info">
+      <div id="score-display">Lv.1 | スコア: 0</div>
+      <div id="target-display">⭐⭐⭐ = 1800pt</div>
+      <div id="birds-display">🦉🦉🦉</div>
+    </div>
+    <button id="pause-btn" title="一時停止">⏸</button>
   </div>
   <div id="overlay" class="hidden">
     <h1 id="ov-title"></h1>
@@ -3640,6 +3660,32 @@ function getPos(e) {
   };
 }
 
+// ─── PAUSE ────────────────────────────────────────────────────
+let prePauseState = null;
+const PAUSABLE_STATES = ['AIMING', 'FLYING', 'SETTLING', 'WAITING'];
+
+function pauseGame() {
+  if (!PAUSABLE_STATES.includes(state)) return;
+  prePauseState = state;
+  state = 'PAUSED';
+  document.getElementById('pause-btn').textContent = '▶';
+}
+function resumeGame() {
+  if (state !== 'PAUSED') return;
+  state = prePauseState;
+  prePauseState = null;
+  document.getElementById('pause-btn').textContent = '⏸';
+}
+function quitToTitle() {
+  state = 'TITLE';
+  prePauseState = null;
+  titleMenuSel = 0; titleFrame = 0;
+  document.getElementById('pause-btn').textContent = '⏸';
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('title-frame').style.display = 'block';
+  document.getElementById('hub-link').style.display = 'block';
+}
+
 function startFromTitle() {
   const savedLevel = getSavedLevel();
   const lvl = (titleMenuSel === 1 && savedLevel >= 0 && savedLevel < LEVEL_CONFIGS.length)
@@ -3662,6 +3708,12 @@ function startFromTitle() {
 
 function onDown(e) {
   e.preventDefault();
+  if (state === 'PAUSED') {
+    const p = getPos(e);
+    if (p.x >= W/2 - 110 && p.x <= W/2 + 110 && p.y >= PAUSE_RESUME_Y - 29 && p.y <= PAUSE_RESUME_Y + 29) { resumeGame(); return; }
+    if (p.x >= W/2 - 110 && p.x <= W/2 + 110 && p.y >= PAUSE_QUIT_Y - 25 && p.y <= PAUSE_QUIT_Y + 25) { quitToTitle(); return; }
+    return;
+  }
   if (state === 'CHECKPOINT') {
     allClearParticles = [];
     nextLevel();
@@ -3756,6 +3808,11 @@ canvas.addEventListener('touchend',   onUp,          { passive: false });
 document.getElementById('ov-btn').addEventListener('click', restartGame);
 document.getElementById('ov-next-btn').addEventListener('click', nextLevel);
 
+document.getElementById('pause-btn').addEventListener('click', () => {
+  if (state === 'PAUSED') resumeGame();
+  else pauseGame();
+});
+
 document.addEventListener('keydown', e => {
   if (state === 'TITLE') {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -3772,7 +3829,7 @@ document.addEventListener('keydown', e => {
 // ─── MAIN LOOP ────────────────────────────────────────────────
 
 function update() {
-  if (state === 'TITLE' || state === 'WIN' || state === 'LOSE' || state === 'CHECKPOINT' || state === 'ALLCLEAR') return;
+  if (state === 'TITLE' || state === 'WIN' || state === 'LOSE' || state === 'CHECKPOINT' || state === 'ALLCLEAR' || state === 'PAUSED') return;
 
   // Always animate particles/dying objects even while waiting
   particles.forEach(p => p.update());
@@ -4227,6 +4284,45 @@ function drawComboAnnouncement() {
   ctx.restore();
 }
 
+// ─── PAUSE OVERLAY (canvas) ─────────────────────────────────────
+const PAUSE_TITLE_Y  = H/2 - 90;
+const PAUSE_RESUME_Y = H/2 - 10;
+const PAUSE_QUIT_Y   = PAUSE_RESUME_Y + 64;
+function drawPausedOverlay() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,15,10,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#EDFCEA';
+  ctx.font = 'bold 32px Arial';
+  ctx.shadowColor = '#4CBE55'; ctx.shadowBlur = 20;
+  ctx.fillText('⏸ 一時停止中', W/2, PAUSE_TITLE_Y);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#4CBE55';
+  ctx.beginPath(); ctx.roundRect(W/2 - 110, PAUSE_RESUME_Y - 29, 220, 58, 29); ctx.fill();
+  ctx.fillStyle = '#0A2010';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.roundRect(W/2 - 110, PAUSE_QUIT_Y - 25, 220, 50, 25); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(W/2 - 110, PAUSE_QUIT_Y - 25, 220, 50, 25); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '18px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
+}
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
   if (state === 'TITLE') { drawTitleScreen(); return; }
@@ -4251,6 +4347,7 @@ function draw() {
   drawLuckyAnnouncement();
   drawComboAnnouncement();
   ctx.restore(); // end shake translate
+  if (state === 'PAUSED') drawPausedOverlay();
 }
 
 function loop() {
