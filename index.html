@@ -226,6 +226,42 @@ header p {
   flex-wrap: wrap;
   justify-content: center;
 }
+#greeting {
+  margin-top: 4px;
+  font-size: clamp(14px, 3vw, 17px);
+  font-weight: 700;
+  color: rgba(237,238,246,0.85);
+}
+#xpBar {
+  width: 100%;
+  max-width: 380px;
+  margin: 10px auto 0;
+  display: none;
+}
+#xpBar.has-xp { display: block; }
+#xpBar .xp-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(237,238,246,0.7);
+  margin-bottom: 5px;
+}
+#xpBar .xp-top .xp-lv { color: #FFC94A; font-weight: 800; }
+#xpBar .xp-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  overflow: hidden;
+}
+#xpBar .xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6EE7A8, #FFC94A);
+  transition: width 0.6s ease;
+}
 #statsTable {
   width: 100%;
   display: none;
@@ -512,6 +548,11 @@ footer {
     </div>
     <h1><span class="wm-moku">MOKU</span><span class="wm-series">SERIES</span></h1>
     <p>Pick a game to play · 9 titles planned (5 live now)</p>
+    <div id="greeting">Hello, Moku! What will you play today?</div>
+    <div id="xpBar">
+      <div class="xp-top"><span class="xp-lv" id="xpLevel">Lv.1</span><span id="xpNum">0 / 200 XP</span></div>
+      <div class="xp-track"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+    </div>
     <div id="skyMeta">
       <div id="clock">---, --- --, ---- --:--</div>
       <div id="placeLabel">···</div>
@@ -770,6 +811,10 @@ footer {
       read: function () {
         var lvl = readInt('amoku-level');
         return lvl && lvl > 0 ? 'Lv.' + Math.min(lvl, 30) + ' / 30' : null;
+      },
+      progress: function () {
+        var lvl = readInt('amoku-level');
+        return lvl && lvl > 0 ? Math.min(lvl, 30) / 30 : 0;
       }
     },
     {
@@ -780,6 +825,11 @@ footer {
         if (!(best > 0) && !(quest > 0)) return null;
         return 'Score ' + (best > 0 ? best.toLocaleString() : '—') +
           ' · Quest ' + (quest > 0 ? quest.toLocaleString() : '—');
+      },
+      progress: function () {
+        var best = readInt('moyomoyo-best') || 0;
+        var quest = readInt('moyomoyo-quest-best') || 0;
+        return Math.min(1, best / 3000) * 0.5 + Math.min(1, quest / 3000) * 0.5;
       }
     },
     {
@@ -790,6 +840,11 @@ footer {
         var s = (p.points || 0) + 'pt';
         if (p.winStreak) s += ' · 🔥' + p.winStreak;
         return s;
+      },
+      progress: function () {
+        var p = readJSON('moku:mk-mobile:profile');
+        if (!p || !p.updatedAt) return 0;
+        return Math.min(1, (p.points || 0) / 2000);
       }
     },
     {
@@ -798,6 +853,11 @@ footer {
         var s = readJSON('moku:save');
         if (!s) return null;
         return 'Lv.' + (s.level || 1) + ' / ' + (s.coins || 0) + ' coins';
+      },
+      progress: function () {
+        var s = readJSON('moku:save');
+        if (!s) return 0;
+        return Math.min(1, (s.level || 1) / 20);
       }
     },
     {
@@ -806,6 +866,11 @@ footer {
         var p = readJSON('moku:shiri-of-moku:progress');
         if (!p || !p.updatedAt) return null;
         return 'Stage ' + (p.unlockedStage || 1) + ' / 20';
+      },
+      progress: function () {
+        var p = readJSON('moku:shiri-of-moku:progress');
+        if (!p || !p.updatedAt) return 0;
+        return Math.min(1, (p.unlockedStage || 1) / 20);
       }
     },
     {
@@ -814,9 +879,32 @@ footer {
         var p = readJSON('moku:mokuball:progress');
         if (!p || !p.updatedAt) return null;
         return 'Stage ' + (p.unlockedStage || 1) + ' / 5 · High ' + (p.highScore || 0).toLocaleString();
+      },
+      progress: function () {
+        var p = readJSON('moku:mokuball:progress');
+        if (!p || !p.updatedAt) return 0;
+        return Math.min(1, (p.unlockedStage || 1) / 5);
       }
     }
   ];
+
+  var XP_PER_GAME = 400;
+  var XP_PER_LEVEL = 200;
+  var totalXp = 0;
+  GAMES.forEach(function (g) {
+    var pr = 0;
+    try { pr = g.progress ? g.progress() : 0; } catch (e) { pr = 0; }
+    totalXp += Math.round((pr || 0) * XP_PER_GAME);
+  });
+  var level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
+  var xpIntoLevel = totalXp % XP_PER_LEVEL;
+  var xpBar = document.getElementById('xpBar');
+  if (totalXp > 0) {
+    document.getElementById('xpLevel').textContent = 'Lv.' + level;
+    document.getElementById('xpNum').textContent = xpIntoLevel + ' / ' + XP_PER_LEVEL + ' XP';
+    document.getElementById('xpFill').style.width = Math.round((xpIntoLevel / XP_PER_LEVEL) * 100) + '%';
+    xpBar.classList.add('has-xp');
+  }
 
   var table = document.getElementById('statsTable');
   var any = false;

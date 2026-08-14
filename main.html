@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Moku Series</title>
+<link rel="apple-touch-icon" href="icons/moyomoyo-apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/moyomoyo-icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/moyomoyo-icon-512.png">
+<link rel="manifest" href="hub-manifest.json">
+<meta name="apple-mobile-web-app-title" content="Moku Series">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --place-photo: url('backgrounds/kualalumpur.jpg');
+  --place-glow: rgba(147,160,255,0.25);
+  --place-accent: #93A0FF;
+  --band-filter: brightness(0.55) saturate(1.05);
+  --band-tint: rgba(5,6,15,0.35);
+}
+html, body {
+  min-height: 100%;
+  background: #0A0B12;
+  color: #EDEEF6;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+/* ---------- shared sky background system (see index.html for the
+   authoritative copy/comments — duplicated here since titles in this
+   series are single-file pages with no shared includes) ---------- */
+#skyLayer { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+#skyPhoto {
+  position: absolute; inset: 0;
+  background-image: var(--place-photo);
+  background-size: cover;
+  background-position: center bottom;
+  filter: var(--band-filter);
+  transition: filter 1.6s ease, background-image 0.6s ease;
+  transform: scale(1.06);
+}
+#skyTint {
+  position: absolute; inset: 0;
+  background: var(--band-tint);
+  mix-blend-mode: multiply;
+  transition: background 1.6s ease;
+}
+#skyVignette {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5,6,15,0.6) 0%, rgba(5,6,15,0.15) 30%, rgba(5,6,15,0.15) 55%, rgba(5,6,15,0.5) 82%, rgba(5,6,15,0.8) 100%);
+}
+#celestialLayer { position: fixed; inset: 0; z-index: 0; pointer-events: none; mix-blend-mode: screen; }
+#celestialBody {
+  position: absolute;
+  left: var(--sun-x, 50%);
+  top: var(--sun-y, 20%);
+  width: var(--sun-size, 46px);
+  height: var(--sun-size, 46px);
+  margin-left: calc(var(--sun-size, 46px) / -2);
+  margin-top: calc(var(--sun-size, 46px) / -2);
+  border-radius: 50%;
+  background: var(--sun-color, #FFE9A8);
+  box-shadow: 0 0 34px 10px var(--sun-glow, rgba(255,233,168,0.35));
+  transition: left 4s linear, top 4s linear, background 1.4s ease, box-shadow 1.4s ease, width 1.4s ease, height 1.4s ease;
+  animation: celestialPulse 5s ease-in-out infinite;
+}
+@keyframes celestialPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+#starsLayer {
+  position: fixed; inset: 0; z-index: 0; opacity: 0; pointer-events: none;
+  transition: opacity 1.4s ease;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 18%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 28% 8%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 44% 22%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 61% 12%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 77% 20%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 88% 9%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 6% 34%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 95% 33%, #fff, transparent);
+  background-repeat: no-repeat;
+  animation: starTwinkle 3.6s ease-in-out infinite;
+}
+@keyframes starTwinkle { 0%, 100% { opacity: var(--star-opacity, 0); } 50% { opacity: calc(var(--star-opacity, 0) * 0.55); } }
+body[data-band="night"] #starsLayer { --star-opacity: 0.85; }
+body[data-band="evening"] #starsLayer { --star-opacity: 0.4; }
+body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
+
+/* ---------- page chrome ---------- */
+.topbar {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 0;
+  max-width: 1040px; margin: 0 auto;
+}
+#whatsBtn {
+  appearance: none; border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06); color: #EDEEF6;
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 8px 14px; border-radius: 999px; cursor: pointer;
+}
+#whatsBtn:hover, #whatsBtn:focus-visible { background: rgba(255,255,255,0.12); }
+#settingsBtn {
+  appearance: none; border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05); color: rgba(237,238,246,0.6);
+  width: 36px; height: 36px; border-radius: 50%;
+  font-size: 15px; cursor: not-allowed;
+}
+#whatsPanel {
+  position: relative; z-index: 1;
+  max-width: 480px; margin: 10px auto 0;
+  padding: 14px 18px; border-radius: 14px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  font-size: 13px; line-height: 1.6; color: rgba(237,238,246,0.8);
+  text-align: center;
+}
+#whatsPanel[hidden] { display: none; }
+
+.main-shell {
+  position: relative; z-index: 1;
+  max-width: 640px; margin: 0 auto;
+  min-height: 100vh; min-height: 100dvh;
+  padding: 40px 20px 32px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px;
+  text-align: center;
+}
+.owl-badge {
+  position: relative;
+  width: clamp(96px, 22vw, 140px);
+  height: clamp(96px, 22vw, 140px);
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(from 0deg, #7C3AED, #3B82F6, #22D3EE, #22C55E, #EAB308, #F97316, #EF4444, #EC4899, #7C3AED);
+  animation: bob 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 22px rgba(255,255,255,0.18));
+}
+.owl-inner {
+  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  background: #1a1228; display: flex; align-items: center; justify-content: center;
+}
+.owl-inner img { width: 122%; height: 122%; object-fit: cover; object-position: center 30%; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+h1 { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1; }
+h1 .wm-moku {
+  font-size: clamp(38px, 9vw, 60px); font-weight: 800; letter-spacing: 0.05em;
+  color: #EDEEF6; text-shadow: 0 0 28px rgba(255,255,255,0.28);
+}
+h1 .wm-series {
+  font-size: clamp(20px, 4.6vw, 30px); font-weight: 800; letter-spacing: 0.34em;
+  padding-left: 0.34em;
+  background: linear-gradient(90deg, #7C3AED, #3B82F6, #22D3EE, #22C55E, #EAB308, #F97316, #EF4444, #EC4899);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 16px rgba(255,255,255,0.2));
+}
+.tagline {
+  font-size: clamp(14px, 3vw, 17px); font-weight: 600;
+  color: rgba(237,238,246,0.6);
+}
+.tagline b { color: #EDEEF6; font-weight: 700; }
+.tagline .c1 { color: #6EE7A8; font-weight: 700; }
+.tagline .c2 { color: #FFC94A; font-weight: 700; }
+
+#getStartedBtn {
+  display: inline-flex; align-items: center; gap: 8px;
+  appearance: none; text-decoration: none;
+  border: 1.5px solid rgba(147,160,255,0.6);
+  background: rgba(147,160,255,0.12);
+  color: #EDEEF6; font-weight: 800; font-size: 16px;
+  padding: 14px 34px; border-radius: 999px;
+  box-shadow: 0 0 24px rgba(147,160,255,0.35);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+#getStartedBtn:hover, #getStartedBtn:focus-visible {
+  background: rgba(147,160,255,0.2);
+  box-shadow: 0 0 32px rgba(147,160,255,0.5);
+}
+#getStartedBtn:active { transform: translateY(1px); }
+
+#loginLink {
+  font-size: 13px; font-weight: 700;
+  color: rgba(237,238,246,0.32);
+  cursor: not-allowed;
+}
+#loginLink span { font-weight: 600; opacity: 0.75; }
+
+.quick-row {
+  display: flex; gap: 14px; font-size: 22px;
+  opacity: 0.55;
+}
+
+footer.page-footer {
+  position: relative; z-index: 1;
+  padding: 0 20px 22px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(237,238,246,0.25);
+}
+</style>
+</head>
+<body>
+<div id="skyLayer">
+  <div id="skyPhoto"></div>
+  <div id="skyTint"></div>
+  <div id="skyVignette"></div>
+</div>
+<div id="starsLayer"></div>
+<div id="celestialLayer"><div id="celestialBody"></div></div>
+
+<div class="topbar">
+  <button id="whatsBtn" type="button" aria-expanded="false">🎮 What's Moku Series?</button>
+  <button id="settingsBtn" type="button" title="Coming soon">⚙️</button>
+</div>
+<p id="whatsPanel" hidden>
+  Moku Series is a free collection of bite-sized mobile mini-games starring Mokumoku the owl —
+  slingshot action, falling-block puzzles, soccer, battle royale, chat quizzes, and pinball. No account, no install — just pick a game and play.
+</p>
+
+<div class="main-shell">
+  <div class="owl-badge">
+    <div class="owl-inner">
+      <img src="brand/mokumoku-hero.png" alt="Mokumoku">
+    </div>
+  </div>
+  <h1><span class="wm-moku">MOKU</span><span class="wm-series">SERIES</span></h1>
+  <p class="tagline">Play <span class="c1">small</span>. Have <span class="c1">fun</span>. Get <span class="c2">better</span>.</p>
+  <a id="getStartedBtn" href="index.html">▶ Get Started</a>
+  <div id="loginLink">Log In <span>(Coming Soon)</span></div>
+  <div class="quick-row" aria-hidden="true">🦉 🍬 ⚽ 🏆 💬 🎱</div>
+</div>
+
+<footer class="page-footer">aohaus/Moku</footer>
+
+<script>
+(function () {
+  // Same time-of-day x place background system as index.html — see that
+  // file for the fully-commented original.
+  var PLACES = [
+    { key: 'bangkok',      name: 'Bangkok',          emoji: '🛕', accent: '#FFC94A' },
+    { key: 'singapore',    name: 'Singapore',        emoji: '🌆', accent: '#45E0D9' },
+    { key: 'kualalumpur',  name: 'Kuala Lumpur',     emoji: '🏙️', accent: '#8C7BFF' },
+    { key: 'manila',       name: 'Manila',           emoji: '🌇', accent: '#FF6F91' },
+    { key: 'hcmc',         name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B' },
+    { key: 'jakarta',      name: 'Jakarta',          emoji: '🕌', accent: '#FF9F45' },
+    { key: 'otherworld',   name: 'Otherworld',       emoji: '✨', accent: '#C77DFF' }
+  ];
+  var BANDS = {
+    morning: { filter: 'brightness(0.82) saturate(0.9) hue-rotate(-8deg)', tint: 'rgba(255,180,130,0.22)', sunColor: '#FFC9A0', sunGlow: 'rgba(255,170,120,0.35)', sunSize: '30px' },
+    day:     { filter: 'brightness(1.25) saturate(0.85) hue-rotate(6deg)',  tint: 'rgba(255,255,255,0.06)', sunColor: '#FFEFC2', sunGlow: 'rgba(255,225,160,0.4)', sunSize: '38px' },
+    evening: { filter: 'brightness(0.95) saturate(1.1) hue-rotate(-12deg)', tint: 'rgba(255,110,60,0.28)', sunColor: '#FF9A52', sunGlow: 'rgba(255,120,60,0.4)', sunSize: '34px' },
+    night:   { filter: 'brightness(0.55) saturate(1.05)',                   tint: 'rgba(10,14,35,0.5)', sunColor: '#DCE6FF', sunGlow: 'rgba(200,210,255,0.25)', sunSize: '24px' }
+  };
+  function bandKeyFor(hour) {
+    if (hour >= 5 && hour < 10) return 'morning';
+    if (hour >= 10 && hour < 17) return 'day';
+    if (hour >= 17 && hour < 20) return 'evening';
+    return 'night';
+  }
+  function updateCelestial(hour, minute) {
+    var isNight = hour >= 20 || hour < 5;
+    var frac;
+    if (isNight) {
+      var h = hour >= 20 ? (hour - 20) : (hour + 4);
+      frac = (h + minute / 60) / 9;
+    } else {
+      var h2 = hour - 5;
+      frac = (h2 + minute / 60) / 15;
+    }
+    frac = Math.max(0, Math.min(1, frac));
+    var arc = Math.sin(frac * Math.PI);
+    var root = document.documentElement.style;
+    root.setProperty('--sun-x', (10 + frac * 80) + '%');
+    root.setProperty('--sun-y', (18 - arc * 10) + '%');
+  }
+  function updateSky() {
+    var now = new Date();
+    var place = PLACES[now.getDay()];
+    var bandKey = bandKeyFor(now.getHours());
+    var band = BANDS[bandKey];
+    var root = document.documentElement.style;
+    root.setProperty('--place-photo', "url('backgrounds/" + place.key + ".jpg')");
+    root.setProperty('--band-filter', band.filter);
+    root.setProperty('--band-tint', band.tint);
+    root.setProperty('--place-glow', place.accent + '1f');
+    root.setProperty('--sun-color', band.sunColor);
+    root.setProperty('--sun-glow', band.sunGlow);
+    root.setProperty('--sun-size', band.sunSize);
+    document.body.dataset.band = bandKey;
+    updateCelestial(now.getHours(), now.getMinutes());
+  }
+  updateSky();
+  setInterval(updateSky, 30000);
+})();
+
+(function () {
+  var btn = document.getElementById('whatsBtn');
+  var panel = document.getElementById('whatsPanel');
+  btn.addEventListener('click', function () {
+    var open = panel.hidden;
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+})();
+</script>
+</body>
+</html>

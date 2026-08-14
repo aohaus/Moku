@@ -144,6 +144,14 @@ Mokuシリーズ全体で使う軽量な共有バックエンド。§1の「外�
   - canvas内部座標を基準に配置する場合、`#wrapper` がcanvasぴったりのサイズでない実装(flexで中央寄せしているだけ等)では、canvasだけを包む専用コンテナ(例: `#canvasBox { position:relative; display:inline-block; line-height:0; }`)を追加してから、その中に `%` 指定で `<img>` を重ねること(MK Mobileがこのパターン)。
 - **タイトル画面の英語化(2026-08-14〜)**: ハブに合わせて、各ゲームの**タイトル画面のみ**を英語表記に統一した(`#hub-link` のラベル `🦉 Moku Series ▶` 含む)。ゲーム本編(ステージ選択・チャット本文・クイズ内容等)は引き続き日本語のままでよい — 本項は「タイトル画面」に限定したルールで、§3の「ハブはEnglish-first、ゲーム本編は日本語のまま」という原則とは独立して追加されたもの。
 
+## 9. MAINページとハブのローカル集計XP(2026-08-14〜)
+
+- **`main.html`(新規)**: シリーズの入口となるシンプルなスプラッシュページ。マスコットバッジ・2段ロゴ・タグライン・「▶ Get Started」ボタン(`index.html`へ遷移)のみのミニマル構成。背景はハブと同じ写真+時間帯グラデーションシステムをそのまま複製している(`PLACES`/`BANDS`/`updateSky()`ロジック共通)。「What's Moku Series?」の説明トグルボタンを備える。**ログイン導線(`Log In (Coming Soon)`)と設定歯車は非活性のプレースホルダーで、実装は対象外**(SPEC全体の「ログイン不要・サーバー同期なし」方針を維持するため)。
+- **ハブのグリーティング + Lv/XPバー**: `index.html` ヘッダーに「Hello, Moku! What will you play today?」の挨拶文と、Lv./XPバー(`#xpBar`)を追加した。**サーバーもログインも一切使わず、`#statsTable`と同じ`GAMES`配列から算出する完全ローカル集計値**。
+  - 各ゲームエントリに `progress()` 関数を追加(0〜1を返す、未プレイなら0)。ゲームごとの指標例: Angry Mokumoku = クリアLv/30、Shiri of Moku = 解放ステージ/20、Mokuball = 解放ステージ/5、Moyomoyo = ベストスコアとQuestベストをそれぞれ3000点で正規化し50%ずつ合算、MK Mobile・Battle Royalはポイント/レベルを適当な上限値で正規化。
+  - `XP_PER_GAME = 400`、`XP_PER_LEVEL = 200`。全ゲームの `progress() * 400` を合算して総XPを算出し、`Lv = floor(総XP / 200) + 1`。全ゲーム未プレイ(総XP = 0)の場合はXPバー自体を非表示にする(`#xpBar.has-xp`)。
+  - 新規タイトル追加時は `progress()` も忘れずに追加すること(`#statsTable`の`read()`とセットで管理)。
+
 ## 未決事項 / 次に決めること
 
 - [ ] `shared/moku-ui.css`・`shared/moku-save.js` の実ファイルを作成するか
