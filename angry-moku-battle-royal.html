@@ -279,6 +279,12 @@
   }
   #ranksNameInput:focus{outline:2px solid var(--gold);}
   #ranksNameHint{font-size:10.5px; opacity:.65; margin-top:4px; width:100%; max-width:320px; text-align:left;}
+  #ranksNameSavedTag{
+    font-size:11px; font-weight:800; color:var(--teal);
+    margin-top:6px; width:100%; max-width:320px; text-align:left;
+    opacity:0; transition:opacity .25s ease;
+  }
+  #ranksNameSavedTag.show{opacity:1;}
   #rankList{
     width:100%; max-width:320px; margin-top:14px;
     display:flex; flex-direction:column; gap:6px;
@@ -560,6 +566,7 @@
       <button class="primary" id="ranksNameSaveBtn">Save</button>
     </div>
     <div id="ranksNameHint">Shown on the leaderboard. Optional — defaults to "Moku".</div>
+    <div id="ranksNameSavedTag">✓ Saved</div>
     <div id="rankStatus"></div>
     <div id="rankList"></div>
   </section>
@@ -636,10 +643,15 @@
       listEl.appendChild(row);
     });
   }
+  let ranksNameSavedTimer = null;
   document.getElementById("ranksNameSaveBtn").addEventListener("click", ()=>{
     const val = document.getElementById("ranksNameInput").value.trim().slice(0,12);
     save.playerName = val || null;
     persistSave();
+    const tag = document.getElementById("ranksNameSavedTag");
+    tag.classList.add("show");
+    clearTimeout(ranksNameSavedTimer);
+    ranksNameSavedTimer = setTimeout(()=>tag.classList.remove("show"), 1600);
   });
 
   async function loadSave(){
