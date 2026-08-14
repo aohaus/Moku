@@ -36,12 +36,16 @@ exports.handler = async (event) => {
 
   const rawPath = event.rawPath || "/";
   // Only ever proxy Dreamlo's own leaderboard path space (/lb/...).
-  if (!rawPath.startsWith("/lb/")) {
+  // API Gateway may prefix rawPath with a stage/resource path (e.g.
+  // "/default/moku-dreamlo-proxy/lb/..."), so look for "/lb/" anywhere
+  // rather than requiring it at the start.
+  const lbIndex = rawPath.indexOf("/lb/");
+  if (lbIndex === -1) {
     return { statusCode: 404, headers: corsHeaders(), body: "not found" };
   }
 
   const query = event.rawQueryString ? `?${event.rawQueryString}` : "";
-  const upstreamPath = rawPath + query;
+  const upstreamPath = rawPath.slice(lbIndex) + query;
 
   try {
     const { statusCode, contentType, body } = await fetchUpstream(upstreamPath);
