@@ -411,6 +411,7 @@
   }
   #titleMascot{
     width:104px; height:104px; border-radius:50%;
+    object-fit:cover; object-position:center 30%;
     box-shadow:0 0 34px rgba(110,123,255,.45);
     animation:titleMascotBob 3.2s ease-in-out infinite;
   }
@@ -443,22 +444,22 @@
 </head>
 <body class="on-title">
 <div id="title-frame"></div>
-<a id="hub-link" href="index.html">🦉 Mokuシリーズ ▶</a>
-<div id="buildInfo">v1.1.0 · Updated Aug 11, 2026</div>
+<a id="hub-link" href="index.html">🦉 Moku Series ▶</a>
+<div id="buildInfo">v1.2.0 · Updated Aug 14, 2026</div>
 <a class="moku-back" href="index.html" aria-label="Back to Moku Series">←</a>
 <div id="rotate-hint">
   <span>📱</span>
-  <p>横向きにしてプレイ！</p>
+  <p>Rotate to play!</p>
 </div>
 <div id="app">
 
   <!-- TITLE SCREEN -->
   <section class="screen active" id="titleScreen">
-    <img id="titleMascot" src="icons/icon-512.png" alt="モクモク">
+    <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
     <h1 id="titleLogo">ANGRY MOKU<br><span>BATTLE ROYAL</span></h1>
     <p id="titleSub">4 V 4 &nbsp; S L I N G S H O T &nbsp; S H O W D O W N</p>
     <nav id="titleMenu">
-      <button class="titleMenuItem" id="titleStartBtn">▶ はじめる</button>
+      <button class="titleMenuItem" id="titleStartBtn">▶ Start</button>
     </nav>
     <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆&nbsp; M O K U M O K U &nbsp;S E R I E S</div>
   </section>
