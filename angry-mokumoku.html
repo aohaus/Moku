@@ -621,8 +621,13 @@ function addShake(intensity) {
   shakeY = (Math.random() - 0.5) * intensity * 2;
 }
 
+function saveBestScore() {
+  const best = parseInt(localStorage.getItem('amoku-best-score'), 10) || 0;
+  if (score > best) localStorage.setItem('amoku-best-score', String(score));
+}
 function updateHUD() {
   const cfg = LEVEL_CONFIGS[currentLevel];
+  saveBestScore();
   document.getElementById('score-display').textContent = `${cfg.name} | スコア: ${score}`;
   document.getElementById('target-display').textContent = `🐀 ${ratsKilled}/${totalRatsAtStart}匹`;
   const rem = Math.max(0, birdsLeft);

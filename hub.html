@@ -497,10 +497,12 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
   display: none;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
-  font-weight: 800;
-  color: var(--hi);
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(237,238,246,0.5);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 .card .progress-badge.has-progress { display: flex; }
 .card.am { --hi: #4CBE55; --lo: #1A5020; }
@@ -642,7 +644,7 @@ footer {
       <p class="desc">Launch an owl to take down enemies in this slingshot action game. 30 stages.</p>
       <div class="cta-row">
         <div class="cta">Play ▶</div>
-        <div class="progress-badge" data-game="am">⭐ —</div>
+        <div class="progress-badge" data-game="am">—</div>
       </div>
     </a>
     <a class="card mm" href="moyomoyo.html">
@@ -652,7 +654,7 @@ footer {
       <p class="desc">Match 4 or more gummies of the same stage to evolve them in this falling-block puzzle.</p>
       <div class="cta-row">
         <div class="cta">Play ▶</div>
-        <div class="progress-badge" data-game="mm">⭐ —</div>
+        <div class="progress-badge" data-game="mm">—</div>
       </div>
     </a>
     <a class="card mk" href="mk-mobile.html">
@@ -662,7 +664,7 @@ footer {
       <p class="desc">Score more goals than your opponent before time runs out in this quick soccer match.</p>
       <div class="cta-row">
         <div class="cta">Play ▶</div>
-        <div class="progress-badge" data-game="mk">⭐ —</div>
+        <div class="progress-badge" data-game="mk">—</div>
       </div>
     </a>
     <a class="card br" href="angry-moku-battle-royal.html">
@@ -672,7 +674,7 @@ footer {
       <p class="desc">4v4 slingshot showdown — team up and knock out the rival owls first.</p>
       <div class="cta-row">
         <div class="cta">Play ▶</div>
-        <div class="progress-badge" data-game="br">⭐ —</div>
+        <div class="progress-badge" data-game="br">—</div>
       </div>
     </a>
     <a class="card so" href="shiri-of-moku.html">
@@ -682,7 +684,7 @@ footer {
       <p class="desc">Talk with Moku without setting him off. Pick your reply carefully — one wrong word and he blows up.</p>
       <div class="cta-row">
         <div class="cta">Play ▶</div>
-        <div class="progress-badge" data-game="so">⭐ —</div>
+        <div class="progress-badge" data-game="so">—</div>
       </div>
     </a>
     <div class="card soon"><div class="emoji">🔒</div><h2>Mokuball</h2><div class="sub">TBA</div></div>
@@ -926,7 +928,9 @@ footer {
       },
       badge: function () {
         var lvl = readInt('amoku-level');
-        return lvl && lvl > 0 ? '⭐ ' + Math.min(lvl, 30) + ' / 30' : null;
+        if (!(lvl > 0)) return null;
+        var best = readInt('amoku-best-score') || 0;
+        return 'Lv.' + Math.min(lvl, 30) + ' · Best ' + best.toLocaleString();
       }
     },
     {
@@ -938,8 +942,10 @@ footer {
         return Math.min(1, best / 3000) * 0.5 + Math.min(1, quest / 3000) * 0.5;
       },
       badge: function () {
-        var pr = this.progress();
-        return pr > 0 ? '⭐ ' + Math.round(pr * 30) + ' / 30' : null;
+        var best = readInt('moyomoyo-best');
+        var quest = readInt('moyomoyo-quest-best');
+        if (!(best > 0) && !(quest > 0)) return null;
+        return 'Score ' + (best || 0).toLocaleString() + ' · Quest ' + (quest || 0).toLocaleString();
       }
     },
     {
@@ -951,8 +957,11 @@ footer {
         return Math.min(1, (p.points || 0) / 2000);
       },
       badge: function () {
-        var pr = this.progress();
-        return pr > 0 ? '⭐ ' + Math.round(pr * 30) + ' / 30' : null;
+        var p = readJSON('moku:mk-mobile:profile');
+        if (!p || !p.updatedAt) return null;
+        var pl = p.players && p.activePlayerId ? p.players[p.activePlayerId] : null;
+        if (!pl) return null;
+        return 'Sp' + pl.sp + ' / Sh' + pl.sh + ' / Def' + pl.def;
       }
     },
     {
@@ -965,7 +974,7 @@ footer {
       },
       badge: function () {
         var s = readJSON('moku:save');
-        return s ? '⭐ ' + (s.level || 1) + ' / 20' : null;
+        return s ? 'Lv.' + (s.level || 1) + ' · ' + (s.coins || 0).toLocaleString() + ' coins' : null;
       }
     },
     {
@@ -978,7 +987,9 @@ footer {
       },
       badge: function () {
         var p = readJSON('moku:shiri-of-moku:progress');
-        return (p && p.updatedAt) ? '⭐ ' + (p.unlockedStage || 1) + ' / 20' : null;
+        if (!p || !p.updatedAt) return null;
+        var cleared = Math.max(0, (p.unlockedStage || 1) - 1);
+        return 'Stage ' + cleared + ' / 20 cleared';
       }
     },
     {
