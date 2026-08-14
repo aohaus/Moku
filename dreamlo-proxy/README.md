@@ -69,16 +69,6 @@ Lambda Function URL(またはAPI Gateway)は呼び出し課金のみ。数百プ
 - **`gameId`**: `angry-moku-battle-royal`
 - Dreamloのpublic/private codeはLambdaの`GAME_KEYS`環境変数にのみ保持(リポジトリには記載しない)。
 
-### ⚠️ 未反映の変更(要作業)
-
-`src/proxy.js`はこのREADME更新時点で「クライアントがprivate codeを直接渡す」設計から
-「`gameId`のみ送り、キーはLambda側で解決する」設計に修正された。**デプロイ済みのLambdaコードは
-まだ古い実装のまま**なので、以下の対応が必要:
-
-1. Lambdaコンソールの「Code」タブで`index.js`の中身を、リポジトリの最新版
-   (`dreamlo-proxy/src/proxy.js`)に丸ごと差し替えて「Deploy」
-2. 「設定」→「環境変数」に `GAME_KEYS` を追加:
-   ```json
-   {"angry-moku-battle-royal":{"public":"<Dreamlo public code>","private":"<Dreamlo private code>"}}
-   ```
-   (実際のコード値は、リポジトリではなくパスワードマネージャー等に保存済みのものを使用)
+2026-08-14、上記の`gameId`ベースAPI(private codeをクライアントに渡さない設計)へのコード更新・
+`GAME_KEYS`環境変数の設定も完了・動作確認済み(スコア送信→ランキング取得の実機テストでOKを確認)。
+クライアント側は`proxyBaseUrl`と`gameId`のみで利用できる。
