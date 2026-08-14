@@ -125,19 +125,184 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
   z-index: 1;
   max-width: 1040px;
   margin: 0 auto;
-  padding: clamp(28px, 6vw, 64px) 20px 40px;
+  padding: 16px 20px calc(88px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: clamp(28px, 5vw, 44px);
+  gap: 22px;
   min-height: 100vh;
   min-height: 100dvh;
 }
-header { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.topbar .brand {
+  font-size: clamp(15px, 3vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.topbar .icon-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.icon-btn {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: #EDEEF6;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+.icon-btn[disabled] { color: rgba(237,238,246,0.35); cursor: not-allowed; }
+.icon-btn:not([disabled]):hover, .icon-btn:not([disabled]):focus-visible { background: rgba(255,255,255,0.12); }
+.icon-btn .dot {
+  position: absolute;
+  top: 6px; right: 7px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #FF5A6E;
+  border: 1.5px solid #0A0B12;
+}
+#settingsMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 190px;
+  background: #16171F;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+  display: none;
+  z-index: 20;
+}
+#settingsMenu.open { display: block; }
+#settingsMenu button {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: #EDEEF6;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#settingsMenu button:hover, #settingsMenu button:focus-visible { background: rgba(255,255,255,0.08); }
+.settings-wrap { position: relative; }
+
+/* ---------- profile card ---------- */
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 160px;
+}
+#greeting {
+  font-size: clamp(16px, 3.4vw, 19px);
+  font-weight: 800;
+}
+.profile-info .sub {
+  font-size: clamp(12.5px, 2.6vw, 14px);
+  color: rgba(237,238,246,0.55);
+  font-weight: 600;
+}
+.profile-xp {
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+}
+#xpLevelPill {
+  flex: none;
+  font-size: 13px;
+  font-weight: 800;
+  color: #6EE7A8;
+  border: 1px solid rgba(110,231,168,0.45);
+  background: rgba(110,231,168,0.1);
+  padding: 5px 13px;
+  border-radius: 999px;
+}
+#xpBar {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+#xpBar .xp-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(237,238,246,0.6);
+  margin-bottom: 5px;
+}
+#xpBar .xp-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  overflow: hidden;
+}
+#xpBar .xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6EE7A8, #FFC94A);
+  transition: width 0.6s ease;
+}
+#skyMeta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(237,238,246,0.4);
+  width: 100%;
+  justify-content: flex-end;
+}
+#placeLabel { color: var(--place-accent); transition: color 1.4s ease; }
+
+/* ---------- section label ---------- */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(237,238,246,0.7);
+}
+
 .owl-badge {
   position: relative;
-  width: clamp(72px, 12vw, 100px);
-  height: clamp(72px, 12vw, 100px);
+  width: clamp(56px, 10vw, 68px);
+  height: clamp(56px, 10vw, 68px);
   border-radius: 50%;
   padding: 3px;
   background: conic-gradient(from 0deg, #7C3AED, #3B82F6, #22D3EE, #22C55E, #EAB308, #F97316, #EF4444, #EC4899, #7C3AED);
@@ -162,166 +327,6 @@ header { text-align: center; display: flex; flex-direction: column; align-items:
   object-position: center 30%;
 }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-h1 {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  line-height: 1;
-}
-h1 .wm-moku {
-  font-size: clamp(30px, 6.5vw, 46px);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  color: #EDEEF6;
-  text-shadow: 0 0 24px rgba(255,255,255,0.25);
-}
-h1 .wm-series {
-  font-size: clamp(17px, 3.6vw, 25px);
-  font-weight: 800;
-  letter-spacing: 0.34em;
-  padding-left: 0.34em; /* balance the trailing letter-spacing gap */
-  background: linear-gradient(90deg, #7C3AED, #3B82F6, #22D3EE, #22C55E, #EAB308, #F97316, #EF4444, #EC4899);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 14px rgba(255,255,255,0.18));
-}
-header p {
-  color: rgba(237,238,246,0.55);
-  font-size: clamp(13px, 2.4vw, 15px);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-#skyMeta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-}
-#clock {
-  font-variant-numeric: tabular-nums;
-  font-size: clamp(13px, 2.6vw, 15px);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-#placeLabel {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--place-accent);
-  transition: color 1.4s ease;
-}
-.header-actions {
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-#greeting {
-  margin-top: 4px;
-  font-size: clamp(14px, 3vw, 17px);
-  font-weight: 700;
-  color: rgba(237,238,246,0.85);
-}
-#xpBar {
-  width: 100%;
-  max-width: 380px;
-  margin: 10px auto 0;
-  display: none;
-}
-#xpBar.has-xp { display: block; }
-#xpBar .xp-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: rgba(237,238,246,0.7);
-  margin-bottom: 5px;
-}
-#xpBar .xp-top .xp-lv { color: #FFC94A; font-weight: 800; }
-#xpBar .xp-track {
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.1);
-  overflow: hidden;
-}
-#xpBar .xp-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #6EE7A8, #FFC94A);
-  transition: width 0.6s ease;
-}
-#statsTable {
-  width: 100%;
-  display: none;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px 18px;
-  padding: 16px 20px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
-}
-#statsTable.has-stats { display: grid; }
-@media (max-width: 700px) {
-  #statsTable { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 460px) {
-  #statsTable { grid-template-columns: 1fr; }
-}
-.stat-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 0;
-  font-size: 12.5px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.stat-line:nth-last-child(-n+3) { border-bottom: none; }
-@media (max-width: 700px) { .stat-line:nth-last-child(-n+3) { border-bottom: 1px solid rgba(255,255,255,0.06); } .stat-line:nth-last-child(-n+2) { border-bottom: none; } }
-@media (max-width: 460px) { .stat-line { border-bottom: 1px solid rgba(255,255,255,0.06) !important; } .stat-line:last-child { border-bottom: none !important; } }
-.stat-line .g-name {
-  color: rgba(237,238,246,0.55);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.stat-line .g-val {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-#a2hsBtn {
-  appearance: none;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.06);
-  color: #EDEEF6;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  padding: 9px 18px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background .15s ease, transform .15s ease, border-color .15s ease;
-}
-#a2hsBtn:hover, #a2hsBtn:focus-visible {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.3);
-}
-#a2hsBtn:active { transform: translateY(1px); }
 
 #a2hsOverlay {
   display: none;
@@ -481,6 +486,23 @@ header p {
   align-items: center;
   gap: 4px;
 }
+.card .cta-row {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card .progress-badge {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--hi);
+  font-variant-numeric: tabular-nums;
+}
+.card .progress-badge.has-progress { display: flex; }
 .card.am { --hi: #4CBE55; --lo: #1A5020; }
 .card.mm { --hi: #E98FC7; --lo: #7A3D63; }
 .card.mk { --hi: #FFC94A; --lo: #8A6218; }
@@ -529,6 +551,40 @@ footer {
   color: rgba(237,238,246,0.25);
   text-align: center;
 }
+
+/* ---------- bottom nav ---------- */
+#bottomNav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: rgba(12,13,22,0.82);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.nav-item {
+  appearance: none;
+  border: none;
+  background: none;
+  color: rgba(237,238,246,0.4);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.nav-item .nav-icon { font-size: 19px; line-height: 1; }
+.nav-item.active { color: #6EE7A8; }
+.nav-item.active .nav-icon { filter: drop-shadow(0 0 8px rgba(110,231,168,0.5)); }
+.nav-item[disabled] { cursor: not-allowed; opacity: 0.55; }
+.nav-item:not([disabled]):not(.active):hover, .nav-item:not([disabled]):not(.active):focus-visible { color: rgba(237,238,246,0.65); }
 </style>
 </head>
 <body>
@@ -540,29 +596,43 @@ footer {
 <div id="starsLayer"></div>
 <div id="celestialLayer"><div id="celestialBody"></div></div>
 <div class="wrap">
-  <header>
+  <div class="topbar">
+    <div class="brand">MOKU SERIES</div>
+    <div class="icon-actions">
+      <button class="icon-btn" type="button" disabled title="Coming soon">🔔</button>
+      <div class="settings-wrap">
+        <button class="icon-btn" id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false">⋯</button>
+        <div id="settingsMenu">
+          <button id="a2hsBtn" type="button">📲 Add to Home Screen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card">
     <div class="owl-badge">
       <div class="owl-inner">
         <img src="brand/mokumoku-hero.png" alt="Mokumoku">
       </div>
     </div>
-    <h1><span class="wm-moku">MOKU</span><span class="wm-series">SERIES</span></h1>
-    <p>Pick a game to play · 9 titles planned (5 live now)</p>
-    <div id="greeting">Hello, Moku! What will you play today?</div>
-    <div id="xpBar">
-      <div class="xp-top"><span class="xp-lv" id="xpLevel">Lv.1</span><span id="xpNum">0 / 200 XP</span></div>
-      <div class="xp-track"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+    <div class="profile-info">
+      <div id="greeting">Hello, Moku!</div>
+      <div class="sub">What will you play today?</div>
+    </div>
+    <div class="profile-xp">
+      <div id="xpLevelPill">Lv.1</div>
+      <div id="xpBar">
+        <div class="xp-top"><span id="xpNum">0 / 200 XP</span></div>
+        <div class="xp-track"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+      </div>
     </div>
     <div id="skyMeta">
-      <div id="clock">---, --- --, ---- --:--</div>
-      <div id="placeLabel">···</div>
+      <span id="placeLabel">···</span>
+      <span id="clock">--:--</span>
     </div>
-    <div class="header-actions">
-      <button id="a2hsBtn" type="button">📲 Add to Home Screen</button>
-    </div>
-  </header>
+  </div>
 
-  <div id="statsTable"></div>
+  <div class="section-label">🎮 PICK A GAME</div>
 
   <div class="cards">
     <a class="card am" href="angry-mokumoku.html">
@@ -570,35 +640,50 @@ footer {
       <div class="sub">Action / Puzzle</div>
       <h2>Angry Mokumoku</h2>
       <p class="desc">Launch an owl to take down enemies in this slingshot action game. 30 stages.</p>
-      <div class="cta">Play ▶</div>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="am">⭐ —</div>
+      </div>
     </a>
     <a class="card mm" href="moyomoyo.html">
       <div class="emoji">🍬</div>
       <div class="sub">Falling Block</div>
       <h2>Moyomoyo</h2>
       <p class="desc">Match 4 or more gummies of the same stage to evolve them in this falling-block puzzle.</p>
-      <div class="cta">Play ▶</div>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="mm">⭐ —</div>
+      </div>
     </a>
     <a class="card mk" href="mk-mobile.html">
       <div class="emoji">⚽</div>
       <div class="sub">Sports</div>
       <h2>MK Mobile</h2>
       <p class="desc">Score more goals than your opponent before time runs out in this quick soccer match.</p>
-      <div class="cta">Play ▶</div>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="mk">⭐ —</div>
+      </div>
     </a>
     <a class="card br" href="angry-moku-battle-royal.html">
       <div class="emoji">🏆</div>
       <div class="sub">Battle Royal</div>
       <h2>Angry Moku Battle Royal</h2>
       <p class="desc">4v4 slingshot showdown — team up and knock out the rival owls first.</p>
-      <div class="cta">Play ▶</div>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="br">⭐ —</div>
+      </div>
     </a>
     <a class="card so" href="shiri-of-moku.html">
       <div class="emoji">💬</div>
       <div class="sub">Chat / Quiz</div>
       <h2>Shiri of Moku</h2>
       <p class="desc">Talk with Moku without setting him off. Pick your reply carefully — one wrong word and he blows up.</p>
-      <div class="cta">Play ▶</div>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="so">⭐ —</div>
+      </div>
     </a>
     <div class="card soon"><div class="emoji">🔒</div><h2>Mokuball</h2><div class="sub">TBA</div></div>
     <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
@@ -611,6 +696,13 @@ footer {
     <div class="repo-note">aohaus/Moku</div>
   </footer>
 </div>
+
+<nav id="bottomNav">
+  <button class="nav-item active" type="button"><span class="nav-icon">🏠</span>Home</button>
+  <button class="nav-item" type="button" disabled title="Coming soon"><span class="nav-icon">🏆</span>Achievements</button>
+  <button class="nav-item" type="button" disabled title="Coming soon"><span class="nav-icon">📊</span>Ranking</button>
+  <button class="nav-item" type="button" disabled title="Coming soon"><span class="nav-icon">👤</span>Profile</button>
+</nav>
 
 <div id="a2hsOverlay">
   <div id="a2hsModal" role="dialog" aria-modal="true" aria-labelledby="a2hsTitle">
@@ -695,7 +787,7 @@ footer {
     var arc = Math.sin(frac * Math.PI);
     var root = document.documentElement.style;
     root.setProperty('--sun-x', (10 + frac * 80) + '%');
-    root.setProperty('--sun-y', (26 - arc * 14) + '%');
+    root.setProperty('--sun-y', (12 - arc * 8) + '%');
     root.setProperty('--sun-color', band.sunColor);
     root.setProperty('--sun-glow', band.sunGlow);
     root.setProperty('--sun-size', band.sunSize);
@@ -716,16 +808,34 @@ footer {
     document.body.dataset.band = bandKey;
     updateCelestial(now.getHours(), now.getMinutes(), band);
 
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    document.getElementById('clock').textContent =
-      WEEKDAYS[now.getDay()] + ', ' + MONTHS[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' ' +
-      pad(now.getHours()) + ':' + pad(now.getMinutes());
+    document.getElementById('clock').textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
     document.getElementById('placeLabel').textContent = place.emoji + ' ' + place.name + ' · ' + band.label;
   }
 
   updateSky();
   setInterval(updateSky, 30000);
+})();
+
+(function () {
+  var settingsBtn = document.getElementById('settingsBtn');
+  var settingsMenu = document.getElementById('settingsMenu');
+  function closeMenu() {
+    settingsMenu.classList.remove('open');
+    settingsBtn.setAttribute('aria-expanded', 'false');
+  }
+  settingsBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var willOpen = !settingsMenu.classList.contains('open');
+    settingsMenu.classList.toggle('open', willOpen);
+    settingsBtn.setAttribute('aria-expanded', String(willOpen));
+  });
+  document.addEventListener('click', function (e) {
+    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) closeMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMenu();
+  });
+  window.__closeSettingsMenu = closeMenu;
 })();
 
 (function () {
@@ -765,6 +875,7 @@ footer {
   }
 
   function openModal() {
+    if (window.__closeSettingsMenu) window.__closeSettingsMenu();
     showPanel();
     overlay.classList.add('open');
   }
@@ -808,83 +919,77 @@ footer {
   var GAMES = [
     {
       name: 'Angry Mokumoku',
-      read: function () {
-        var lvl = readInt('amoku-level');
-        return lvl && lvl > 0 ? 'Lv.' + Math.min(lvl, 30) + ' / 30' : null;
-      },
+      card: 'am',
       progress: function () {
         var lvl = readInt('amoku-level');
         return lvl && lvl > 0 ? Math.min(lvl, 30) / 30 : 0;
+      },
+      badge: function () {
+        var lvl = readInt('amoku-level');
+        return lvl && lvl > 0 ? '⭐ ' + Math.min(lvl, 30) + ' / 30' : null;
       }
     },
     {
       name: 'Moyomoyo',
-      read: function () {
-        var best = readInt('moyomoyo-best');
-        var quest = readInt('moyomoyo-quest-best');
-        if (!(best > 0) && !(quest > 0)) return null;
-        return 'Score ' + (best > 0 ? best.toLocaleString() : '—') +
-          ' · Quest ' + (quest > 0 ? quest.toLocaleString() : '—');
-      },
+      card: 'mm',
       progress: function () {
         var best = readInt('moyomoyo-best') || 0;
         var quest = readInt('moyomoyo-quest-best') || 0;
         return Math.min(1, best / 3000) * 0.5 + Math.min(1, quest / 3000) * 0.5;
+      },
+      badge: function () {
+        var pr = this.progress();
+        return pr > 0 ? '⭐ ' + Math.round(pr * 30) + ' / 30' : null;
       }
     },
     {
       name: 'MK Mobile',
-      read: function () {
-        var p = readJSON('moku:mk-mobile:profile');
-        if (!p || !p.updatedAt) return null;
-        var s = (p.points || 0) + 'pt';
-        if (p.winStreak) s += ' · 🔥' + p.winStreak;
-        return s;
-      },
+      card: 'mk',
       progress: function () {
         var p = readJSON('moku:mk-mobile:profile');
         if (!p || !p.updatedAt) return 0;
         return Math.min(1, (p.points || 0) / 2000);
+      },
+      badge: function () {
+        var pr = this.progress();
+        return pr > 0 ? '⭐ ' + Math.round(pr * 30) + ' / 30' : null;
       }
     },
     {
       name: 'Angry Moku Battle Royal',
-      read: function () {
-        var s = readJSON('moku:save');
-        if (!s) return null;
-        return 'Lv.' + (s.level || 1) + ' / ' + (s.coins || 0) + ' coins';
-      },
+      card: 'br',
       progress: function () {
         var s = readJSON('moku:save');
         if (!s) return 0;
         return Math.min(1, (s.level || 1) / 20);
+      },
+      badge: function () {
+        var s = readJSON('moku:save');
+        return s ? '⭐ ' + (s.level || 1) + ' / 20' : null;
       }
     },
     {
       name: 'Shiri of Moku',
-      read: function () {
-        var p = readJSON('moku:shiri-of-moku:progress');
-        if (!p || !p.updatedAt) return null;
-        return 'Stage ' + (p.unlockedStage || 1) + ' / 20';
-      },
+      card: 'so',
       progress: function () {
         var p = readJSON('moku:shiri-of-moku:progress');
         if (!p || !p.updatedAt) return 0;
         return Math.min(1, (p.unlockedStage || 1) / 20);
+      },
+      badge: function () {
+        var p = readJSON('moku:shiri-of-moku:progress');
+        return (p && p.updatedAt) ? '⭐ ' + (p.unlockedStage || 1) + ' / 20' : null;
       }
     },
     {
       name: 'Mokuball',
-      read: function () {
-        var p = readJSON('moku:mokuball:progress');
-        if (!p || !p.updatedAt) return null;
-        return 'Stage ' + (p.unlockedStage || 1) + ' / 5 · High ' + (p.highScore || 0).toLocaleString();
-      },
+      card: null,
       progress: function () {
         var p = readJSON('moku:mokuball:progress');
         if (!p || !p.updatedAt) return 0;
         return Math.min(1, (p.unlockedStage || 1) / 5);
-      }
+      },
+      badge: function () { return null; }
     }
   ];
 
@@ -898,33 +1003,21 @@ footer {
   });
   var level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
   var xpIntoLevel = totalXp % XP_PER_LEVEL;
-  var xpBar = document.getElementById('xpBar');
-  if (totalXp > 0) {
-    document.getElementById('xpLevel').textContent = 'Lv.' + level;
-    document.getElementById('xpNum').textContent = xpIntoLevel + ' / ' + XP_PER_LEVEL + ' XP';
-    document.getElementById('xpFill').style.width = Math.round((xpIntoLevel / XP_PER_LEVEL) * 100) + '%';
-    xpBar.classList.add('has-xp');
-  }
+  document.getElementById('xpLevelPill').textContent = 'Lv.' + level;
+  document.getElementById('xpNum').textContent = xpIntoLevel + ' / ' + XP_PER_LEVEL + ' XP';
+  document.getElementById('xpFill').style.width = Math.round((xpIntoLevel / XP_PER_LEVEL) * 100) + '%';
 
-  var table = document.getElementById('statsTable');
-  var any = false;
   GAMES.forEach(function (g) {
+    if (!g.card) return;
+    var el = document.querySelector('.progress-badge[data-game="' + g.card + '"]');
+    if (!el) return;
     var val = null;
-    try { val = g.read(); } catch (e) { val = null; }
-    if (val) any = true;
-    var line = document.createElement('div');
-    line.className = 'stat-line';
-    var name = document.createElement('span');
-    name.className = 'g-name';
-    name.textContent = g.name;
-    var value = document.createElement('span');
-    value.className = 'g-val';
-    value.textContent = val || '—';
-    line.appendChild(name);
-    line.appendChild(value);
-    table.appendChild(line);
+    try { val = g.badge ? g.badge() : null; } catch (e) { val = null; }
+    if (val) {
+      el.textContent = val;
+      el.classList.add('has-progress');
+    }
   });
-  if (any) table.classList.add('has-stats');
 })();
 </script>
 </body>
