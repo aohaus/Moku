@@ -79,6 +79,16 @@ body {
   touch-action: manipulation;
 }
 .ctrl-btn:active { background: #FF8FBC; }
+/* VS mode's wider board runs the falling piece closer to the screen
+   edges than marathon's single narrow board does, so the control
+   buttons end up sitting on top of live play area instead of beside it
+   — lower opacity here so a falling/landed block is still visible
+   through the button instead of fully hidden behind it. */
+body.vs-active .ctrl-btn {
+  background: rgba(255,111,168,0.4);
+  box-shadow: 0 4px 16px rgba(255,111,168,0.2);
+}
+body.vs-active .ctrl-btn:active { background: rgba(255,143,188,0.55); }
 #wrapper {
   position: relative;
   display: flex;
@@ -426,6 +436,7 @@ const VS_FOOTER_GAP = 40;
 const VS_BOTTOM_MARGIN = 16;
 const VS_CANVAS_H = VS_GRID_Y0 + VS_GRID_H + VS_FOOTER_GAP + VS_BOTTOM_MARGIN;
 const VS_SPAWN_COL = 5;
+const VS_COUNTDOWN_FRAMES = 5 * 60; // 5 seconds at 60fps before Moyo Quest actually starts falling
 // Big attacks rain down over a couple of spawn cycles instead of landing
 // all at once — closer to how a real ojama tray drops in bursts, and it
 // keeps one huge chain from being an instant, unavoidable kill.
@@ -505,11 +516,12 @@ const RAINBOW_FACE = '#3A1848';
 const ROT_OFFSETS = [[0,-1],[1,0],[0,1],[-1,0]]; // up, right, down, left
 
 // ─── STATE ────────────────────────────────────────────────────
-let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER | VS_LEVEL_CLEAR
+let state = 'TITLE'; // TITLE | PLAYING | PAUSED | GAMEOVER | VS_LEVEL_CLEAR | VS_COUNTDOWN
 let mode = 'MARATHON'; // MARATHON | VS — which ruleset the PLAYING/PAUSED/GAMEOVER states refer to
 let vsP = null, vsC = null; // the two boards while mode === 'VS' (player / CPU)
 let vsWinnerIsPlayer = false; // set right before GAMEOVER in VS mode, drives the result text
 let cpuLevel = 1; // 1-5, index into CPU_ENEMIES — which boss the CPU board currently is
+let vsCountdownTimer = 0; // frames left in the pre-match "5,4,3,2,1" countdown, state === 'VS_COUNTDOWN'
 let phase = 'FALL';  // FALL | LOCK_PAUSE | RESOLVING | SPAWN_PAUSE
 let pauseTimer = 0;
 let fallTimer = 0;
@@ -1364,6 +1376,16 @@ function draw() {
 // ─── GAME LOGIC ───────────────────────────────────────────────
 
 function update() {
+  if (state === 'VS_COUNTDOWN') {
+    particles.forEach(p => p.update());
+    particles = particles.filter(p => p.alive);
+    if (--vsCountdownTimer <= 0) {
+      state = 'PLAYING';
+      vbTrySpawnPiece(vsP);
+      vbTrySpawnPiece(vsC);
+    }
+    return;
+  }
   if (state !== 'PLAYING') return;
   if (mode === 'VS') { updateVs(); return; }
 
@@ -1520,6 +1542,7 @@ function startGame() {
   mode = 'MARATHON';
   state = 'PLAYING';
   resizeCanvasTo(W, H);
+  document.body.classList.remove('vs-active');
   phase = 'FALL';
   score = 0;
   level = 1;
@@ -2303,6 +2326,32 @@ function drawVs() {
 
   if (state === 'PAUSED') drawPausedOverlay(VS_CANVAS_W, VS_CANVAS_H);
   if (state === 'VS_LEVEL_CLEAR') drawVsLevelClear();
+  if (state === 'VS_COUNTDOWN') drawVsCountdown();
+}
+
+// Full-screen "5,4,3,2,1" before the match's first pieces spawn — see
+// startVsGame/update, which hold off on vbTrySpawnPiece until this hits 0.
+function drawVsCountdown() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,2,20,0.6)';
+  ctx.fillRect(0, 0, VS_CANVAS_W, VS_CANVAS_H);
+  const secs = Math.ceil(vsCountdownTimer / 60);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const pulse = 1 + 0.08 * Math.sin(vsCountdownTimer * 0.25);
+  ctx.translate(VS_CANVAS_W / 2, VS_CANVAS_H / 2);
+  ctx.scale(pulse, pulse);
+  ctx.shadowColor = '#FF6FA8'; ctx.shadowBlur = 40;
+  ctx.fillStyle = '#FFE9F5';
+  ctx.font = 'bold 150px Arial';
+  ctx.fillText(String(Math.max(secs, 1)), 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.scale(1 / pulse, 1 / pulse);
+  ctx.font = 'bold 22px Arial';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText(`Lv.${cpuLevel} ${currentCpuEnemy().name} とうじょう！`, 0, 100);
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 // Position of the "つぎへ" button on the level-clear screen — shared
@@ -2394,7 +2443,13 @@ function advanceVsCampaign() {
 
 function startVsGame() {
   mode = 'VS';
-  state = 'PLAYING';
+  // Boards/HUD are fully set up now, but nothing actually falls until
+  // the countdown (see update()/drawVsCountdown) reaches zero and spawns
+  // the first pieces — the match used to drop straight into falling
+  // pieces the instant you picked Moyo Quest from the title, with no
+  // beat to get oriented first.
+  state = 'VS_COUNTDOWN';
+  vsCountdownTimer = VS_COUNTDOWN_FRAMES;
   resizeCanvasTo(VS_CANVAS_W, VS_CANVAS_H);
   particles = [];
   flashAlpha = 0; shakeX = 0; shakeY = 0;
@@ -2416,8 +2471,7 @@ function startVsGame() {
   document.getElementById('title-frame').style.display = 'none';
   document.getElementById('hub-link').style.display = 'none';
   document.getElementById('buildInfo').style.display = 'none';
-  vbTrySpawnPiece(vsP);
-  vbTrySpawnPiece(vsC);
+  document.body.classList.add('vs-active');
 }
 
 function endRunVs() {
@@ -2512,6 +2566,7 @@ function quitToTitle() {
   state = 'TITLE';
   mode = 'MARATHON';
   resizeCanvasTo(W, H);
+  document.body.classList.remove('vs-active');
   titleFrame = 0;
   titleMenuSel = 0;
   document.getElementById('pause-btn').textContent = '⏸';
