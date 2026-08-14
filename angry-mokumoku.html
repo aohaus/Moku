@@ -206,7 +206,7 @@ canvas { display: block; cursor: crosshair; width: 100%; height: auto; }
       <div id="target-display">⭐⭐⭐ = 1800pt</div>
       <div id="birds-display">🦉🦉🦉</div>
     </div>
-    <button id="pause-btn" title="一時停止">⏸</button>
+    <button id="pause-btn" title="Pause">⏸</button>
   </div>
   <div id="overlay" class="hidden">
     <h1 id="ov-title"></h1>
@@ -4296,7 +4296,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = '#EDFCEA';
   ctx.font = 'bold 32px Arial';
   ctx.shadowColor = '#4CBE55'; ctx.shadowBlur = 20;
-  ctx.fillText('⏸ 一時停止中', W/2, PAUSE_TITLE_Y);
+  ctx.fillText('⏸ Paused', W/2, PAUSE_TITLE_Y);
   ctx.shadowBlur = 0;
   ctx.restore();
 
@@ -4306,7 +4306,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = '#0A2010';
   ctx.font = 'bold 20px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('▶ 再開', W/2, PAUSE_RESUME_Y);
+  ctx.fillText('▶ Resume', W/2, PAUSE_RESUME_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 
@@ -4318,7 +4318,7 @@ function drawPausedOverlay() {
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = '18px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏠 タイトルへ', W/2, PAUSE_QUIT_Y);
+  ctx.fillText('🏠 Title Screen', W/2, PAUSE_QUIT_Y);
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
