@@ -125,7 +125,20 @@ Mokuシリーズ全体で使う軽量な共有バックエンド。§1の「外�
 
 `dashboard.html` は廃止し、統計テーブルはハブ(`index.html`)自体に `#statsTable` として埋め込み済み。各ゲーム名+主要スタッツ(Lv./スコア/コインなど)を1行ずつ、レスポンシブな2〜3列グリッドで表示する。ロジックは旧`dashboard.html`のものをそのまま移植(localStorageのみ参照、ネットワーク通信なし)。新規タイトルを追加する際は、この`GAMES`配列(index.html内のJSブロック)にも1エントリ追加すること。
 
-**進行中のリデザイン方針**: ハブのビジュアルを、写実的な都市スカイライン写真(都市ごとに1枚、CSSで時間帯の光を調整)ベースに刷新する計画がある。現状は procedural な SVG シルエット+グラデーション背景のまま(写真アセットが未生成のため)。写真が揃い次第、`#skyLayer`/`#skylineLayer`まわりを差し替える想定。
+**ハブ背景の写真化(完了、2026-08-14)**: 手描きSVGシルエットは廃止し、`backgrounds/<city>.jpg`(都市ごとに1枚、JPEG・軽量化済み)を実背景として採用。時間帯ごとの見た目は画像を差し替えず、CSSの `filter`(brightness/saturate/hue-rotate)+ `mix-blend-mode: multiply` の色調オーバーレイのみで作る。太陽/月の可動域はヘッダーバッジ付近の狭い帯(カード・時刻表示と重ならない範囲)に収めてある。新しい都市を追加する場合は `backgrounds/<key>.jpg` を追加し、`index.html` の `PLACES` 配列にエントリを足すだけでよい。
+
+## 8. ブランド素材とタイトル画面ヒーローマスコット(2026-08-14〜)
+
+- **`brand/` ディレクトリ**: シリーズ共通のマスターイラスト置き場。アプリアイコン書き出し用の `icons/` とは別。
+  - `brand/mokumoku-hero.png` — モクモクの高精細マスターイラスト(透過PNG、正方形、キャラがフレームの大部分を占める構図)。
+  - `brand/moku-series-wordmark.png` — 「MOKU SERIES」ロゴタイプ素材(未採用。現状ハブは2段組みCSSテキストのロゴ実装を使用 — 下記参照)。
+- **ハブのマスコットバッジ**: `index.html` ヘッダーは `brand/mokumoku-hero.png` を円形クロップし、レインボーリング(`conic-gradient`)をCSSで再構築して表示する(`.owl-badge` / `.owl-inner`)。素材自体にはリングを焼き込まない。
+- **ハブのロゴタイプ**: 画像化はせず、CSSで「MOKU」(白・太字)を上段、「SERIES」(レインボーグラデーションの `background-clip: text`)を下段に2行組み。
+- **各ゲームのタイトル画面ヒーローマスコット**: モクモク(フクロウ)がタイトル画面の主役として登場するタイトル(Angry Mokumoku / MK Mobile / Angry Moku Battle Royal / Shiri of Moku / Mokuball)は、タイトル画面だけ `brand/mokumoku-hero.png` を使ったHTML `<img>` に統一済み。**ゲームプレイ中に描画される `drawMokumoku()`(スリングで飛ばす鳥、選手アバター、チャット中の反応する顔など)は対象外・変更しない** — あくまで各タイトルのタイトル画面という「静止した1カット」だけを高精細イラストに差し替える。
+  - Moyomoyo はモクモクではなく独自キャラ(グミ)が主役のため、この置き換え対象外。
+  - 実装パターン: `<img>` にタイトル画面用のCSS(`width`/`object-fit: cover`/`object-position: center 30%`/浮遊アニメーション/ゲームごとのアクセントカラーで `drop-shadow` グロー)を当て、`#title-frame`・`#hub-link`・`#buildInfo` と同じタイミング(タイトル画面のみ)で表示・非表示を切り替える。
+  - canvas内部座標を基準に配置する場合、`#wrapper` がcanvasぴったりのサイズでない実装(flexで中央寄せしているだけ等)では、canvasだけを包む専用コンテナ(例: `#canvasBox { position:relative; display:inline-block; line-height:0; }`)を追加してから、その中に `%` 指定で `<img>` を重ねること(MK Mobileがこのパターン)。
+- **タイトル画面の英語化(2026-08-14〜)**: ハブに合わせて、各ゲームの**タイトル画面のみ**を英語表記に統一した(`#hub-link` のラベル `🦉 Moku Series ▶` 含む)。ゲーム本編(ステージ選択・チャット本文・クイズ内容等)は引き続き日本語のままでよい — 本項は「タイトル画面」に限定したルールで、§3の「ハブはEnglish-first、ゲーム本編は日本語のまま」という原則とは独立して追加されたもの。
 
 ## 未決事項 / 次に決めること
 
