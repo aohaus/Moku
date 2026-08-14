@@ -267,6 +267,34 @@
   #spinBtn:disabled{opacity:.5; cursor:not-allowed;}
   #spinNote{font-size:11px; opacity:.7; margin-top:8px;}
 
+  /* ---------- Ranks screen ---------- */
+  #ranksScreen{align-items:center; text-align:center; overflow-y:auto;}
+  #ranksNameRow{
+    display:flex; gap:8px; align-items:center; width:100%; max-width:320px;
+    margin-top:6px;
+  }
+  #ranksNameInput{
+    flex:1; padding:9px 12px; border-radius:12px; border:1px solid #384073;
+    background:var(--navy-panel); color:var(--cream); font-size:13px; font-weight:700;
+  }
+  #ranksNameInput:focus{outline:2px solid var(--gold);}
+  #ranksNameHint{font-size:10.5px; opacity:.65; margin-top:4px; width:100%; max-width:320px; text-align:left;}
+  #rankList{
+    width:100%; max-width:320px; margin-top:14px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .rankRow{
+    display:flex; align-items:center; gap:10px;
+    background:var(--navy-panel); border:1px solid #384073; border-radius:12px;
+    padding:9px 12px; font-size:13px; text-align:left;
+  }
+  .rankRow.me{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset;}
+  .rankRow .rnum{width:22px; font-weight:800; opacity:.7; flex:none;}
+  .rankRow .rname{flex:1; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rankRow .rlv{font-size:11px; opacity:.75; flex:none;}
+  .rankRow .rscore{font-weight:800; color:var(--gold); flex:none;}
+  #rankStatus{font-size:12px; opacity:.75; margin-top:16px;}
+
   button.primary{
     padding:10px 20px; border:none; border-radius:12px; font-weight:800; cursor:pointer;
     background:linear-gradient(160deg,var(--gold),#c8912f); color:#2a1c05;
@@ -524,15 +552,29 @@
     </div>
   </section>
 
+  <!-- RANKS SCREEN -->
+  <section class="screen" id="ranksScreen">
+    <div class="panelTitle">🏆 Ranks</div>
+    <div id="ranksNameRow">
+      <input id="ranksNameInput" type="text" maxlength="12" placeholder="Moku" autocomplete="off">
+      <button class="primary" id="ranksNameSaveBtn">Save</button>
+    </div>
+    <div id="ranksNameHint">Shown on the leaderboard. Optional — defaults to "Moku".</div>
+    <div id="rankStatus"></div>
+    <div id="rankList"></div>
+  </section>
+
   <nav id="bottomnav">
     <button class="navbtn active" data-screen="homeScreen"><span class="ic">🏠</span>Home</button>
     <button class="navbtn" data-screen="customizeScreen"><span class="ic">🧣</span>Customize</button>
     <button class="navbtn" data-screen="battleScreen"><span class="ic">🦉</span>Battle</button>
     <button class="navbtn" data-screen="spinScreen"><span class="ic">🎡</span>Spin</button>
+    <button class="navbtn" data-screen="ranksScreen"><span class="ic">🏆</span>Ranks</button>
   </nav>
 
 </div>
 
+<script src="shared/moku-scores.js"></script>
 <script>
 (function(){
   "use strict";
@@ -549,9 +591,56 @@
     unlocked: ["hat_lv1","clothes_lv1","weapon_none","wing_none","charm_none"],
     equipped: {hat:"hat_lv1", clothes:"clothes_lv1", weapon:"weapon_none", wing:"wing_none", charm:"charm_none"},
     tempBuff: null,
-    event: null
+    event: null,
+    playerName: null
   };
   let save = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+
+  /* ================= LEADERBOARD (see SPEC.md §6) ================= */
+  MokuScores.configure({
+    proxyBaseUrl: "https://juqg6nv21k.execute-api.ap-southeast-5.amazonaws.com/default/moku-dreamlo-proxy",
+    gameId: "angry-moku-battle-royal"
+  });
+  function submitScore(){
+    // Fire-and-forget: never let a failed/slow request affect gameplay.
+    MokuScores.submit(save.level, {playerName: save.playerName, level: save.level}).catch(()=>{});
+  }
+  async function renderRanks(){
+    const listEl = document.getElementById("rankList");
+    const statusEl = document.getElementById("rankStatus");
+    const nameInput = document.getElementById("ranksNameInput");
+    nameInput.value = save.playerName || "";
+    listEl.textContent = "";
+    statusEl.textContent = "Loading rankings…";
+    let ranking;
+    try{
+      ranking = await MokuScores.fetchTop(20);
+    }catch(e){
+      statusEl.textContent = "Couldn't load rankings — check your connection and try again.";
+      return;
+    }
+    if(!ranking || !ranking.length){
+      statusEl.textContent = "No rankings yet — be the first!";
+      return;
+    }
+    statusEl.textContent = "";
+    const myDeviceSuffix = MokuScores.getDeviceId().slice(0,6);
+    ranking.forEach(entry=>{
+      const row = document.createElement("div");
+      row.className = "rankRow" + (entry.deviceIdSuffix===myDeviceSuffix ? " me" : "");
+      const num = document.createElement("span"); num.className="rnum"; num.textContent = "#"+entry.rank;
+      const name = document.createElement("span"); name.className="rname"; name.textContent = entry.playerName;
+      const lv = document.createElement("span"); lv.className="rlv"; lv.textContent = entry.level!=null ? "Lv"+entry.level : "";
+      const score = document.createElement("span"); score.className="rscore"; score.textContent = entry.score;
+      row.append(num, name, lv, score);
+      listEl.appendChild(row);
+    });
+  }
+  document.getElementById("ranksNameSaveBtn").addEventListener("click", ()=>{
+    const val = document.getElementById("ranksNameInput").value.trim().slice(0,12);
+    save.playerName = val || null;
+    persistSave();
+  });
 
   async function loadSave(){
     try{
@@ -1076,6 +1165,7 @@
       gameOver = true;
       save.level += 1;
       persistSave(); refreshTopStats();
+      submitScore();
       showBanner();
     }
   }
@@ -1660,6 +1750,7 @@
     document.getElementById(screenId).classList.add("active");
     if(screenId==="customizeScreen") renderPreview();
     if(screenId==="homeScreen") resizeHomeCanvas();
+    if(screenId==="ranksScreen") renderRanks();
     persistSave();
   }
   document.querySelectorAll(".navbtn").forEach(btn=>{
