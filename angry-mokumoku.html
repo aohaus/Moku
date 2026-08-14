@@ -4156,8 +4156,8 @@ function drawTitleScreen() {
   const hasSave    = savedLevel >= 0 && savedLevel < LEVEL_CONFIGS.length;
   const menuY = 345;
   const items = [
-    { text: 'はじめから',                   enabled: true  },
-    { text: hasSave ? `つづきから  (Lv.${savedLevel+1})` : 'つづきから  (データなし)', enabled: hasSave },
+    { text: 'Start',                   enabled: true  },
+    { text: hasSave ? `Continue  (Lv.${savedLevel+1})` : 'Continue  (No Save)', enabled: hasSave },
   ];
   ctx.font = 'bold 20px "Courier New", monospace';
   items.forEach((item, i) => {
