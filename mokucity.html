@@ -170,10 +170,18 @@ body.playing #wrapper { display: flex; }
 #hud {
   position: relative;
   z-index: 15;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px;
-  flex-wrap: wrap;
+}
+#dashboard {
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(10,8,18,0.35);
+  border: 1px solid rgba(255,255,255,0.08);
+  max-width: 74%;
 }
 #hud .stat {
   font-size: 22px; font-weight: 800;
@@ -188,6 +196,7 @@ body.playing #wrapper { display: flex; }
 #hud .stat.pop { color: var(--hi); }
 #hud .stat.nature { color: #3FA34D; }
 #hud .stat.sat { color: #E98FC7; }
+#hud .stat.time { color: rgba(237,238,246,0.55); }
 #hud .stat.mood { font-size: 27px; padding: 6px 12px; transition: filter 0.3s; }
 #hud.natureLow .stat.nature { color: #FF6B4A; }
 #hud.natureLow .stat.mood { filter: drop-shadow(0 0 6px rgba(255,107,74,0.7)); }
@@ -379,7 +388,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.4.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.5.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -404,12 +413,15 @@ canvas#c {
 <div id="wrapper">
   <div id="hud">
     <button id="titleBtn" type="button">◀ Title</button>
-    <div class="stat lvl">⭐ Lv <span id="hudLevel">1</span></div>
-    <div class="stat coins">💰 <span id="hudCoins">0</span></div>
-    <div class="stat pop">👤 <span id="hudPop">0</span></div>
-    <div class="stat nature">🌿 <span id="hudNature">0</span>%</div>
-    <div class="stat sat">😊 <span id="hudSat">0</span>%</div>
-    <div class="stat mood" id="hudMood">😐</div>
+    <div id="dashboard">
+      <div class="stat lvl">⭐ Lv <span id="hudLevel">1</span></div>
+      <div class="stat coins">💰 <span id="hudCoins">0</span></div>
+      <div class="stat pop">👤 <span id="hudPop">0</span></div>
+      <div class="stat nature">🌿 <span id="hudNature">0</span>%</div>
+      <div class="stat sat">😊 <span id="hudSat">0</span>%</div>
+      <div class="stat time">⏱ <span id="hudTime">0m</span></div>
+      <div class="stat mood" id="hudMood">😐</div>
+    </div>
   </div>
   <div id="questBar">
     <div class="questIcon">🎯</div>
@@ -448,6 +460,9 @@ canvas#c {
   // ---------- building types ----------
   var BUILDINGS = {
     road:  { id: 'road',  name: 'Road',   icon: '🛣️', cost: 10,  color: '#5B5F73' },
+    // Land is a cheap flattened plot — clears forest into buildable ground
+    // without committing to anything yet, handy for staging a 2x2 merge.
+    land:  { id: 'land',  name: 'Land',   icon: '🟫', cost: 5,   color: '#8B7355' },
     house: { id: 'house', name: 'House',  icon: '🏠', cost: 50,  color: '#4CBE8A', pop: 4 },
     shop:  { id: 'shop',  name: 'Shop',   icon: '🏪', cost: 100, color: '#FFC94A', income: 4 },
     park:  { id: 'park',  name: 'Park',   icon: '🌳', cost: 30,  color: '#3FA34D', sat: 6, nature: 1 },
@@ -458,9 +473,16 @@ canvas#c {
     bulldoze: { id: 'bulldoze', name: 'Clear', icon: '🗑️', cost: 0 },
     // 'forest' is natural terrain, not a placeable palette tool — it seeds
     // the map and is what Nature actually measures alongside parks.
-    forest: { id: 'forest', name: 'Forest', icon: '🌲', color: '#2E7D46', nature: 1 }
+    forest: { id: 'forest', name: 'Forest', icon: '🌲', color: '#2E7D46', nature: 1 },
+    // house2/park2 aren't placed directly — four of the same building in a
+    // 2x2 block auto-merge into these, a reward for planning a tidy layout
+    // rather than scattering buildings randomly. Values are PER CELL (each
+    // occupies all 4 grid cells of the block), tuned above 1/4 of four
+    // separate buildings so merging is a genuine upgrade, not just tidier.
+    house2: { id: 'house2', name: 'Apartment', icon: '🏢', color: '#2E9E6B', pop: 5 },
+    park2:  { id: 'park2',  name: 'Grove',     icon: '🏞️', color: '#2C7A46', sat: 9 }
   };
-  var PALETTE_ORDER = ['road', 'house', 'shop', 'park', 'school', 'landmark', 'bulldoze'];
+  var PALETTE_ORDER = ['road', 'land', 'house', 'shop', 'park', 'school', 'landmark', 'bulldoze'];
   var NATURE_LOW = 35, NATURE_HIGH = 65;
 
   // ---------- natural disasters ----------
@@ -486,12 +508,71 @@ canvas#c {
     }
     return arr;
   }
+
+  // ---------- 2x2 merges ----------
+  // Four of the same building sitting in a 2x2 square auto-upgrade into one
+  // bigger object. progress.merges tracks each block's anchor (top-left
+  // cell) separately from the grid so rendering knows exactly which single
+  // cell draws the big sprite — deriving that purely from adjacent-cell
+  // checks breaks when two merged blocks sit diagonally next to each other
+  // (a corner cell can look like a false anchor of its neighbor's block).
+  function tryMerge2x2(gx, gy, baseType, mergedType) {
+    if (tileAt(gx, gy) === baseType && tileAt(gx + 1, gy) === baseType &&
+        tileAt(gx, gy + 1) === baseType && tileAt(gx + 1, gy + 1) === baseType) {
+      progress.grid[idx(gx, gy)] = mergedType;
+      progress.grid[idx(gx + 1, gy)] = mergedType;
+      progress.grid[idx(gx, gy + 1)] = mergedType;
+      progress.grid[idx(gx + 1, gy + 1)] = mergedType;
+      progress.merges.push({ type: mergedType, gx: gx, gy: gy });
+      return true;
+    }
+    return false;
+  }
+  function checkMerges() {
+    var didMerge = false;
+    for (var gy = 0; gy < GRID_H - 1; gy++) {
+      for (var gx = 0; gx < GRID_W - 1; gx++) {
+        if (tryMerge2x2(gx, gy, 'house', 'house2')) { didMerge = true; continue; }
+        if (tryMerge2x2(gx, gy, 'park', 'park2')) didMerge = true;
+      }
+    }
+    if (didMerge) showToast('🏙️ Buildings merged into something bigger!');
+  }
+  function findMergeAnchor(gx, gy) {
+    for (var i = 0; i < progress.merges.length; i++) {
+      if (progress.merges[i].gx === gx && progress.merges[i].gy === gy) return progress.merges[i];
+    }
+    return null;
+  }
+  function findMergeContaining(gx, gy) {
+    for (var i = 0; i < progress.merges.length; i++) {
+      var m = progress.merges[i];
+      if (gx >= m.gx && gx <= m.gx + 1 && gy >= m.gy && gy <= m.gy + 1) return i;
+    }
+    return -1;
+  }
+  // Clears a single grid cell, but breaks a whole merged block at once if
+  // the cell belongs to one — a disaster or bulldoze hitting any corner of
+  // an Apartment/Grove takes out the entire 2x2, not a single stray cell.
+  function clearCell(gx, gy) {
+    var mi = findMergeContaining(gx, gy);
+    if (mi >= 0) {
+      var m = progress.merges[mi];
+      progress.grid[idx(m.gx, m.gy)] = null;
+      progress.grid[idx(m.gx + 1, m.gy)] = null;
+      progress.grid[idx(m.gx, m.gy + 1)] = null;
+      progress.grid[idx(m.gx + 1, m.gy + 1)] = null;
+      progress.merges.splice(mi, 1);
+    } else {
+      progress.grid[idx(gx, gy)] = null;
+    }
+  }
   var DISASTERS = [
     { icon: '🔥', warn: 'Smoke on the horizon — a fire is brewing!', apply: function () {
       var targets = collectDamageable();
       if (!targets.length) return null;
       var t = targets[Math.floor(Math.random() * targets.length)];
-      progress.grid[idx(t.gx, t.gy)] = null;
+      clearCell(t.gx, t.gy);
       var loss = Math.min(progress.coins, 20);
       progress.coins -= loss;
       return 'Fire destroyed a building! (-' + loss + '💰 in repairs)';
@@ -506,7 +587,7 @@ canvas#c {
       var targets = shuffle(collectDamageable());
       if (!targets.length) return null;
       var n = Math.min(targets.length, 1 + Math.floor(Math.random() * 2));
-      for (var i = 0; i < n; i++) progress.grid[idx(targets[i].gx, targets[i].gy)] = null;
+      for (var i = 0; i < n; i++) clearCell(targets[i].gx, targets[i].gy);
       var loss = Math.min(progress.coins, n * 10);
       progress.coins -= loss;
       return 'A storm damaged ' + n + ' building' + (n > 1 ? 's' : '') + '! (-' + loss + '💰)';
@@ -515,7 +596,7 @@ canvas#c {
       var targets = shuffle(collectDamageable());
       if (!targets.length) return null;
       var n = Math.min(targets.length, 3);
-      for (var i = 0; i < n; i++) progress.grid[idx(targets[i].gx, targets[i].gy)] = null;
+      for (var i = 0; i < n; i++) clearCell(targets[i].gx, targets[i].gy);
       var loss = Math.min(progress.coins, 20 + n * 15);
       progress.coins -= loss;
       return 'Earthquake! ' + n + ' building' + (n > 1 ? 's' : '') + ' damaged — -' + loss + '💰 in repairs';
@@ -615,13 +696,15 @@ canvas#c {
       if (Math.random() < 0.45) grid[i] = 'forest';
     }
     return {
-      version: 2,
+      version: 3,
       gameId: GAME_ID,
       coins: 500,
       grid: grid,
       level: 1,
       questIndex: 0,
       flags: { shop: false },
+      merges: [],
+      playMinutes: 0,
       updatedAt: ''
     };
   }
@@ -631,10 +714,12 @@ canvas#c {
       if (raw) {
         var data = JSON.parse(raw);
         if (data && data.gameId === GAME_ID && Array.isArray(data.grid) && data.grid.length === GRID_W * GRID_H) {
-          // Backfill for saves written before the quest/level system existed.
+          // Backfill for saves written before later versions added fields.
           if (typeof data.level !== 'number') data.level = 1;
           if (typeof data.questIndex !== 'number') data.questIndex = 0;
           if (!data.flags) data.flags = { shop: false };
+          if (!Array.isArray(data.merges)) data.merges = [];
+          if (typeof data.playMinutes !== 'number') data.playMinutes = 0;
           return data;
         }
       }
@@ -663,12 +748,14 @@ canvas#c {
   // the HUD mood tracks how the forest/park balance is actually doing.
   var stats = { coins: 0, population: 0, satisfaction: 0, nature: 100 };
   function recompute() {
-    var pop = 0, houses = 0, parks = 0, forestTiles = 0, natureTiles = 0, schools = 0, landmarks = 0;
+    var pop = 0, houses = 0, parks = 0, parks2 = 0, forestTiles = 0, natureTiles = 0, schools = 0, landmarks = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
         if (t === 'house') { pop += BUILDINGS.house.pop; houses++; }
+        if (t === 'house2') { pop += BUILDINGS.house2.pop; houses++; }
         if (t === 'park') { parks++; natureTiles++; }
+        if (t === 'park2') { parks2++; natureTiles++; }
         if (t === 'forest') { forestTiles++; natureTiles++; }
         if (t === 'school') schools++;
         if (t === 'landmark') landmarks++;
@@ -680,9 +767,10 @@ canvas#c {
     // dropped into the red.
     var sat = 50;
     if (houses > 0) {
-      var communityBonus = parks * BUILDINGS.park.sat + schools * BUILDINGS.school.sat + landmarks * BUILDINGS.landmark.sat;
+      var communityBonus = parks * BUILDINGS.park.sat + parks2 * BUILDINGS.park2.sat +
+        schools * BUILDINGS.school.sat + landmarks * BUILDINGS.landmark.sat;
       sat += Math.min(50, communityBonus);
-      sat -= Math.min(30, Math.max(0, houses - parks * 2) * 2);
+      sat -= Math.min(30, Math.max(0, houses - (parks + parks2) * 2) * 2);
     }
     if (nature < NATURE_LOW) sat -= (NATURE_LOW - nature);
     else if (nature > NATURE_HIGH) sat += Math.min(10, (nature - NATURE_HIGH) / 2);
@@ -691,7 +779,7 @@ canvas#c {
     stats.satisfaction = sat;
     stats.nature = nature;
     stats.forestTiles = forestTiles;
-    stats.parks = parks;
+    stats.parks = parks + parks2;
     stats.schools = schools;
     stats.landmarks = landmarks;
     stats.coins = progress.coins;
@@ -755,14 +843,21 @@ canvas#c {
   var hudNature = document.getElementById('hudNature');
   var hudMood = document.getElementById('hudMood');
   var hudLevel = document.getElementById('hudLevel');
+  var hudTime = document.getElementById('hudTime');
   var questTitleEl = document.getElementById('questTitle');
   var questProgressEl = document.getElementById('questProgress');
+  function formatPlaytime(min) {
+    min = min || 0;
+    if (min < 60) return min + 'm';
+    return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
+  }
   function updateHud() {
     hudCoins.textContent = stats.coins;
     hudPop.textContent = stats.population;
     hudSat.textContent = stats.satisfaction;
     hudNature.textContent = stats.nature;
     hudLevel.textContent = progress.level;
+    hudTime.textContent = formatPlaytime(progress.playMinutes);
     var mood = natureMood();
     hudMood.textContent = mood.face;
     hudMood.title = mood.label;
@@ -848,7 +943,12 @@ canvas#c {
     zoom = Math.min(2.2, Math.max(0.4, Math.min(w / gridPxW, h / gridPxH) * 0.94));
     ctx.setTransform(DPR * zoom, 0, 0, DPR * zoom, 0, 0);
     originX = (w / zoom) / 2;
-    originY = (h / zoom) / 2 - (GRID_H * TILE_H) / 4;
+    // Bias the grid's own vertical center toward the upper part of
+    // canvasArea (roughly 38% down) instead of dead-center — there's
+    // reliably more empty headroom above than clearance below before the
+    // palette bar, so use it.
+    var gridCenterY = (GRID_H * TILE_H) / 2;
+    originY = (h / zoom) * 0.38 - gridCenterY;
     draw();
   }
 
@@ -865,14 +965,15 @@ canvas#c {
     return { gx: Math.floor(gx), gy: Math.floor(gy) };
   }
 
-  function diamondPath(cx, topY) {
+  function diamondPathSized(cx, topY, w, h) {
     ctx.beginPath();
     ctx.moveTo(cx, topY);
-    ctx.lineTo(cx + TILE_W / 2, topY + TILE_H / 2);
-    ctx.lineTo(cx, topY + TILE_H);
-    ctx.lineTo(cx - TILE_W / 2, topY + TILE_H / 2);
+    ctx.lineTo(cx + w / 2, topY + h / 2);
+    ctx.lineTo(cx, topY + h);
+    ctx.lineTo(cx - w / 2, topY + h / 2);
     ctx.closePath();
   }
+  function diamondPath(cx, topY) { diamondPathSized(cx, topY, TILE_W, TILE_H); }
 
   function drawTileBase(gx, gy) {
     var p = gridToScreen(gx, gy);
@@ -890,7 +991,7 @@ canvas#c {
     if (!b || !b.color) return;
     var p = gridToScreen(gx, gy);
     var cx = p.x, topY = p.y;
-    if (key === 'road') {
+    if (key === 'road' || key === 'land') {
       diamondPath(cx, topY + TILE_H * 0.22);
       ctx.fillStyle = b.color;
       ctx.fill();
@@ -929,6 +1030,49 @@ canvas#c {
     ctx.font = (key === 'landmark' ? 18 : key === 'shop' || key === 'school' ? 16 : 13) + 'px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(b.icon, cx, baseY - height - TILE_H * 0.06);
+  }
+
+  // A merged 2x2 block (Apartment/Grove) draws once from its anchor cell,
+  // at double the footprint — same extrusion shape as drawBuilding, just
+  // scaled, since the anchor's own top vertex is exactly the combined
+  // diamond's top vertex (gridToScreen is a linear map).
+  function drawMergedBuilding(ax, ay, key) {
+    var b = BUILDINGS[key];
+    var top = gridToScreen(ax, ay);
+    var cx = top.x, topY = top.y;
+    var W2 = TILE_W * 2, H2 = TILE_H * 2;
+    var height = key === 'park2' ? 30 : 42;
+    var baseY = topY + H2 * 0.72;
+    ctx.fillStyle = shade(b.color, -30);
+    ctx.beginPath();
+    ctx.moveTo(cx - W2 * 0.28, baseY);
+    ctx.lineTo(cx, baseY + H2 * 0.28);
+    ctx.lineTo(cx, baseY + H2 * 0.28 - height);
+    ctx.lineTo(cx - W2 * 0.28, baseY - height);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = shade(b.color, -12);
+    ctx.beginPath();
+    ctx.moveTo(cx + W2 * 0.28, baseY);
+    ctx.lineTo(cx, baseY + H2 * 0.28);
+    ctx.lineTo(cx, baseY + H2 * 0.28 - height);
+    ctx.lineTo(cx + W2 * 0.28, baseY - height);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY - height - H2 * 0.28);
+    ctx.lineTo(cx + W2 * 0.28, baseY - height);
+    ctx.lineTo(cx, baseY - height + H2 * 0.28);
+    ctx.lineTo(cx - W2 * 0.28, baseY - height);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.icon, cx, baseY - height - H2 * 0.06);
   }
 
   function shade(hex, amt) {
@@ -1032,7 +1176,13 @@ canvas#c {
     order.sort(function (a, b) { return (a.gx + a.gy) - (b.gx + b.gy); });
     order.forEach(function (t) {
       var key = tileAt(t.gx, t.gy);
-      if (key) drawBuilding(t.gx, t.gy, key);
+      if (!key) return;
+      if (key === 'house2' || key === 'park2') {
+        var anchor = findMergeAnchor(t.gx, t.gy);
+        if (anchor) drawMergedBuilding(t.gx, t.gy, key);
+        return;
+      }
+      drawBuilding(t.gx, t.gy, key);
     });
     drawResidents(performance.now());
     if (hoverTile) {
@@ -1078,7 +1228,7 @@ canvas#c {
     var cur = tileAt(gx, gy);
     if (selectedTool === 'bulldoze') {
       if (cur) {
-        progress.grid[idx(gx, gy)] = null;
+        clearCell(gx, gy);
         recompute();
         saveProgress();
         draw();
@@ -1094,6 +1244,7 @@ canvas#c {
     progress.coins -= b.cost;
     progress.grid[idx(gx, gy)] = selectedTool;
     if (selectedTool === 'shop') progress.flags.shop = true;
+    checkMerges();
     recompute();
     saveProgress();
     draw();
@@ -1253,6 +1404,13 @@ canvas#c {
     updateResidents(performance.now());
     draw();
   }, 150);
+
+  var playtimeTimer = setInterval(function () {
+    if (!document.body.classList.contains('playing')) return;
+    progress.playMinutes = (progress.playMinutes || 0) + 1;
+    updateHud();
+    saveProgress();
+  }, 60000);
 
   recompute();
 })();
