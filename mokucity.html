@@ -117,6 +117,27 @@ body.playing #title-frame { display: none; }
   border-top: 1px solid rgba(255,255,255,0.12);
   font-size: 9px; letter-spacing: 0.05em; color: rgba(237,238,246,0.4);
 }
+.textLink {
+  margin-top: 14px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.02em;
+  color: rgba(237,238,246,0.55);
+  cursor: pointer;
+}
+.textLink.active { color: var(--hi); }
+#howToPanel {
+  display: none;
+  margin-top: 8px;
+  width: min(320px, 88%);
+  font-size: 11px; line-height: 1.65;
+  color: rgba(237,238,246,0.65);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: left;
+}
+#howToPanel.show { display: block; }
+#howToPanel em { color: var(--hi); font-style: normal; font-weight: 700; }
 
 /* ---------- game wrapper ---------- */
 #wrapper {
@@ -145,6 +166,7 @@ body.playing #wrapper { display: flex; }
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+#hud .stat.lvl { color: #FFC94A; background: rgba(255,201,74,0.12); }
 #hud .stat.coins { color: #FFC94A; }
 #hud .stat.pop { color: var(--hi); }
 #hud .stat.nature { color: #3FA34D; }
@@ -152,6 +174,30 @@ body.playing #wrapper { display: flex; }
 #hud .stat.mood { font-size: 16px; padding: 4px 9px; transition: filter 0.3s; }
 #hud.natureLow .stat.nature { color: #FF6B4A; }
 #hud.natureLow .stat.mood { filter: drop-shadow(0 0 6px rgba(255,107,74,0.7)); }
+
+#questBar {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255,201,74,0.08);
+  border: 1px solid rgba(255,201,74,0.22);
+}
+#questBar .questIcon { font-size: 16px; flex: 0 0 auto; }
+#questBar .questText { min-width: 0; flex: 1 1 auto; }
+#questBar .questTitle {
+  font-size: 12px; font-weight: 800; color: #FFC94A;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#questBar .questProgress {
+  font-size: 10.5px; color: rgba(237,238,246,0.6);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 #titleBtn {
   appearance: none; border: none; cursor: pointer;
   background: rgba(10,8,18,0.5);
@@ -215,7 +261,7 @@ canvas#c {
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.1.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.2.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -225,17 +271,33 @@ canvas#c {
     <div class="menuItem sel" data-action="continue">Continue</div>
     <div class="menuItem" data-action="reset">New City</div>
   </nav>
+  <div class="textLink" id="howToToggle">❓ How to Play</div>
+  <div id="howToPanel">
+    Moku doesn't just govern this town — Moku <em>lives</em> here. Each level
+    gives you one goal: build up the town, but keep enough forest and parks
+    standing to keep Nature healthy. Let Nature drop too far and both the
+    economy and Moku's mood suffer. Clear a goal to level up and unlock a
+    bigger one.
+  </div>
   <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
 </section>
 
 <div id="wrapper">
   <div id="hud">
     <button id="titleBtn" type="button">◀ Title</button>
+    <div class="stat lvl">⭐ Lv <span id="hudLevel">1</span></div>
     <div class="stat coins">💰 <span id="hudCoins">0</span></div>
     <div class="stat pop">👤 <span id="hudPop">0</span></div>
     <div class="stat nature">🌿 <span id="hudNature">0</span>%</div>
     <div class="stat sat">😊 <span id="hudSat">0</span>%</div>
     <div class="stat mood" id="hudMood">😐</div>
+  </div>
+  <div id="questBar">
+    <div class="questIcon">🎯</div>
+    <div class="questText">
+      <div class="questTitle" id="questTitle"></div>
+      <div class="questProgress" id="questProgress"></div>
+    </div>
   </div>
   <div id="canvasArea">
     <canvas id="c"></canvas>
@@ -268,6 +330,51 @@ canvas#c {
   var PALETTE_ORDER = ['road', 'house', 'shop', 'park', 'bulldoze'];
   var NATURE_LOW = 35, NATURE_HIGH = 65;
 
+  // ---------- quests / levels ----------
+  // The quest text IS the tutorial: instead of a separate how-to-play
+  // wall of text, each level states one concrete goal, and the early ones
+  // walk the player through road -> house -> shop -> the nature tradeoff.
+  var QUESTS = [
+    { title: 'First Neighbor', desc: 'Build a house for Moku.',
+      check: function (s) { return s.population >= 4; },
+      progress: function (s) { return 'population ' + Math.min(s.population, 4) + '/4'; },
+      reward: 50 },
+    { title: 'Growing Together', desc: 'Grow to 3 houses, but plant a park too.',
+      check: function (s) { return s.population >= 12 && s.parks >= 1; },
+      progress: function (s) { return 'pop ' + Math.min(s.population, 12) + '/12 · parks ' + Math.min(s.parks, 1) + '/1'; },
+      reward: 80 },
+    { title: 'Open for Business', desc: 'Open a shop and save up 300 coins.',
+      check: function (s, f) { return f.shop && s.coins >= 300; },
+      progress: function (s, f) { return (f.shop ? 'shop ✓' : 'shop —') + ' · ' + Math.min(s.coins, 300) + '/300 coins'; },
+      reward: 100 },
+    { title: 'Balance Point', desc: "Reach 24 population without Nature falling below 40%.",
+      check: function (s) { return s.population >= 24 && s.nature >= 40; },
+      progress: function (s) { return 'pop ' + Math.min(s.population, 24) + '/24 · nature ' + s.nature + '% (need ≥40%)'; },
+      reward: 150 },
+    { title: 'Thriving Town', desc: 'Reach 36 population with 50%+ Nature and 60%+ satisfaction, together.',
+      check: function (s) { return s.population >= 36 && s.nature >= 50 && s.satisfaction >= 60; },
+      progress: function (s) { return 'pop ' + Math.min(s.population, 36) + '/36 · nature ' + s.nature + '% · sat ' + s.satisfaction + '%'; },
+      reward: 200 },
+    { title: "Moku's Promise", desc: 'Prove a town can grow without losing its forest — 50 population, 55%+ Nature.',
+      check: function (s) { return s.population >= 50 && s.nature >= 55; },
+      progress: function (s) { return 'pop ' + Math.min(s.population, 50) + '/50 · nature ' + s.nature + '% (need ≥55%)'; },
+      reward: 300 }
+  ];
+  // Beyond the handcrafted arc, levels keep coming — same shape (bigger
+  // population, Nature held at 50%+) so growth never just plateaus.
+  function questForIndex(i) {
+    if (i < QUESTS.length) return QUESTS[i];
+    var step = i - QUESTS.length + 1;
+    var popTarget = 50 + step * 15;
+    return {
+      title: 'Harmony Lv ' + (i + 2),
+      desc: 'Grow to ' + popTarget + ' population while keeping Nature at 50%+.',
+      check: function (s) { return s.population >= popTarget && s.nature >= 50; },
+      progress: function (s) { return 'pop ' + Math.min(s.population, popTarget) + '/' + popTarget + ' · nature ' + s.nature + '%'; },
+      reward: 150 + step * 50
+    };
+  }
+
   // ---------- save data ----------
   function defaultProgress() {
     // The city starts mostly wild — Moku's town grows INTO the forest, not
@@ -277,10 +384,13 @@ canvas#c {
       if (Math.random() < 0.45) grid[i] = 'forest';
     }
     return {
-      version: 1,
+      version: 2,
       gameId: GAME_ID,
       coins: 500,
       grid: grid,
+      level: 1,
+      questIndex: 0,
+      flags: { shop: false },
       updatedAt: ''
     };
   }
@@ -290,6 +400,10 @@ canvas#c {
       if (raw) {
         var data = JSON.parse(raw);
         if (data && data.gameId === GAME_ID && Array.isArray(data.grid) && data.grid.length === GRID_W * GRID_H) {
+          // Backfill for saves written before the quest/level system existed.
+          if (typeof data.level !== 'number') data.level = 1;
+          if (typeof data.questIndex !== 'number') data.questIndex = 0;
+          if (!data.flags) data.flags = { shop: false };
           return data;
         }
       }
@@ -338,13 +452,31 @@ canvas#c {
     if (nature < NATURE_LOW) sat -= (NATURE_LOW - nature);
     else if (nature > NATURE_HIGH) sat += Math.min(10, (nature - NATURE_HIGH) / 2);
     sat = Math.max(0, Math.min(100, Math.round(sat)));
-    stats.coins = progress.coins;
     stats.population = pop;
     stats.satisfaction = sat;
     stats.nature = nature;
     stats.forestTiles = forestTiles;
     stats.parks = parks;
+    stats.coins = progress.coins;
+    checkQuestAdvance();
+    stats.coins = progress.coins; // a cleared quest may have paid out a reward
     updateHud();
+  }
+
+  // Advances through as many quests as are already satisfied in one go
+  // (e.g. loading a save that already qualifies), each paying its reward
+  // and handing the player the next goal.
+  function checkQuestAdvance() {
+    var guard = 0;
+    while (guard++ < 50) {
+      var q = questForIndex(progress.questIndex);
+      if (!q.check(stats, progress.flags)) break;
+      progress.coins += q.reward;
+      progress.level++;
+      progress.questIndex++;
+      showToast('🎉 Level Up! Lv ' + progress.level + ' — +' + q.reward + '💰');
+      stats.coins = progress.coins;
+    }
   }
 
   function natureMood() {
@@ -382,15 +514,22 @@ canvas#c {
   var hudSat = document.getElementById('hudSat');
   var hudNature = document.getElementById('hudNature');
   var hudMood = document.getElementById('hudMood');
+  var hudLevel = document.getElementById('hudLevel');
+  var questTitleEl = document.getElementById('questTitle');
+  var questProgressEl = document.getElementById('questProgress');
   function updateHud() {
     hudCoins.textContent = stats.coins;
     hudPop.textContent = stats.population;
     hudSat.textContent = stats.satisfaction;
     hudNature.textContent = stats.nature;
+    hudLevel.textContent = progress.level;
     var mood = natureMood();
     hudMood.textContent = mood.face;
     hudMood.title = mood.label;
     document.getElementById('hud').classList.toggle('natureLow', stats.nature < NATURE_LOW);
+    var q = questForIndex(progress.questIndex);
+    questTitleEl.textContent = 'Lv ' + (progress.level + 1) + ' · ' + q.title + ' — ' + q.desc;
+    questProgressEl.textContent = q.progress(stats, progress.flags);
   }
 
   var toastEl = document.getElementById('toast');
@@ -588,6 +727,7 @@ canvas#c {
     }
     progress.coins -= b.cost;
     progress.grid[idx(gx, gy)] = selectedTool;
+    if (selectedTool === 'shop') progress.flags.shop = true;
     recompute();
     saveProgress();
     draw();
@@ -640,6 +780,11 @@ canvas#c {
     startCity();
   });
   document.getElementById('titleBtn').addEventListener('click', goTitle);
+
+  document.getElementById('howToToggle').addEventListener('click', function () {
+    document.getElementById('howToPanel').classList.toggle('show');
+    this.classList.toggle('active');
+  });
 
   var tickTimer = setInterval(function () {
     if (document.body.classList.contains('playing')) shopIncomeTick();
