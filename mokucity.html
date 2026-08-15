@@ -344,44 +344,68 @@ canvas#c {
 }
 
 /* ---------- Moku quest announcer ---------- */
-/* Fires when a new goal begins: Moku walks in from the side, shows a
-   speech-bubble summary, then walks off — a friendlier way to introduce
-   each level's goal than just having it silently appear in the notification
-   bar above (which stays as the persistent reference throughout the level). */
+/* Fires when a new goal begins: Moku pops up big, front-and-center, with a
+   speech-bubble summary, then drops back out after ~3s — a friendlier way
+   to introduce each level's goal than just having it silently appear in
+   the notification bar above (which stays as the persistent reference
+   throughout the level; this is only the entrance moment). */
 #questMoku {
   position: absolute;
-  bottom: 14px; left: 50%;
-  z-index: 22;
+  left: 50%; bottom: 8%;
+  z-index: 25;
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   pointer-events: none;
   opacity: 0;
-  transform: translate(calc(-50% - 220px), 0);
+  transform: translate(-50%, 36px) scale(0.72);
+}
+#questMoku::before {
+  content: '';
+  position: absolute;
+  inset: -30px -70px 20px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(10,8,18,0.55), transparent 70%);
 }
 #questMoku.enter {
   opacity: 1;
-  transform: translate(-50%, 0);
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+  transform: translate(-50%, 0) scale(1);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
 }
 #questMoku.leave {
   opacity: 0;
-  transform: translate(calc(-50% + 260px), 0);
-  transition: transform 0.55s ease-in, opacity 0.5s ease-in;
+  transform: translate(-50%, 26px) scale(0.85);
+  transition: transform 0.45s ease-in, opacity 0.4s ease-in;
 }
 .questMokuAvatar {
-  font-size: 34px;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+  width: clamp(96px, 16vw, 168px);
+  height: clamp(96px, 16vw, 168px);
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 30%;
+  box-shadow: 0 0 0 3px rgba(255,201,74,0.55), 0 16px 32px rgba(0,0,0,0.6), 0 0 40px rgba(255,201,74,0.3);
 }
 .questMokuBubble {
-  max-width: min(320px, 60vw);
-  background: rgba(10,8,18,0.92);
-  border: 1px solid rgba(255,201,74,0.4);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 12.5px; font-weight: 700;
-  line-height: 1.4;
+  position: relative;
+  max-width: min(380px, 72vw);
+  background: rgba(10,8,18,0.94);
+  border: 1px solid rgba(255,201,74,0.5);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: clamp(13px, 1.6vw, 15px); font-weight: 700;
+  line-height: 1.45;
   color: #EDEEF6;
+  text-align: center;
+}
+.questMokuBubble::after {
+  content: '';
+  position: absolute; left: 50%; bottom: -8px;
+  transform: translateX(-50%);
+  border-width: 8px 8px 0 8px;
+  border-style: solid;
+  border-color: rgba(10,8,18,0.94) transparent transparent transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   #questMoku, #questMoku.enter, #questMoku.leave { transition: none; }
@@ -482,7 +506,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.7.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.7.1 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -534,7 +558,7 @@ canvas#c {
     <div id="toast"></div>
     <div id="questMoku">
       <div class="questMokuBubble" id="questMokuBubble"></div>
-      <div class="questMokuAvatar">🦉</div>
+      <img class="questMokuAvatar" src="brand/mokumoku-hero.png" alt="Moku">
     </div>
     <div id="touchControls">
       <div id="dpad">
@@ -1029,8 +1053,8 @@ canvas#c {
     questMokuTimer = setTimeout(function () {
       questMokuEl.classList.remove('enter');
       questMokuEl.classList.add('leave');
-      questMokuTimer = setTimeout(function () { questMokuEl.classList.remove('leave'); }, 700);
-    }, 3400);
+      questMokuTimer = setTimeout(function () { questMokuEl.classList.remove('leave'); }, 450);
+    }, 3000);
   }
 
   var toastEl = document.getElementById('toast');
