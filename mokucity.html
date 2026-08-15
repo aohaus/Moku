@@ -309,29 +309,82 @@ canvas#c {
 #toast.show { opacity: 1; }
 
 /* ---------- disaster warning ---------- */
+/* Occupies the SAME notification slot as #questBar (breaking-news-over-
+   the-regular-update, not a separate floating pill) — JS hides #questBar
+   and shows this in its place while a disaster is pending, then swaps
+   back once it resolves. */
 #disasterWarning {
-  position: absolute;
-  top: 10px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 21;
-  display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 800;
+  position: relative;
+  z-index: 15;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 16px; font-weight: 800;
   color: #FF6B4A;
   background: rgba(120,30,20,0.55);
   border: 1px solid rgba(255,107,74,0.5);
-  padding: 8px 16px; border-radius: 999px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-  white-space: nowrap;
 }
-#disasterWarning.show { opacity: 1; animation: disasterWarningPulse 0.9s ease-in-out infinite; }
-#disasterWarningIcon { font-size: 17px; animation: disasterWarningBlink 0.6s steps(1) infinite; }
-@keyframes disasterWarningPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+#disasterWarning.show { display: flex; animation: disasterWarningPulse 0.9s ease-in-out infinite; }
+.dwLabel {
+  flex: 0 0 auto;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  background: #FF6B4A; color: #1a0a06;
+  padding: 3px 7px; border-radius: 5px;
+}
+#disasterWarningIcon { font-size: 18px; animation: disasterWarningBlink 0.6s steps(1) infinite; }
+#disasterWarningText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes disasterWarningPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
 @keyframes disasterWarningBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) {
   #disasterWarning.show { animation: none; }
   #disasterWarningIcon { animation: none; }
+}
+
+/* ---------- Moku quest announcer ---------- */
+/* Fires when a new goal begins: Moku walks in from the side, shows a
+   speech-bubble summary, then walks off — a friendlier way to introduce
+   each level's goal than just having it silently appear in the notification
+   bar above (which stays as the persistent reference throughout the level). */
+#questMoku {
+  position: absolute;
+  bottom: 14px; left: 50%;
+  z-index: 22;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(calc(-50% - 220px), 0);
+}
+#questMoku.enter {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+}
+#questMoku.leave {
+  opacity: 0;
+  transform: translate(calc(-50% + 260px), 0);
+  transition: transform 0.55s ease-in, opacity 0.5s ease-in;
+}
+.questMokuAvatar {
+  font-size: 34px;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+}
+.questMokuBubble {
+  max-width: min(320px, 60vw);
+  background: rgba(10,8,18,0.92);
+  border: 1px solid rgba(255,201,74,0.4);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12.5px; font-weight: 700;
+  line-height: 1.4;
+  color: #EDEEF6;
+}
+@media (prefers-reduced-motion: reduce) {
+  #questMoku, #questMoku.enter, #questMoku.leave { transition: none; }
 }
 
 /* ---------- on-screen touch controls (iPad / no-keyboard play) ---------- */
@@ -429,7 +482,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.6.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.7.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -471,10 +524,18 @@ canvas#c {
       <div class="questProgress" id="questProgress"></div>
     </div>
   </div>
+  <div id="disasterWarning">
+    <span class="dwLabel">🚨 BREAKING</span>
+    <span id="disasterWarningIcon">⚠️</span>
+    <span id="disasterWarningText"></span>
+  </div>
   <div id="canvasArea">
     <canvas id="c"></canvas>
     <div id="toast"></div>
-    <div id="disasterWarning"><span id="disasterWarningIcon">⚠️</span><span id="disasterWarningText"></span></div>
+    <div id="questMoku">
+      <div class="questMokuBubble" id="questMokuBubble"></div>
+      <div class="questMokuAvatar">🦉</div>
+    </div>
     <div id="touchControls">
       <div id="dpad">
         <button class="dbtn up" type="button" data-dir="up" aria-label="Move up">▲</button>
@@ -653,20 +714,31 @@ canvas#c {
   var disasterWarnIconEl = document.getElementById('disasterWarningIcon');
   var disasterWarnTextEl = document.getElementById('disasterWarningText');
   var DISASTER_WARN_MS = 4500;
+  // The warning takes over the quest bar's own slot (breaking news
+  // interrupting the regular notification) rather than floating somewhere
+  // else on screen, and hands it back once resolved.
+  function showDisasterBanner(icon, text) {
+    document.getElementById('questBar').style.display = 'none';
+    disasterWarnIconEl.textContent = icon;
+    disasterWarnTextEl.textContent = text;
+    disasterWarnEl.classList.add('show');
+  }
+  function hideDisasterBanner() {
+    disasterWarnEl.classList.remove('show');
+    document.getElementById('questBar').style.display = '';
+  }
   function scheduleDisasterWarning() {
     if (pendingDisaster) return;
     var d = DISASTERS[Math.floor(Math.random() * DISASTERS.length)];
     pendingDisaster = d;
-    disasterWarnIconEl.textContent = d.icon;
-    disasterWarnTextEl.textContent = d.warn;
-    disasterWarnEl.classList.add('show');
+    showDisasterBanner(d.icon, d.warn);
     disasterWarnTimer = setTimeout(function () { resolvePendingDisaster(); }, DISASTER_WARN_MS);
   }
   function resolvePendingDisaster() {
     var d = pendingDisaster;
     pendingDisaster = null;
     disasterWarnTimer = null;
-    disasterWarnEl.classList.remove('show');
+    hideDisasterBanner();
     if (!d || !document.body.classList.contains('playing')) return;
     var msg = d.apply();
     if (!msg) return; // nothing left to damage — false alarm
@@ -680,7 +752,7 @@ canvas#c {
   function cancelPendingDisaster() {
     if (disasterWarnTimer) { clearTimeout(disasterWarnTimer); disasterWarnTimer = null; }
     pendingDisaster = null;
-    disasterWarnEl.classList.remove('show');
+    hideDisasterBanner();
   }
 
   // ---------- quests / levels ----------
@@ -700,6 +772,14 @@ canvas#c {
       check: function (s, f) { return f.shop && s.coins >= 300; },
       progress: function (s, f) { return (f.shop ? 'shop ✓' : 'shop —') + ' · ' + Math.min(s.coins, 300) + '/300 coins'; },
       reward: 100 },
+    { title: 'Class Is In Session', desc: 'Build a School to unlock the Landmark.',
+      check: function (s) { return s.schools >= 1; },
+      progress: function (s) { return 'school ' + (s.schools >= 1 ? '✓' : '—'); },
+      reward: 120 },
+    { title: 'Civic Pride', desc: 'Build a Landmark for the town.',
+      check: function (s) { return s.landmarks >= 1; },
+      progress: function (s) { return 'landmark ' + (s.landmarks >= 1 ? '✓' : '—'); },
+      reward: 180 },
     { title: 'Balance Point', desc: "Reach 24 population without Nature falling below 40%.",
       check: function (s) { return s.population >= 24 && s.nature >= 40; },
       progress: function (s) { return 'pop ' + Math.min(s.population, 24) + '/24 · nature ' + s.nature + '% (need ≥40%)'; },
@@ -713,12 +793,19 @@ canvas#c {
       progress: function (s) { return 'pop ' + Math.min(s.population, 50) + '/50 · nature ' + s.nature + '% (need ≥55%)'; },
       reward: 300 }
   ];
-  // Beyond the handcrafted arc, levels keep coming — same shape (bigger
-  // population, Nature held at 50%+) so growth never just plateaus.
+  // Beyond the handcrafted arc, levels keep coming — but a 10x10 grid with
+  // Nature held at 50%+ has a real ceiling (roughly 250 population at
+  // maximum plausible density: 50 non-nature cells, fully merged into
+  // Apartments at 5 pop/cell). A target that keeps climbing by a flat +15
+  // forever eventually asks for more land than exists — a real dead end,
+  // not just a hard one. The curve below climbs steeply at first, same
+  // pace as before, then eases off and approaches a ceiling comfortably
+  // under the true maximum, so there's always a denser layout that gets
+  // there — city growth plateauing into a steady state, not a wall.
   function questForIndex(i) {
     if (i < QUESTS.length) return QUESTS[i];
     var step = i - QUESTS.length + 1;
-    var popTarget = 50 + step * 15;
+    var popTarget = 50 + Math.round(190 * (1 - Math.exp(-step / 7)));
     return {
       title: 'Harmony Lv ' + (i + 2),
       desc: 'Grow to ' + popTarget + ' population while keeping Nature at 50%+.',
@@ -834,6 +921,7 @@ canvas#c {
   // and handing the player the next goal.
   function checkQuestAdvance() {
     var guard = 0;
+    var advanced = false;
     while (guard++ < 50) {
       var q = questForIndex(progress.questIndex);
       if (!q.check(stats, progress.flags)) break;
@@ -842,7 +930,11 @@ canvas#c {
       progress.questIndex++;
       showToast('🎉 Level Up! Lv ' + progress.level + ' — +' + q.reward + '💰');
       stats.coins = progress.coins;
+      advanced = true;
     }
+    // Only announce once even if several levels cleared in one tick (e.g.
+    // loading a save that already qualifies for a few) — the freshest goal.
+    if (advanced) announceQuest(questForIndex(progress.questIndex));
   }
 
   function natureMood() {
@@ -919,6 +1011,26 @@ canvas#c {
       var costEl = el.querySelector('.cost');
       costEl.textContent = locked ? '🔒 Lv' + b.unlockLevel : (b.cost > 0 ? b.cost + '💰' : '');
     });
+  }
+
+  // Moku walks in, shows the new goal in a speech bubble, walks back out —
+  // the quest bar above stays put as the persistent reference the whole
+  // level; this is just the "announcement" moment when a level begins.
+  var questMokuEl = document.getElementById('questMoku');
+  var questMokuBubbleEl = document.getElementById('questMokuBubble');
+  var questMokuTimer = null;
+  function announceQuest(q) {
+    if (!document.body.classList.contains('playing')) return;
+    questMokuBubbleEl.textContent = q.title + ' — ' + q.desc;
+    clearTimeout(questMokuTimer);
+    questMokuEl.classList.remove('enter', 'leave');
+    void questMokuEl.offsetWidth; // restart the transition if already mid-cycle
+    questMokuEl.classList.add('enter');
+    questMokuTimer = setTimeout(function () {
+      questMokuEl.classList.remove('enter');
+      questMokuEl.classList.add('leave');
+      questMokuTimer = setTimeout(function () { questMokuEl.classList.remove('leave'); }, 700);
+    }, 3400);
   }
 
   var toastEl = document.getElementById('toast');
@@ -1354,6 +1466,7 @@ canvas#c {
     recompute();
     resizeCanvas();
     ensureResidentCount();
+    announceQuest(questForIndex(progress.questIndex));
   }
 
   function handleMenuAction(item) {
