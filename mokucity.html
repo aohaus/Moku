@@ -388,7 +388,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.5.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.5.1 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -1041,8 +1041,15 @@ canvas#c {
     var top = gridToScreen(ax, ay);
     var cx = top.x, topY = top.y;
     var W2 = TILE_W * 2, H2 = TILE_H * 2;
-    var height = key === 'park2' ? 30 : 42;
+    // Deliberately NOT scaled up with the doubled footprint — a taller
+    // block would bury anything sitting behind it on the isometric grid.
+    // Height stays close to a normal single-tile building; the wider
+    // footprint alone reads as "bigger", and a touch of transparency on
+    // the walls (not the icon) keeps whatever's behind it visible too.
+    var height = key === 'park2' ? 13 : 25;
     var baseY = topY + H2 * 0.72;
+    ctx.save();
+    ctx.globalAlpha = 0.82;
     ctx.fillStyle = shade(b.color, -30);
     ctx.beginPath();
     ctx.moveTo(cx - W2 * 0.28, baseY);
@@ -1069,6 +1076,7 @@ canvas#c {
     ctx.lineTo(cx - W2 * 0.28, baseY - height);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
 
     ctx.font = '24px sans-serif';
     ctx.textAlign = 'center';
