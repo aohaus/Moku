@@ -99,7 +99,7 @@ body.playing #title-frame { display: none; }
 }
 #titleLogo span { color: var(--hi); }
 #titleSub {
-  font-size: clamp(10px, 1.4vw, 12.5px);
+  font-size: clamp(12px, 1.7vw, 14.5px);
   font-weight: 700; letter-spacing: 0.06em;
   color: rgba(237,238,246,0.6);
 }
@@ -127,8 +127,8 @@ body.playing #title-frame { display: none; }
 #howToPanel {
   display: none;
   margin-top: 8px;
-  width: min(320px, 88%);
-  font-size: 11px; line-height: 1.65;
+  width: min(360px, 90%);
+  font-size: 13.5px; line-height: 1.65;
   color: rgba(237,238,246,0.65);
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.1);
@@ -159,7 +159,7 @@ body.playing #wrapper { display: flex; }
   flex-wrap: wrap;
 }
 #hud .stat {
-  font-size: 12.5px; font-weight: 800;
+  font-size: 15px; font-weight: 800;
   color: #EDEEF6;
   background: rgba(10,8,18,0.5);
   padding: 5px 12px; border-radius: 999px;
@@ -171,7 +171,7 @@ body.playing #wrapper { display: flex; }
 #hud .stat.pop { color: var(--hi); }
 #hud .stat.nature { color: #3FA34D; }
 #hud .stat.sat { color: #E98FC7; }
-#hud .stat.mood { font-size: 16px; padding: 4px 9px; transition: filter 0.3s; }
+#hud .stat.mood { font-size: 20px; padding: 4px 9px; transition: filter 0.3s; }
 #hud.natureLow .stat.nature { color: #FF6B4A; }
 #hud.natureLow .stat.mood { filter: drop-shadow(0 0 6px rgba(255,107,74,0.7)); }
 
@@ -187,14 +187,14 @@ body.playing #wrapper { display: flex; }
   background: rgba(255,201,74,0.08);
   border: 1px solid rgba(255,201,74,0.22);
 }
-#questBar .questIcon { font-size: 16px; flex: 0 0 auto; }
+#questBar .questIcon { font-size: 19px; flex: 0 0 auto; }
 #questBar .questText { min-width: 0; flex: 1 1 auto; }
 #questBar .questTitle {
-  font-size: 12px; font-weight: 800; color: #FFC94A;
+  font-size: 14.5px; font-weight: 800; color: #FFC94A;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #questBar .questProgress {
-  font-size: 10.5px; color: rgba(237,238,246,0.6);
+  font-size: 12.5px; color: rgba(237,238,246,0.6);
   font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -202,8 +202,8 @@ body.playing #wrapper { display: flex; }
   appearance: none; border: none; cursor: pointer;
   background: rgba(10,8,18,0.5);
   color: #EDEEF6;
-  padding: 5px 10px; border-radius: 999px;
-  font-size: 12px; font-weight: 800;
+  padding: 6px 12px; border-radius: 999px;
+  font-size: 14.5px; font-weight: 800;
 }
 
 #canvasArea {
@@ -227,19 +227,33 @@ canvas#c {
   border-top: 1px solid rgba(255,255,255,0.08);
 }
 .paletteItem {
+  position: relative;
   flex: 0 0 auto;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 14px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.03);
   cursor: pointer;
-  min-width: 62px;
+  min-width: 72px;
+}
+.paletteItem .kbd {
+  position: absolute; top: 4px; left: 6px;
+  font-size: 9.5px; font-weight: 800;
+  color: rgba(237,238,246,0.35);
+  font-variant-numeric: tabular-nums;
+}
+.paletteItem:focus-visible,
+.menuItem:focus-visible,
+.textLink:focus-visible,
+#titleBtn:focus-visible {
+  outline: 2px solid var(--hi);
+  outline-offset: 2px;
 }
 .paletteItem.sel { border-color: var(--hi); box-shadow: 0 0 0 1px var(--hi), 0 0 14px rgba(76,190,138,0.35); }
-.paletteItem .ic { font-size: 22px; line-height: 1; }
-.paletteItem .nm { font-size: 9.5px; font-weight: 800; letter-spacing: 0.02em; color: rgba(237,238,246,0.7); }
-.paletteItem .cost { font-size: 9px; font-weight: 700; color: #FFC94A; }
+.paletteItem .ic { font-size: 27px; line-height: 1; }
+.paletteItem .nm { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: rgba(237,238,246,0.7); }
+.paletteItem .cost { font-size: 11px; font-weight: 700; color: #FFC94A; }
 .paletteItem.locked { opacity: 0.4; }
 
 #toast {
@@ -247,10 +261,10 @@ canvas#c {
   top: 8px; left: 50%;
   transform: translateX(-50%);
   z-index: 20;
-  font-size: 11.5px; font-weight: 800;
+  font-size: 14px; font-weight: 800;
   color: #EDEEF6;
   background: rgba(10,8,18,0.75);
-  padding: 6px 14px; border-radius: 999px;
+  padding: 7px 16px; border-radius: 999px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s;
@@ -268,10 +282,10 @@ canvas#c {
   <h1 id="titleLogo">MOKU<span>CITY</span></h1>
   <p id="titleSub">Grow the town, keep the forest — Moku lives here too</p>
   <nav id="titleMenu">
-    <div class="menuItem sel" data-action="continue">Continue</div>
-    <div class="menuItem" data-action="reset">New City</div>
+    <div class="menuItem sel" data-action="continue" tabindex="0" role="button">Continue</div>
+    <div class="menuItem" data-action="reset" tabindex="0" role="button">New City</div>
   </nav>
-  <div class="textLink" id="howToToggle">❓ How to Play</div>
+  <div class="textLink" id="howToToggle" tabindex="0" role="button">❓ How to Play</div>
   <div id="howToPanel">
     Moku doesn't just govern this town — Moku <em>lives</em> here. Each level
     gives you one goal: build up the town, but keep enough forest and parks
@@ -544,20 +558,32 @@ canvas#c {
   // ---------- palette ----------
   var selectedTool = 'road';
   var paletteEl = document.getElementById('palette');
-  PALETTE_ORDER.forEach(function (key) {
+  var paletteEls = {};
+  function selectTool(key) {
+    selectedTool = key;
+    Array.prototype.forEach.call(paletteEl.children, function (c) { c.classList.remove('sel'); });
+    paletteEls[key].classList.add('sel');
+  }
+  PALETTE_ORDER.forEach(function (key, i) {
     var b = BUILDINGS[key];
     var el = document.createElement('div');
     el.className = 'paletteItem' + (key === selectedTool ? ' sel' : '');
     el.dataset.key = key;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
     el.innerHTML = '<div class="ic">' + b.icon + '</div>' +
       '<div class="nm">' + b.name + '</div>' +
-      '<div class="cost">' + (b.cost > 0 ? b.cost + '💰' : '') + '</div>';
-    el.addEventListener('click', function () {
-      selectedTool = key;
-      Array.prototype.forEach.call(paletteEl.children, function (c) { c.classList.remove('sel'); });
-      el.classList.add('sel');
+      '<div class="cost">' + (b.cost > 0 ? b.cost + '💰' : '') + '</div>' +
+      '<div class="kbd">' + (i + 1) + '</div>';
+    el.addEventListener('click', function () { selectTool(key); });
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault(); e.stopPropagation();
+        selectTool(key);
+      }
     });
     paletteEl.appendChild(el);
+    paletteEls[key] = el;
   });
 
   // ---------- canvas / isometric rendering ----------
@@ -690,14 +716,32 @@ canvas#c {
     if (hoverTile) {
       var p = gridToScreen(hoverTile.gx, hoverTile.gy);
       diamondPath(p.x, p.y);
-      ctx.strokeStyle = 'var(--hi)';
       ctx.strokeStyle = '#4CBE8A';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+    if (keyboardActive) {
+      var kp = gridToScreen(keyCursor.gx, keyCursor.gy);
+      diamondPath(kp.x, kp.y);
+      ctx.strokeStyle = '#FFC94A';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   var hoverTile = null;
+  // keyboard cursor: a second, independent way to target a tile so the
+  // whole game is playable without a pointer.
+  var keyCursor = { gx: Math.floor(GRID_W / 2), gy: Math.floor(GRID_H / 2) };
+  var keyboardActive = false;
+  function moveCursor(dgx, dgy) {
+    keyboardActive = true;
+    keyCursor.gx = Math.max(0, Math.min(GRID_W - 1, keyCursor.gx + dgx));
+    keyCursor.gy = Math.max(0, Math.min(GRID_H - 1, keyCursor.gy + dgy));
+    draw();
+  }
 
   function pointerToGrid(clientX, clientY) {
     var rect = canvas.getBoundingClientRect();
@@ -738,6 +782,7 @@ canvas#c {
     handlePlace(g.gx, g.gy);
   });
   canvas.addEventListener('pointermove', function (e) {
+    keyboardActive = false;
     var g = pointerToGrid(e.clientX, e.clientY);
     if (g.gx < 0 || g.gy < 0 || g.gx >= GRID_W || g.gy >= GRID_H) {
       if (hoverTile) { hoverTile = null; draw(); }
@@ -767,9 +812,7 @@ canvas#c {
     resizeCanvas();
   }
 
-  document.getElementById('titleMenu').addEventListener('click', function (e) {
-    var item = e.target.closest('.menuItem');
-    if (!item) return;
+  function handleMenuAction(item) {
     var action = item.dataset.action;
     if (action === 'reset') {
       if (confirm('Start a new city? This clears your current progress.')) {
@@ -778,12 +821,72 @@ canvas#c {
       }
     }
     startCity();
+  }
+  var titleMenuEl = document.getElementById('titleMenu');
+  titleMenuEl.addEventListener('click', function (e) {
+    var item = e.target.closest('.menuItem');
+    if (!item) return;
+    handleMenuAction(item);
+  });
+  titleMenuEl.addEventListener('keydown', function (e) {
+    var item = e.target.closest('.menuItem');
+    if (!item || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault(); e.stopPropagation();
+    handleMenuAction(item);
   });
   document.getElementById('titleBtn').addEventListener('click', goTitle);
 
-  document.getElementById('howToToggle').addEventListener('click', function () {
+  function toggleHowTo() {
     document.getElementById('howToPanel').classList.toggle('show');
-    this.classList.toggle('active');
+    document.getElementById('howToToggle').classList.toggle('active');
+  }
+  var howToToggleEl = document.getElementById('howToToggle');
+  howToToggleEl.addEventListener('click', toggleHowTo);
+  howToToggleEl.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault(); e.stopPropagation();
+    toggleHowTo();
+  });
+
+  // ---------- keyboard controls ----------
+  // Arrows/WASD move a keyboard cursor across the grid, 1-5 pick a
+  // palette tool, Enter/Space place/clear at the cursor, Esc returns to
+  // the title. On the title screen, Up/Down move the menu selection.
+  window.addEventListener('keydown', function (e) {
+    if (document.body.classList.contains('playing')) {
+      switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W': moveCursor(0, -1); e.preventDefault(); return;
+        case 'ArrowDown': case 's': case 'S': moveCursor(0, 1); e.preventDefault(); return;
+        case 'ArrowLeft': case 'a': case 'A': moveCursor(-1, 0); e.preventDefault(); return;
+        case 'ArrowRight': case 'd': case 'D': moveCursor(1, 0); e.preventDefault(); return;
+        case 'Enter': case ' ':
+          keyboardActive = true;
+          handlePlace(keyCursor.gx, keyCursor.gy);
+          e.preventDefault();
+          return;
+        case 'Escape': goTitle(); return;
+        default:
+          var n = parseInt(e.key, 10);
+          if (n >= 1 && n <= PALETTE_ORDER.length) selectTool(PALETTE_ORDER[n - 1]);
+      }
+      return;
+    }
+    // title screen: skip when a focused element already handles its own key
+    var active = document.activeElement;
+    if (active && (active.classList.contains('menuItem') || active.id === 'howToToggle')) return;
+    var items = Array.prototype.slice.call(titleMenuEl.querySelectorAll('.menuItem'));
+    var curIdx = items.findIndex(function (it) { return it.classList.contains('sel'); });
+    if (curIdx < 0) curIdx = 0;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var next = items[(curIdx + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+      items.forEach(function (it) { it.classList.remove('sel'); });
+      next.classList.add('sel');
+      next.focus();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleMenuAction(items[curIdx]);
+    }
   });
 
   var tickTimer = setInterval(function () {
