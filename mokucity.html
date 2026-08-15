@@ -147,7 +147,11 @@ body.playing #wrapper { display: flex; }
 }
 #hud .stat.coins { color: #FFC94A; }
 #hud .stat.pop { color: var(--hi); }
+#hud .stat.nature { color: #3FA34D; }
 #hud .stat.sat { color: #E98FC7; }
+#hud .stat.mood { font-size: 16px; padding: 4px 9px; transition: filter 0.3s; }
+#hud.natureLow .stat.nature { color: #FF6B4A; }
+#hud.natureLow .stat.mood { filter: drop-shadow(0 0 6px rgba(255,107,74,0.7)); }
 #titleBtn {
   appearance: none; border: none; cursor: pointer;
   background: rgba(10,8,18,0.5);
@@ -211,12 +215,12 @@ canvas#c {
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.0.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.1.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
   <h1 id="titleLogo">MOKU<span>CITY</span></h1>
-  <p id="titleSub">Build a tiny town for the Mokus</p>
+  <p id="titleSub">Grow the town, keep the forest — Moku lives here too</p>
   <nav id="titleMenu">
     <div class="menuItem sel" data-action="continue">Continue</div>
     <div class="menuItem" data-action="reset">New City</div>
@@ -229,7 +233,9 @@ canvas#c {
     <button id="titleBtn" type="button">◀ Title</button>
     <div class="stat coins">💰 <span id="hudCoins">0</span></div>
     <div class="stat pop">👤 <span id="hudPop">0</span></div>
+    <div class="stat nature">🌿 <span id="hudNature">0</span>%</div>
     <div class="stat sat">😊 <span id="hudSat">0</span>%</div>
+    <div class="stat mood" id="hudMood">😐</div>
   </div>
   <div id="canvasArea">
     <canvas id="c"></canvas>
@@ -253,18 +259,28 @@ canvas#c {
     road:  { id: 'road',  name: 'Road',   icon: '🛣️', cost: 10,  color: '#5B5F73' },
     house: { id: 'house', name: 'House',  icon: '🏠', cost: 50,  color: '#4CBE8A', pop: 4 },
     shop:  { id: 'shop',  name: 'Shop',   icon: '🏪', cost: 100, color: '#FFC94A', income: 6 },
-    park:  { id: 'park',  name: 'Park',   icon: '🌳', cost: 30,  color: '#3FA34D', sat: 6 },
-    bulldoze: { id: 'bulldoze', name: 'Clear', icon: '🗑️', cost: 0 }
+    park:  { id: 'park',  name: 'Park',   icon: '🌳', cost: 30,  color: '#3FA34D', sat: 6, nature: 1 },
+    bulldoze: { id: 'bulldoze', name: 'Clear', icon: '🗑️', cost: 0 },
+    // 'forest' is natural terrain, not a placeable palette tool — it seeds
+    // the map and is what Nature actually measures alongside parks.
+    forest: { id: 'forest', name: 'Forest', icon: '🌲', color: '#2E7D46', nature: 1 }
   };
   var PALETTE_ORDER = ['road', 'house', 'shop', 'park', 'bulldoze'];
+  var NATURE_LOW = 35, NATURE_HIGH = 65;
 
   // ---------- save data ----------
   function defaultProgress() {
+    // The city starts mostly wild — Moku's town grows INTO the forest, not
+    // onto a blank lot, so every build choice is a choice to clear nature.
+    var grid = new Array(GRID_W * GRID_H).fill(null);
+    for (var i = 0; i < grid.length; i++) {
+      if (Math.random() < 0.45) grid[i] = 'forest';
+    }
     return {
       version: 1,
       gameId: GAME_ID,
       coins: 500,
-      grid: new Array(GRID_W * GRID_H).fill(null),
+      grid: grid,
       updatedAt: ''
     };
   }
@@ -297,27 +313,44 @@ canvas#c {
   }
 
   // ---------- derived stats ----------
-  var stats = { coins: 0, population: 0, satisfaction: 0 };
+  // Nature isn't cosmetic — it's the second win condition alongside the
+  // economy. Moku doesn't govern the city from above; Moku lives in it, so
+  // the HUD mood tracks how the forest/park balance is actually doing.
+  var stats = { coins: 0, population: 0, satisfaction: 0, nature: 100 };
   function recompute() {
-    var pop = 0, satPoints = 0, houses = 0, parks = 0;
+    var pop = 0, houses = 0, parks = 0, forestTiles = 0, natureTiles = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
         if (t === 'house') { pop += BUILDINGS.house.pop; houses++; }
-        if (t === 'park') { parks++; }
+        if (t === 'park') { parks++; natureTiles++; }
+        if (t === 'forest') { forestTiles++; natureTiles++; }
       }
     }
-    // satisfaction: baseline 50%, +park coverage, -crowding without parks
+    var nature = Math.round((natureTiles / (GRID_W * GRID_H)) * 100);
+    // satisfaction: baseline 50%, +park coverage, -crowding without parks,
+    // and it suffers directly whenever nature has dropped into the red.
     var sat = 50;
     if (houses > 0) {
       sat += Math.min(40, parks * BUILDINGS.park.sat);
       sat -= Math.min(30, Math.max(0, houses - parks * 2) * 2);
     }
+    if (nature < NATURE_LOW) sat -= (NATURE_LOW - nature);
+    else if (nature > NATURE_HIGH) sat += Math.min(10, (nature - NATURE_HIGH) / 2);
     sat = Math.max(0, Math.min(100, Math.round(sat)));
     stats.coins = progress.coins;
     stats.population = pop;
     stats.satisfaction = sat;
+    stats.nature = nature;
+    stats.forestTiles = forestTiles;
+    stats.parks = parks;
     updateHud();
+  }
+
+  function natureMood() {
+    if (stats.nature < NATURE_LOW) return { face: '😢', label: 'Moku is worried' };
+    if (stats.nature > NATURE_HIGH) return { face: '😊', label: 'Moku is thriving' };
+    return { face: '😐', label: 'Moku is watching' };
   }
 
   function shopIncomeTick() {
@@ -330,10 +363,15 @@ canvas#c {
     }
     if (shopCount === 0) return;
     var satMul = 0.6 + (stats.satisfaction / 100) * 0.8;
-    var perShop = Math.max(1, Math.round((BUILDINGS.shop.income + totalPop * 0.4) * satMul / Math.max(1, shopCount * 0.35)));
+    // A city that paved over its forest doesn't just make Moku sad — the
+    // economy itself suffers, so growth and nature can't be optimized
+    // independently of each other.
+    var natureMul = stats.nature < NATURE_LOW ? 0.5 : (stats.nature > NATURE_HIGH ? 1.2 : 1);
+    var perShop = Math.max(1, Math.round((BUILDINGS.shop.income + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopCount * 0.35)));
     var earned = perShop * shopCount;
     progress.coins += earned;
     if (earned > 0) showToast('+' + earned + ' 💰 from shops');
+    if (stats.nature < NATURE_LOW) showToast('🌲 Nature is low — Moku needs more green');
     recompute();
     saveProgress();
   }
@@ -342,10 +380,17 @@ canvas#c {
   var hudCoins = document.getElementById('hudCoins');
   var hudPop = document.getElementById('hudPop');
   var hudSat = document.getElementById('hudSat');
+  var hudNature = document.getElementById('hudNature');
+  var hudMood = document.getElementById('hudMood');
   function updateHud() {
     hudCoins.textContent = stats.coins;
     hudPop.textContent = stats.population;
     hudSat.textContent = stats.satisfaction;
+    hudNature.textContent = stats.nature;
+    var mood = natureMood();
+    hudMood.textContent = mood.face;
+    hudMood.title = mood.label;
+    document.getElementById('hud').classList.toggle('natureLow', stats.nature < NATURE_LOW);
   }
 
   var toastEl = document.getElementById('toast');
@@ -517,7 +562,9 @@ canvas#c {
 
   function pointerToGrid(clientX, clientY) {
     var rect = canvas.getBoundingClientRect();
-    var sx = clientX - rect.left, sy = clientY - rect.top;
+    // canvas is drawn in logical units then scaled by `zoom` via ctx transform,
+    // so a CSS-pixel click position has to be un-scaled before hit-testing.
+    var sx = (clientX - rect.left) / zoom, sy = (clientY - rect.top) / zoom;
     return screenToGrid(sx, sy);
   }
 
