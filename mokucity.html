@@ -68,6 +68,23 @@ body.playing #hub-link,
 body.playing #buildInfo,
 body.playing #title-frame { display: none; }
 
+/* ---------- rotate-to-landscape gate ---------- */
+#rotate-hint {
+  display: none;
+  position: fixed; inset: 0; z-index: 999;
+  background: #0A0B12;
+  flex-direction: column; align-items: center; justify-content: center;
+  color: #EDEEF6; font-size: 15px; font-weight: 700; gap: 16px; text-align: center;
+  padding: 20px;
+}
+#rotate-hint span { font-size: 52px; display: inline-block; animation: rotateHintSpin 1.5s ease-in-out infinite alternate; }
+@keyframes rotateHintSpin { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+#rotate-hint p { color: rgba(237,238,246,0.6); font-size: 12.5px; font-weight: 600; max-width: 260px; line-height: 1.6; }
+@media (max-width: 1024px) and (orientation: portrait) {
+  #rotate-hint { display: flex; }
+  #title-frame, #hub-link, #buildInfo, #titleScreen, #wrapper { display: none !important; }
+}
+
 /* ---------- screens ---------- */
 .screen {
   position: absolute; inset: 0;
@@ -281,12 +298,88 @@ canvas#c {
   transition: opacity 0.2s;
 }
 #toast.show { opacity: 1; }
+
+/* ---------- disaster warning ---------- */
+#disasterWarning {
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800;
+  color: #FF6B4A;
+  background: rgba(120,30,20,0.55);
+  border: 1px solid rgba(255,107,74,0.5);
+  padding: 8px 16px; border-radius: 999px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+#disasterWarning.show { opacity: 1; animation: disasterWarningPulse 0.9s ease-in-out infinite; }
+#disasterWarningIcon { font-size: 17px; animation: disasterWarningBlink 0.6s steps(1) infinite; }
+@keyframes disasterWarningPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+@keyframes disasterWarningBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  #disasterWarning.show { animation: none; }
+  #disasterWarningIcon { animation: none; }
+}
+
+/* ---------- on-screen touch controls (iPad / no-keyboard play) ---------- */
+/* Mirrors the keyboard cursor scheme (arrows + Enter) as thumb-reachable,
+   translucent buttons in the left/right landscape thumb zones. */
+#touchControls {
+  position: absolute; inset: 0;
+  z-index: 14;
+  pointer-events: none;
+}
+#dpad {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 16px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 140px; height: 140px;
+}
+.dbtn {
+  position: absolute;
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.07);
+  color: rgba(237,238,246,0.8);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.dbtn:active { background: rgba(255,255,255,0.2); }
+.dbtn.up { left: 47px; top: 0; }
+.dbtn.down { left: 47px; top: 94px; }
+.dbtn.left { left: 0; top: 47px; }
+.dbtn.right { left: 94px; top: 47px; }
+#placeBtn {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 1px solid rgba(76,190,138,0.45);
+  background: rgba(76,190,138,0.14);
+  color: #4CBE8A;
+  font-size: 26px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+#placeBtn:active { background: rgba(76,190,138,0.3); }
 </style>
 </head>
 <body>
+<div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.3.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.4.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -328,6 +421,16 @@ canvas#c {
   <div id="canvasArea">
     <canvas id="c"></canvas>
     <div id="toast"></div>
+    <div id="disasterWarning"><span id="disasterWarningIcon">⚠️</span><span id="disasterWarningText"></span></div>
+    <div id="touchControls">
+      <div id="dpad">
+        <button class="dbtn up" type="button" data-dir="up" aria-label="Move up">▲</button>
+        <button class="dbtn left" type="button" data-dir="left" aria-label="Move left">◀</button>
+        <button class="dbtn right" type="button" data-dir="right" aria-label="Move right">▶</button>
+        <button class="dbtn down" type="button" data-dir="down" aria-label="Move down">▼</button>
+      </div>
+      <button id="placeBtn" type="button" aria-label="Place or clear">✓</button>
+    </div>
   </div>
   <div id="palette"></div>
 </div>
@@ -384,7 +487,7 @@ canvas#c {
     return arr;
   }
   var DISASTERS = [
-    { icon: '🔥', apply: function () {
+    { icon: '🔥', warn: 'Smoke on the horizon — a fire is brewing!', apply: function () {
       var targets = collectDamageable();
       if (!targets.length) return null;
       var t = targets[Math.floor(Math.random() * targets.length)];
@@ -393,13 +496,13 @@ canvas#c {
       progress.coins -= loss;
       return 'Fire destroyed a building! (-' + loss + '💰 in repairs)';
     } },
-    { icon: '🌊', apply: function () {
+    { icon: '🌊', warn: 'Storm clouds gathering over the coast — flood risk rising!', apply: function () {
       if (progress.coins <= 0) return null;
       var loss = Math.min(progress.coins, Math.max(15, Math.round(progress.coins * 0.15)));
       progress.coins -= loss;
       return 'Flood swept through town — -' + loss + '💰 in damage';
     } },
-    { icon: '🌪️', apply: function () {
+    { icon: '🌪️', warn: 'Winds are picking up fast — a storm is closing in!', apply: function () {
       var targets = shuffle(collectDamageable());
       if (!targets.length) return null;
       var n = Math.min(targets.length, 1 + Math.floor(Math.random() * 2));
@@ -408,7 +511,7 @@ canvas#c {
       progress.coins -= loss;
       return 'A storm damaged ' + n + ' building' + (n > 1 ? 's' : '') + '! (-' + loss + '💰)';
     } },
-    { icon: '🌍', apply: function () {
+    { icon: '🌍', warn: 'The ground is trembling — an earthquake may strike!', apply: function () {
       var targets = shuffle(collectDamageable());
       if (!targets.length) return null;
       var n = Math.min(targets.length, 3);
@@ -418,20 +521,44 @@ canvas#c {
       return 'Earthquake! ' + n + ' building' + (n > 1 ? 's' : '') + ' damaged — -' + loss + '💰 in repairs';
     } }
   ];
-  function triggerRandomDisaster() {
-    var pool = shuffle(DISASTERS.slice());
-    for (var i = 0; i < pool.length; i++) {
-      var msg = pool[i].apply();
-      if (msg) {
-        showToast(pool[i].icon + ' ' + msg);
-        var area = document.getElementById('canvasArea');
-        area.classList.remove('shake'); void area.offsetWidth; area.classList.add('shake');
-        recompute();
-        saveProgress();
-        draw();
-        return;
-      }
-    }
+
+  // Disasters telegraph before they land: a pulsing banner names the
+  // threat, then it resolves a few seconds later — enough warning to
+  // react (or just brace for it), unlike the old instant-hit version.
+  var pendingDisaster = null;
+  var disasterWarnTimer = null;
+  var disasterWarnEl = document.getElementById('disasterWarning');
+  var disasterWarnIconEl = document.getElementById('disasterWarningIcon');
+  var disasterWarnTextEl = document.getElementById('disasterWarningText');
+  var DISASTER_WARN_MS = 4500;
+  function scheduleDisasterWarning() {
+    if (pendingDisaster) return;
+    var d = DISASTERS[Math.floor(Math.random() * DISASTERS.length)];
+    pendingDisaster = d;
+    disasterWarnIconEl.textContent = d.icon;
+    disasterWarnTextEl.textContent = d.warn;
+    disasterWarnEl.classList.add('show');
+    disasterWarnTimer = setTimeout(function () { resolvePendingDisaster(); }, DISASTER_WARN_MS);
+  }
+  function resolvePendingDisaster() {
+    var d = pendingDisaster;
+    pendingDisaster = null;
+    disasterWarnTimer = null;
+    disasterWarnEl.classList.remove('show');
+    if (!d || !document.body.classList.contains('playing')) return;
+    var msg = d.apply();
+    if (!msg) return; // nothing left to damage — false alarm
+    showToast(d.icon + ' ' + msg);
+    var area = document.getElementById('canvasArea');
+    area.classList.remove('shake'); void area.offsetWidth; area.classList.add('shake');
+    recompute();
+    saveProgress();
+    draw();
+  }
+  function cancelPendingDisaster() {
+    if (disasterWarnTimer) { clearTimeout(disasterWarnTimer); disasterWarnTimer = null; }
+    pendingDisaster = null;
+    disasterWarnEl.classList.remove('show');
   }
 
   // ---------- quests / levels ----------
@@ -813,6 +940,74 @@ canvas#c {
     return 'rgb(' + r + ',' + g + ',' + bl + ')';
   }
 
+  // ---------- residents ----------
+  // Purely decorative: a handful of little Mokus glide between built tiles
+  // so the town doesn't look static. Kept deliberately cheap — capped
+  // headcount, one grid scan per tick, plain lerp'd positions, no physics.
+  var RESIDENT_CAP = 6;
+  var residents = [];
+  function randomBuiltTile() {
+    var list = [];
+    for (var gy = 0; gy < GRID_H; gy++) {
+      for (var gx = 0; gx < GRID_W; gx++) {
+        var t = tileAt(gx, gy);
+        if (t && t !== 'forest') list.push({ gx: gx, gy: gy });
+      }
+    }
+    if (!list.length) return null;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  function pickNeighborTile(fromGx, fromGy) {
+    var candidates = [];
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        var nx = fromGx + dx, ny = fromGy + dy;
+        if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+        candidates.push({ gx: nx, gy: ny });
+      }
+    }
+    if (!candidates.length) return { gx: fromGx, gy: fromGy };
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+  function ensureResidentCount() {
+    var houses = 0;
+    for (var gy = 0; gy < GRID_H; gy++) {
+      for (var gx = 0; gx < GRID_W; gx++) {
+        if (tileAt(gx, gy) === 'house') houses++;
+      }
+    }
+    var target = houses > 0 ? Math.min(RESIDENT_CAP, houses) : 0;
+    while (residents.length > target) residents.pop();
+    while (residents.length < target) {
+      var spot = randomBuiltTile();
+      if (!spot) break;
+      residents.push({ fx: spot.gx, fy: spot.gy, tx: spot.gx, ty: spot.gy, t0: performance.now(), dur: 1 });
+    }
+  }
+  function updateResidents(now) {
+    residents.forEach(function (r) {
+      if (now - r.t0 >= r.dur * 1000) {
+        r.fx = r.tx; r.fy = r.ty;
+        var next = pickNeighborTile(r.tx, r.ty);
+        r.tx = next.gx; r.ty = next.gy;
+        r.t0 = now;
+        r.dur = 1.4 + Math.random() * 1.4;
+      }
+    });
+  }
+  function drawResidents(now) {
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    residents.forEach(function (r) {
+      var t = Math.max(0, Math.min(1, (now - r.t0) / (r.dur * 1000)));
+      var gx = r.fx + (r.tx - r.fx) * t;
+      var gy = r.fy + (r.ty - r.fy) * t;
+      var p = gridToScreen(gx, gy);
+      ctx.fillText('🦉', p.x, p.y + TILE_H * 0.6);
+    });
+  }
+
   function draw() {
     var w = canvas.width / DPR, h = canvas.height / DPR;
     // clearRect respects the current transform (scaled by DPR*zoom), so
@@ -839,6 +1034,7 @@ canvas#c {
       var key = tileAt(t.gx, t.gy);
       if (key) drawBuilding(t.gx, t.gy, key);
     });
+    drawResidents(performance.now());
     if (hoverTile) {
       var p = gridToScreen(hoverTile.gx, hoverTile.gy);
       diamondPath(p.x, p.y);
@@ -922,9 +1118,30 @@ canvas#c {
 
   window.addEventListener('resize', resizeCanvas);
 
+  // ---------- on-screen touch controls ----------
+  // Same targeting as the keyboard cursor, just reachable by thumb — this
+  // is what makes the game playable on an iPad with no keyboard attached.
+  Array.prototype.forEach.call(document.querySelectorAll('.dbtn'), function (btn) {
+    btn.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      switch (btn.dataset.dir) {
+        case 'up': moveCursor(0, -1); break;
+        case 'down': moveCursor(0, 1); break;
+        case 'left': moveCursor(-1, 0); break;
+        case 'right': moveCursor(1, 0); break;
+      }
+    });
+  });
+  document.getElementById('placeBtn').addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    keyboardActive = true;
+    handlePlace(keyCursor.gx, keyCursor.gy);
+  });
+
   // ---------- game flow ----------
   function goTitle() {
     document.body.classList.remove('playing');
+    cancelPendingDisaster();
     showScreen('titleScreen');
   }
   function showScreen(id) {
@@ -936,6 +1153,7 @@ canvas#c {
     showScreen(null);
     recompute();
     resizeCanvas();
+    ensureResidentCount();
   }
 
   function handleMenuAction(item) {
@@ -1026,8 +1244,15 @@ canvas#c {
     if (!document.body.classList.contains('playing')) return;
     if (stats.population <= 0 && progress.coins <= 0) return;
     if (Math.random() > 0.3) return;
-    triggerRandomDisaster();
+    scheduleDisasterWarning();
   }, 20000);
+
+  var residentTimer = setInterval(function () {
+    if (!document.body.classList.contains('playing')) return;
+    ensureResidentCount();
+    updateResidents(performance.now());
+    draw();
+  }, 150);
 
   recompute();
 })();
