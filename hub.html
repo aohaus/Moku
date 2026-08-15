@@ -510,6 +510,7 @@ body[data-band="morning"] #starsLayer { --star-opacity: 0.15; }
 .card.mk { --hi: #FFC94A; --lo: #8A6218; }
 .card.br { --hi: #6E7BFF; --lo: #2B2F80; }
 .card.so { --hi: #FF6B4A; --lo: #7A2E1A; }
+.card.mc { --hi: #4BC9C9; --lo: #1F6666; }
 
 .card.soon {
   --hi: rgba(237,238,246,0.22);
@@ -687,8 +688,17 @@ footer {
         <div class="progress-badge" data-game="so">—</div>
       </div>
     </a>
+    <a class="card mc" href="mokucity.html">
+      <div class="emoji">🏘️</div>
+      <div class="sub">Town Builder</div>
+      <h2>MokuCity</h2>
+      <p class="desc">Grow Moku's town from the forest — build houses, shops, and parks without losing Nature.</p>
+      <div class="cta-row">
+        <div class="cta">Play ▶</div>
+        <div class="progress-badge" data-game="mc">—</div>
+      </div>
+    </a>
     <div class="card soon"><div class="emoji">🔒</div><h2>Mokuball</h2><div class="sub">TBA</div></div>
-    <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
     <div class="card soon"><div class="emoji">🔒</div><h2>Coming Soon</h2><div class="sub">TBA</div></div>
   </div>
 
@@ -1004,6 +1014,20 @@ footer {
         return Math.min(1, (p.unlockedStage || 1) / 5);
       },
       badge: function () { return null; }
+    },
+    {
+      name: 'MokuCity',
+      card: 'mc',
+      progress: function () {
+        var p = readJSON('moku:mokucity:progress');
+        if (!p || !p.updatedAt) return 0;
+        return Math.min(1, (p.level || 1) / 10);
+      },
+      badge: function () {
+        var p = readJSON('moku:mokucity:progress');
+        if (!p || !p.updatedAt) return null;
+        return 'Lv.' + (p.level || 1) + ' · ' + (p.coins || 0).toLocaleString() + ' coins';
+      }
     }
   ];
 
