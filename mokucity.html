@@ -382,13 +382,54 @@ canvas#c {
   -webkit-tap-highlight-color: transparent;
 }
 #placeBtn:active { background: rgba(76,190,138,0.3); }
+
+/* ---------- compact layout: short landscape (phones) ---------- */
+/* iPad-scale chrome (large stat pills, a 140px D-pad) eats most of a
+   phone's ~380-430px landscape height before the grid gets any room at
+   all, and the touch controls — sized/positioned for a much taller
+   canvasArea — poke out above it into the quest bar. Everything here
+   only kicks in below iPad-mini-landscape height (768px), so tablets are
+   untouched. */
+@media (max-height: 520px) {
+  #hud { padding: calc(env(safe-area-inset-top, 0px) + 4px) 8px 4px; gap: 6px; }
+  #dashboard { gap: 4px; padding: 4px 6px; border-radius: 10px; max-width: 82%; }
+  #hud .stat { font-size: 12px; padding: 3px 7px; }
+  #hud .stat.mood { font-size: 15px; padding: 3px 6px; }
+  #titleBtn { font-size: 11.5px; padding: 4px 8px; }
+  #questBar { margin: 0 8px 4px; padding: 4px 8px; gap: 6px; }
+  #questBar .questIcon { font-size: 12px; }
+  #questBar .questTitle { font-size: 10.5px; }
+  #questBar .questProgress { font-size: 9px; }
+  #palette { padding: 3px 6px calc(env(safe-area-inset-bottom, 0px) + 3px); gap: 4px; }
+  .paletteItem { padding: 3px 7px; min-width: 46px; gap: 0; }
+  .paletteItem .ic { font-size: 17px; }
+  .paletteItem .nm { font-size: 8px; }
+  .paletteItem .cost { font-size: 7px; }
+  .paletteItem .kbd { display: none; }
+  #dpad {
+    left: calc(env(safe-area-inset-left, 0px) + 6px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    width: 90px; height: 90px;
+  }
+  .dbtn { width: 30px; height: 30px; font-size: 12px; border-radius: 7px; }
+  .dbtn.up { left: 30px; top: 0; }
+  .dbtn.down { left: 30px; top: 60px; }
+  .dbtn.left { left: 0; top: 30px; }
+  .dbtn.right { left: 60px; top: 30px; }
+  #placeBtn {
+    right: calc(env(safe-area-inset-right, 0px) + 6px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    width: 46px; height: 46px;
+    font-size: 17px;
+  }
+}
 </style>
 </head>
 <body>
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.5.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.6.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
