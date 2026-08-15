@@ -159,7 +159,7 @@ body.playing #wrapper { display: flex; }
   flex-wrap: wrap;
 }
 #hud .stat {
-  font-size: 15px; font-weight: 800;
+  font-size: 18px; font-weight: 800;
   color: #EDEEF6;
   background: rgba(10,8,18,0.5);
   padding: 5px 12px; border-radius: 999px;
@@ -171,7 +171,7 @@ body.playing #wrapper { display: flex; }
 #hud .stat.pop { color: var(--hi); }
 #hud .stat.nature { color: #3FA34D; }
 #hud .stat.sat { color: #E98FC7; }
-#hud .stat.mood { font-size: 20px; padding: 4px 9px; transition: filter 0.3s; }
+#hud .stat.mood { font-size: 23px; padding: 5px 10px; transition: filter 0.3s; }
 #hud.natureLow .stat.nature { color: #FF6B4A; }
 #hud.natureLow .stat.mood { filter: drop-shadow(0 0 6px rgba(255,107,74,0.7)); }
 
@@ -187,14 +187,14 @@ body.playing #wrapper { display: flex; }
   background: rgba(255,201,74,0.08);
   border: 1px solid rgba(255,201,74,0.22);
 }
-#questBar .questIcon { font-size: 19px; flex: 0 0 auto; }
+#questBar .questIcon { font-size: 21px; flex: 0 0 auto; }
 #questBar .questText { min-width: 0; flex: 1 1 auto; }
 #questBar .questTitle {
-  font-size: 14.5px; font-weight: 800; color: #FFC94A;
+  font-size: 16px; font-weight: 800; color: #FFC94A;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #questBar .questProgress {
-  font-size: 12.5px; color: rgba(237,238,246,0.6);
+  font-size: 13.5px; color: rgba(237,238,246,0.6);
   font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -215,6 +215,16 @@ canvas#c {
   display: block;
   width: 100%; height: 100%;
 }
+@keyframes disasterShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+#canvasArea.shake { animation: disasterShake 0.4s; }
+@media (prefers-reduced-motion: reduce) {
+  #canvasArea.shake { animation: none; }
+}
 
 #palette {
   position: relative;
@@ -230,12 +240,12 @@ canvas#c {
   position: relative;
   flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 9px 14px;
+  padding: 10px 16px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.03);
   cursor: pointer;
-  min-width: 72px;
+  min-width: 84px;
 }
 .paletteItem .kbd {
   position: absolute; top: 4px; left: 6px;
@@ -251,10 +261,11 @@ canvas#c {
   outline-offset: 2px;
 }
 .paletteItem.sel { border-color: var(--hi); box-shadow: 0 0 0 1px var(--hi), 0 0 14px rgba(76,190,138,0.35); }
-.paletteItem .ic { font-size: 27px; line-height: 1; }
-.paletteItem .nm { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: rgba(237,238,246,0.7); }
-.paletteItem .cost { font-size: 11px; font-weight: 700; color: #FFC94A; }
+.paletteItem .ic { font-size: 32px; line-height: 1; }
+.paletteItem .nm { font-size: 14px; font-weight: 800; letter-spacing: 0.02em; color: rgba(237,238,246,0.7); }
+.paletteItem .cost { font-size: 13px; font-weight: 700; color: #FFC94A; }
 .paletteItem.locked { opacity: 0.4; }
+.paletteItem.locked .cost { color: rgba(237,238,246,0.5); }
 
 #toast {
   position: absolute;
@@ -275,7 +286,7 @@ canvas#c {
 <body>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.2.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.3.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -290,8 +301,9 @@ canvas#c {
     Moku doesn't just govern this town — Moku <em>lives</em> here. Each level
     gives you one goal: build up the town, but keep enough forest and parks
     standing to keep Nature healthy. Let Nature drop too far and both the
-    economy and Moku's mood suffer. Clear a goal to level up and unlock a
-    bigger one.
+    economy and Moku's mood suffer. Leveling up unlocks new buildings like
+    the School and Landmark — and watch out for the occasional fire, flood,
+    storm, or earthquake, which can damage buildings and cost coins.
   </div>
   <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
 </section>
@@ -336,13 +348,91 @@ canvas#c {
     house: { id: 'house', name: 'House',  icon: '🏠', cost: 50,  color: '#4CBE8A', pop: 4 },
     shop:  { id: 'shop',  name: 'Shop',   icon: '🏪', cost: 100, color: '#FFC94A', income: 6 },
     park:  { id: 'park',  name: 'Park',   icon: '🌳', cost: 30,  color: '#3FA34D', sat: 6, nature: 1 },
+    // School and Landmark unlock as the town levels up — visible but locked
+    // in the palette until then, so growth keeps handing the player new toys.
+    school:   { id: 'school',   name: 'School',   icon: '🏫', cost: 150, color: '#5B8DEF', sat: 8,  unlockLevel: 3 },
+    landmark: { id: 'landmark', name: 'Landmark', icon: '🏛️', cost: 250, color: '#C77DFF', sat: 12, income: 15, unlockLevel: 5 },
     bulldoze: { id: 'bulldoze', name: 'Clear', icon: '🗑️', cost: 0 },
     // 'forest' is natural terrain, not a placeable palette tool — it seeds
     // the map and is what Nature actually measures alongside parks.
     forest: { id: 'forest', name: 'Forest', icon: '🌲', color: '#2E7D46', nature: 1 }
   };
-  var PALETTE_ORDER = ['road', 'house', 'shop', 'park', 'bulldoze'];
+  var PALETTE_ORDER = ['road', 'house', 'shop', 'park', 'school', 'landmark', 'bulldoze'];
   var NATURE_LOW = 35, NATURE_HIGH = 65;
+
+  // ---------- natural disasters ----------
+  // Growth isn't just opposed by Nature dropping — the town itself is
+  // fragile. Each `apply` mutates the grid/coins directly and returns a
+  // toast message, or null if it found nothing to damage (e.g. fire with
+  // no buildings standing), so the caller can try another disaster instead
+  // of showing an empty event.
+  function collectDamageable() {
+    var list = [];
+    for (var gy = 0; gy < GRID_H; gy++) {
+      for (var gx = 0; gx < GRID_W; gx++) {
+        var t = tileAt(gx, gy);
+        if (t && t !== 'forest' && t !== 'road') list.push({ gx: gx, gy: gy });
+      }
+    }
+    return list;
+  }
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+  var DISASTERS = [
+    { icon: '🔥', apply: function () {
+      var targets = collectDamageable();
+      if (!targets.length) return null;
+      var t = targets[Math.floor(Math.random() * targets.length)];
+      progress.grid[idx(t.gx, t.gy)] = null;
+      var loss = Math.min(progress.coins, 20);
+      progress.coins -= loss;
+      return 'Fire destroyed a building! (-' + loss + '💰 in repairs)';
+    } },
+    { icon: '🌊', apply: function () {
+      if (progress.coins <= 0) return null;
+      var loss = Math.min(progress.coins, Math.max(15, Math.round(progress.coins * 0.15)));
+      progress.coins -= loss;
+      return 'Flood swept through town — -' + loss + '💰 in damage';
+    } },
+    { icon: '🌪️', apply: function () {
+      var targets = shuffle(collectDamageable());
+      if (!targets.length) return null;
+      var n = Math.min(targets.length, 1 + Math.floor(Math.random() * 2));
+      for (var i = 0; i < n; i++) progress.grid[idx(targets[i].gx, targets[i].gy)] = null;
+      var loss = Math.min(progress.coins, n * 10);
+      progress.coins -= loss;
+      return 'A storm damaged ' + n + ' building' + (n > 1 ? 's' : '') + '! (-' + loss + '💰)';
+    } },
+    { icon: '🌍', apply: function () {
+      var targets = shuffle(collectDamageable());
+      if (!targets.length) return null;
+      var n = Math.min(targets.length, 3);
+      for (var i = 0; i < n; i++) progress.grid[idx(targets[i].gx, targets[i].gy)] = null;
+      var loss = Math.min(progress.coins, 20 + n * 15);
+      progress.coins -= loss;
+      return 'Earthquake! ' + n + ' building' + (n > 1 ? 's' : '') + ' damaged — -' + loss + '💰 in repairs';
+    } }
+  ];
+  function triggerRandomDisaster() {
+    var pool = shuffle(DISASTERS.slice());
+    for (var i = 0; i < pool.length; i++) {
+      var msg = pool[i].apply();
+      if (msg) {
+        showToast(pool[i].icon + ' ' + msg);
+        var area = document.getElementById('canvasArea');
+        area.classList.remove('shake'); void area.offsetWidth; area.classList.add('shake');
+        recompute();
+        saveProgress();
+        draw();
+        return;
+      }
+    }
+  }
 
   // ---------- quests / levels ----------
   // The quest text IS the tutorial: instead of a separate how-to-play
@@ -446,21 +536,25 @@ canvas#c {
   // the HUD mood tracks how the forest/park balance is actually doing.
   var stats = { coins: 0, population: 0, satisfaction: 0, nature: 100 };
   function recompute() {
-    var pop = 0, houses = 0, parks = 0, forestTiles = 0, natureTiles = 0;
+    var pop = 0, houses = 0, parks = 0, forestTiles = 0, natureTiles = 0, schools = 0, landmarks = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
         if (t === 'house') { pop += BUILDINGS.house.pop; houses++; }
         if (t === 'park') { parks++; natureTiles++; }
         if (t === 'forest') { forestTiles++; natureTiles++; }
+        if (t === 'school') schools++;
+        if (t === 'landmark') landmarks++;
       }
     }
     var nature = Math.round((natureTiles / (GRID_W * GRID_H)) * 100);
-    // satisfaction: baseline 50%, +park coverage, -crowding without parks,
-    // and it suffers directly whenever nature has dropped into the red.
+    // satisfaction: baseline 50%, +community coverage (parks/school/landmark),
+    // -crowding without parks, and it suffers directly whenever nature has
+    // dropped into the red.
     var sat = 50;
     if (houses > 0) {
-      sat += Math.min(40, parks * BUILDINGS.park.sat);
+      var communityBonus = parks * BUILDINGS.park.sat + schools * BUILDINGS.school.sat + landmarks * BUILDINGS.landmark.sat;
+      sat += Math.min(50, communityBonus);
       sat -= Math.min(30, Math.max(0, houses - parks * 2) * 2);
     }
     if (nature < NATURE_LOW) sat -= (NATURE_LOW - nature);
@@ -471,6 +565,8 @@ canvas#c {
     stats.nature = nature;
     stats.forestTiles = forestTiles;
     stats.parks = parks;
+    stats.schools = schools;
+    stats.landmarks = landmarks;
     stats.coins = progress.coins;
     checkQuestAdvance();
     stats.coins = progress.coins; // a cleared quest may have paid out a reward
@@ -507,16 +603,19 @@ canvas#c {
         if (tileAt(gx, gy) === 'shop') shopCount++;
       }
     }
-    if (shopCount === 0) return;
+    var landmarkCount = stats.landmarks || 0;
+    if (shopCount === 0 && landmarkCount === 0) return;
     var satMul = 0.6 + (stats.satisfaction / 100) * 0.8;
     // A city that paved over its forest doesn't just make Moku sad — the
     // economy itself suffers, so growth and nature can't be optimized
     // independently of each other.
     var natureMul = stats.nature < NATURE_LOW ? 0.5 : (stats.nature > NATURE_HIGH ? 1.2 : 1);
-    var perShop = Math.max(1, Math.round((BUILDINGS.shop.income + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopCount * 0.35)));
-    var earned = perShop * shopCount;
+    var perShop = shopCount > 0
+      ? Math.max(1, Math.round((BUILDINGS.shop.income + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopCount * 0.35)))
+      : 0;
+    var earned = perShop * shopCount + Math.round(landmarkCount * BUILDINGS.landmark.income * satMul);
     progress.coins += earned;
-    if (earned > 0) showToast('+' + earned + ' 💰 from shops');
+    if (earned > 0) showToast('+' + earned + ' 💰 from the local economy');
     if (stats.nature < NATURE_LOW) showToast('🌲 Nature is low — Moku needs more green');
     recompute();
     saveProgress();
@@ -544,6 +643,19 @@ canvas#c {
     var q = questForIndex(progress.questIndex);
     questTitleEl.textContent = 'Lv ' + (progress.level + 1) + ' · ' + q.title + ' — ' + q.desc;
     questProgressEl.textContent = q.progress(stats, progress.flags);
+    refreshPaletteLocks();
+  }
+
+  function refreshPaletteLocks() {
+    PALETTE_ORDER.forEach(function (key) {
+      var b = BUILDINGS[key];
+      var el = paletteEls[key];
+      if (!el) return;
+      var locked = !!(b.unlockLevel && progress.level < b.unlockLevel);
+      el.classList.toggle('locked', locked);
+      var costEl = el.querySelector('.cost');
+      costEl.textContent = locked ? '🔒 Lv' + b.unlockLevel : (b.cost > 0 ? b.cost + '💰' : '');
+    });
   }
 
   var toastEl = document.getElementById('toast');
@@ -560,6 +672,11 @@ canvas#c {
   var paletteEl = document.getElementById('palette');
   var paletteEls = {};
   function selectTool(key) {
+    var b = BUILDINGS[key];
+    if (b.unlockLevel && progress.level < b.unlockLevel) {
+      showToast('🔒 ' + b.name + ' unlocks at Lv ' + b.unlockLevel);
+      return;
+    }
     selectedTool = key;
     Array.prototype.forEach.call(paletteEl.children, function (c) { c.classList.remove('sel'); });
     paletteEls[key].classList.add('sel');
@@ -652,7 +769,7 @@ canvas#c {
       ctx.fill();
       return;
     }
-    var height = key === 'shop' ? 30 : key === 'house' ? 22 : 10;
+    var height = key === 'landmark' ? 38 : key === 'school' ? 26 : key === 'shop' ? 30 : key === 'house' ? 22 : 10;
     var baseY = topY + TILE_H * 0.72;
     // simple extruded box: front-left, front-right, top diamond
     ctx.fillStyle = shade(b.color, -30);
@@ -682,7 +799,7 @@ canvas#c {
     ctx.closePath();
     ctx.fill();
 
-    ctx.font = (key === 'shop' ? 16 : 13) + 'px sans-serif';
+    ctx.font = (key === 'landmark' ? 18 : key === 'shop' || key === 'school' ? 16 : 13) + 'px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(b.icon, cx, baseY - height - TILE_H * 0.06);
   }
@@ -892,6 +1009,16 @@ canvas#c {
   var tickTimer = setInterval(function () {
     if (document.body.classList.contains('playing')) shopIncomeTick();
   }, 4000);
+
+  // Roughly a 30% chance every 20s once there's something to lose — keeps
+  // early play (no coins, no buildings) calm instead of punishing a first
+  // house immediately.
+  var disasterTimer = setInterval(function () {
+    if (!document.body.classList.contains('playing')) return;
+    if (stats.population <= 0 && progress.coins <= 0) return;
+    if (Math.random() > 0.3) return;
+    triggerRandomDisaster();
+  }, 20000);
 
   recompute();
 })();
