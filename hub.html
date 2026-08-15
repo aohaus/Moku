@@ -738,18 +738,20 @@ footer {
 <script>
 (function () {
   // Background = time-of-day band (4) × place (7: 6 SE Asian cities + one
-  // "otherworld" slot), fixed by the visitor's local day-of-week and hour
-  // rather than randomized, so the hub reliably cycles through all 7
-  // places across a week and all 4 lighting moods across a day.
+  // "otherworld" slot). The place now advances with EVERY band change, not
+  // just once per calendar day — slot = dayOfWeek*4 + bandOrder, place =
+  // PLACES[slot % 7] — so a single day cycles through ~4 different cities
+  // (one per band) instead of showing only one place all day.
   var PLACES = [
-    { key: 'bangkok',      name: 'Bangkok',          emoji: '🛕', accent: '#FFC94A' }, // Sun
-    { key: 'singapore',    name: 'Singapore',        emoji: '🌆', accent: '#45E0D9' }, // Mon
-    { key: 'kualalumpur',  name: 'Kuala Lumpur',     emoji: '🏙️', accent: '#8C7BFF' }, // Tue
-    { key: 'manila',       name: 'Manila',           emoji: '🌇', accent: '#FF6F91' }, // Wed
-    { key: 'hcmc',         name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B' }, // Thu
-    { key: 'jakarta',      name: 'Jakarta',          emoji: '🕌', accent: '#FF9F45' }, // Fri
-    { key: 'otherworld',   name: 'Otherworld',       emoji: '✨', accent: '#C77DFF' }  // Sat
+    { key: 'bangkok',      name: 'Bangkok',          emoji: '🛕', accent: '#FFC94A' },
+    { key: 'singapore',    name: 'Singapore',        emoji: '🌆', accent: '#45E0D9' },
+    { key: 'kualalumpur',  name: 'Kuala Lumpur',     emoji: '🏙️', accent: '#8C7BFF' },
+    { key: 'manila',       name: 'Manila',           emoji: '🌇', accent: '#FF6F91' },
+    { key: 'hcmc',         name: 'Ho Chi Minh City', emoji: '🏮', accent: '#4FCB6B' },
+    { key: 'jakarta',      name: 'Jakarta',          emoji: '🕌', accent: '#FF9F45' },
+    { key: 'otherworld',   name: 'Otherworld',       emoji: '✨', accent: '#C77DFF' }
   ];
+  var BAND_ORDER = { morning: 0, day: 1, evening: 2, night: 3 };
   // Each band re-grades the same photo via CSS filter + a multiply tint
   // (see #skyPhoto/#skyTint) rather than swapping images, so "Day" reads
   // brighter/cooler and "Night" reads dark and blue without needing a
@@ -797,9 +799,10 @@ footer {
 
   function updateSky() {
     var now = new Date();
-    var place = PLACES[now.getDay()];
     var bandKey = bandKeyFor(now.getHours());
     var band = BANDS[bandKey];
+    var slot = now.getDay() * 4 + BAND_ORDER[bandKey];
+    var place = PLACES[slot % 7];
     var root = document.documentElement.style;
 
     root.setProperty('--place-photo', "url('backgrounds/" + place.key + ".jpg')");
