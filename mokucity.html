@@ -506,7 +506,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.7.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v1.8.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -605,8 +605,9 @@ canvas#c {
     // rather than scattering buildings randomly. Values are PER CELL (each
     // occupies all 4 grid cells of the block), tuned above 1/4 of four
     // separate buildings so merging is a genuine upgrade, not just tidier.
-    house2: { id: 'house2', name: 'Apartment', icon: '🏢', color: '#2E9E6B', pop: 5 },
-    park2:  { id: 'park2',  name: 'Grove',     icon: '🏞️', color: '#2C7A46', sat: 9 }
+    house2: { id: 'house2', name: 'Apartment',    icon: '🏢', color: '#2E9E6B', pop: 5 },
+    park2:  { id: 'park2',  name: 'Grove',        icon: '🏞️', color: '#2C7A46', sat: 9 },
+    shop2:  { id: 'shop2',  name: 'Shopping Mall', icon: '🏬', color: '#E6A93A', income: 5.5 }
   };
   var PALETTE_ORDER = ['road', 'land', 'house', 'shop', 'park', 'school', 'landmark', 'bulldoze'];
   var NATURE_LOW = 35, NATURE_HIGH = 65;
@@ -659,7 +660,8 @@ canvas#c {
     for (var gy = 0; gy < GRID_H - 1; gy++) {
       for (var gx = 0; gx < GRID_W - 1; gx++) {
         if (tryMerge2x2(gx, gy, 'house', 'house2')) { didMerge = true; continue; }
-        if (tryMerge2x2(gx, gy, 'park', 'park2')) didMerge = true;
+        if (tryMerge2x2(gx, gy, 'park', 'park2')) { didMerge = true; continue; }
+        if (tryMerge2x2(gx, gy, 'shop', 'shop2')) didMerge = true;
       }
     }
     if (didMerge) showToast('🏙️ Buildings merged into something bigger!');
@@ -969,23 +971,29 @@ canvas#c {
 
   function shopIncomeTick() {
     var totalPop = stats.population;
-    var shopCount = 0;
+    var shopCount = 0, shop2Count = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
-        if (tileAt(gx, gy) === 'shop') shopCount++;
+        var t = tileAt(gx, gy);
+        if (t === 'shop') shopCount++;
+        if (t === 'shop2') shop2Count++;
       }
     }
+    var shopUnits = shopCount + shop2Count;
     var landmarkCount = stats.landmarks || 0;
-    if (shopCount === 0 && landmarkCount === 0) return;
+    if (shopUnits === 0 && landmarkCount === 0) return;
     var satMul = 0.6 + (stats.satisfaction / 100) * 0.8;
     // A city that paved over its forest doesn't just make Moku sad — the
     // economy itself suffers, so growth and nature can't be optimized
     // independently of each other.
     var natureMul = stats.nature < NATURE_LOW ? 0.5 : (stats.nature > NATURE_HIGH ? 1.2 : 1);
-    var perShop = shopCount > 0
-      ? Math.max(1, Math.round((BUILDINGS.shop.income + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopCount * 0.35)))
+    var avgBaseIncome = shopUnits > 0
+      ? (shopCount * BUILDINGS.shop.income + shop2Count * BUILDINGS.shop2.income) / shopUnits
       : 0;
-    var earned = perShop * shopCount + Math.round(landmarkCount * BUILDINGS.landmark.income * satMul);
+    var perUnit = shopUnits > 0
+      ? Math.max(1, Math.round((avgBaseIncome + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopUnits * 0.35)))
+      : 0;
+    var earned = perUnit * shopUnits + Math.round(landmarkCount * BUILDINGS.landmark.income * satMul);
     progress.coins += earned;
     if (earned > 0) showToast('+' + earned + ' 💰 from the local economy');
     if (stats.nature < NATURE_LOW) showToast('🌲 Nature is low — Moku needs more green');
@@ -1223,7 +1231,7 @@ canvas#c {
     // Height stays close to a normal single-tile building; the wider
     // footprint alone reads as "bigger", and a touch of transparency on
     // the walls (not the icon) keeps whatever's behind it visible too.
-    var height = key === 'park2' ? 13 : 25;
+    var height = key === 'park2' ? 13 : key === 'shop2' ? 28 : 25;
     var baseY = topY + H2 * 0.72;
     ctx.save();
     ctx.globalAlpha = 0.82;
@@ -1270,10 +1278,18 @@ canvas#c {
   }
 
   // ---------- residents ----------
-  // Purely decorative: a handful of little Mokus glide between built tiles
-  // so the town doesn't look static. Kept deliberately cheap — capped
-  // headcount, one grid scan per tick, plain lerp'd positions, no physics.
+  // Purely decorative: a handful of little figures glide between built
+  // tiles so the town doesn't look static — Moku included, but mostly
+  // ordinary townsfolk. Kept deliberately cheap — capped headcount, one
+  // grid scan per tick, plain lerp'd positions, no physics.
   var RESIDENT_CAP = 6;
+  var PERSON_ICONS = ['🚶', '🚶‍♀️', '🚶‍♂️', '🧍‍♀️', '🧍‍♂️'];
+  function pickResidentIcon(indexInFlock) {
+    // Guarantee Moku is always one of the wandering figures, not just an
+    // emoji swarm of owls — everyone else is a regular resident.
+    if (indexInFlock === 0) return '🦉';
+    return PERSON_ICONS[Math.floor(Math.random() * PERSON_ICONS.length)];
+  }
   var residents = [];
   function randomBuiltTile() {
     var list = [];
@@ -1303,7 +1319,8 @@ canvas#c {
     var houses = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
-        if (tileAt(gx, gy) === 'house') houses++;
+        var t = tileAt(gx, gy);
+        if (t === 'house' || t === 'house2') houses++;
       }
     }
     var target = houses > 0 ? Math.min(RESIDENT_CAP, houses) : 0;
@@ -1311,7 +1328,10 @@ canvas#c {
     while (residents.length < target) {
       var spot = randomBuiltTile();
       if (!spot) break;
-      residents.push({ fx: spot.gx, fy: spot.gy, tx: spot.gx, ty: spot.gy, t0: performance.now(), dur: 1 });
+      residents.push({
+        fx: spot.gx, fy: spot.gy, tx: spot.gx, ty: spot.gy, t0: performance.now(), dur: 1,
+        icon: pickResidentIcon(residents.length)
+      });
     }
   }
   function updateResidents(now) {
@@ -1333,7 +1353,7 @@ canvas#c {
       var gx = r.fx + (r.tx - r.fx) * t;
       var gy = r.fy + (r.ty - r.fy) * t;
       var p = gridToScreen(gx, gy);
-      ctx.fillText('🦉', p.x, p.y + TILE_H * 0.6);
+      ctx.fillText(r.icon, p.x, p.y + TILE_H * 0.6);
     });
   }
 
@@ -1362,7 +1382,7 @@ canvas#c {
     order.forEach(function (t) {
       var key = tileAt(t.gx, t.gy);
       if (!key) return;
-      if (key === 'house2' || key === 'park2') {
+      if (key === 'house2' || key === 'park2' || key === 'shop2') {
         var anchor = findMergeAnchor(t.gx, t.gy);
         if (anchor) drawMergedBuilding(t.gx, t.gy, key);
         return;
@@ -1575,10 +1595,14 @@ canvas#c {
   }, 7000);
 
   // Roughly a 30% chance every 20s once there's something to lose — keeps
-  // early play (no coins, no buildings) calm instead of punishing a first
-  // house immediately.
+  // early play calm instead of punishing a first house immediately. Also
+  // held off entirely before Lv6: a disaster wiping out a beginner's tiny
+  // coin reserve is a run-ender, not a setback, with nothing built up yet
+  // to absorb it.
+  var DISASTER_MIN_LEVEL = 6;
   var disasterTimer = setInterval(function () {
     if (!document.body.classList.contains('playing')) return;
+    if (progress.level < DISASTER_MIN_LEVEL) return;
     if (stats.population <= 0 && progress.coins <= 0) return;
     if (Math.random() > 0.3) return;
     scheduleDisasterWarning();
