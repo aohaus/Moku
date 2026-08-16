@@ -506,7 +506,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v1.8.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.0.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -521,9 +521,11 @@ canvas#c {
     Moku doesn't just govern this town — Moku <em>lives</em> here. Each level
     gives you one goal: build up the town, but keep enough forest and parks
     standing to keep Nature healthy. Let Nature drop too far and both the
-    economy and Moku's mood suffer. Leveling up unlocks new buildings like
-    the School and Landmark — and watch out for the occasional fire, flood,
-    storm, or earthquake, which can damage buildings and cost coins.
+    economy and Moku's mood suffer. Leveling up unlocks new buildings —
+    School, Landmark, Restaurant, Moku Gift Shop, Highway, Station, Hotel,
+    Airport — and eventually a couple of distant islands once the mainland
+    fills up. Watch out for the occasional fire, flood, storm, or
+    earthquake, which can damage buildings and cost coins.
   </div>
   <div id="titleFooterTag">🦉 × 🍬 × ⚽ × 🏆 × 💬 × 🔮 MOKUMOKU SERIES</div>
 </section>
@@ -580,7 +582,33 @@ canvas#c {
   var SAVE_KEY = 'moku:' + GAME_ID + ':progress';
 
   // ---------- grid config ----------
-  var GRID_W = 10, GRID_H = 10;
+  // The world is bigger than the buildable mainland — a ring of ocean
+  // surrounds a 10x10 mainland (kept at the original coordinates so old
+  // saves migrate in untouched), with two islands out in that ring that
+  // stay hidden (rendered/treated as plain water) until the town is high
+  // enough level to plausibly reach them. Solves the late-game "no more
+  // room" wall from growing the mainland alone.
+  var GRID_W = 18, GRID_H = 18;
+  var MAINLAND_MIN = 4, MAINLAND_SIZE = 10;
+  // Mainland occupies [MAINLAND_MIN, MAINLAND_MIN+MAINLAND_SIZE) = [4,14) in
+  // both axes, leaving a 4-tile-wide ocean margin on each side ([0,4) and
+  // [14,18)) — islands must fit entirely inside that margin. Sizing one
+  // even 1 tile bigger overlaps the mainland's own cells, which tileAt()
+  // would then mask as water while locked (and silently swallow whatever
+  // was actually built there — found by a migrated-save population
+  // mismatch: a house sitting in the 1-tile overlap vanished from the
+  // count until this was fixed).
+  var ISLANDS = [
+    { name: 'Sunrise Isle', x0: 0, y0: 0, w: 4, h: 4, unlockLevel: 10 },
+    { name: 'Harbor Isle', x0: 14, y0: 14, w: 4, h: 4, unlockLevel: 16 }
+  ];
+  function islandAt(gx, gy) {
+    for (var i = 0; i < ISLANDS.length; i++) {
+      var isl = ISLANDS[i];
+      if (gx >= isl.x0 && gx < isl.x0 + isl.w && gy >= isl.y0 && gy < isl.y0 + isl.h) return isl;
+    }
+    return null;
+  }
   var TILE_W = 84, TILE_H = 42; // isometric (dimetric) diamond size
 
   // ---------- building types ----------
@@ -594,22 +622,43 @@ canvas#c {
     park:  { id: 'park',  name: 'Park',   icon: '🌳', cost: 30,  color: '#3FA34D', sat: 6, nature: 1 },
     // School and Landmark unlock as the town levels up — visible but locked
     // in the palette until then, so growth keeps handing the player new toys.
-    school:   { id: 'school',   name: 'School',   icon: '🏫', cost: 150, color: '#5B8DEF', sat: 8,  unlockLevel: 3 },
-    landmark: { id: 'landmark', name: 'Landmark', icon: '🏛️', cost: 250, color: '#C77DFF', sat: 12, income: 10, unlockLevel: 5 },
+    school:     { id: 'school',     name: 'School',     icon: '🏫', cost: 150, color: '#5B8DEF', sat: 8,  unlockLevel: 3 },
+    landmark:   { id: 'landmark',   name: 'Landmark',   icon: '🏛️', cost: 250, color: '#C77DFF', sat: 12, income: 10, unlockLevel: 5 },
+    restaurant: { id: 'restaurant', name: 'Restaurant', icon: '🍽️', cost: 130, color: '#E8654A', sat: 5, income: 5, unlockLevel: 6 },
+    giftshop:   { id: 'giftshop',   name: 'Moku Gift Shop', icon: '🎁', cost: 160, color: '#E85C9E', sat: 4, income: 9, unlockLevel: 7 },
+    // Highway is Road's bigger sibling — same job (it's what cars drive on),
+    // just a later-game visual upgrade rather than a stat difference.
+    highway:    { id: 'highway',    name: 'Highway',    icon: '🛤️', cost: 60,  color: '#3B3F4E', unlockLevel: 8 },
+    station:    { id: 'station',    name: 'Station',     icon: '🚉', cost: 220, color: '#4A7FBF', sat: 10, income: 8, unlockLevel: 9 },
+    hotel:      { id: 'hotel',      name: 'Hotel',       icon: '🏨', cost: 300, color: '#C79A3D', sat: 10, income: 16, unlockLevel: 11 },
+    airport:    { id: 'airport',    name: 'Airport',     icon: '🛫', cost: 450, color: '#5A6B8C', sat: 6,  income: 22, unlockLevel: 13 },
     bulldoze: { id: 'bulldoze', name: 'Clear', icon: '🗑️', cost: 0 },
     // 'forest' is natural terrain, not a placeable palette tool — it seeds
     // the map and is what Nature actually measures alongside parks.
     forest: { id: 'forest', name: 'Forest', icon: '🌲', color: '#2E7D46', nature: 1 },
-    // house2/park2 aren't placed directly — four of the same building in a
-    // 2x2 block auto-merge into these, a reward for planning a tidy layout
-    // rather than scattering buildings randomly. Values are PER CELL (each
-    // occupies all 4 grid cells of the block), tuned above 1/4 of four
-    // separate buildings so merging is a genuine upgrade, not just tidier.
-    house2: { id: 'house2', name: 'Apartment',    icon: '🏢', color: '#2E9E6B', pop: 5 },
-    park2:  { id: 'park2',  name: 'Grove',        icon: '🏞️', color: '#2C7A46', sat: 9 },
+    // 'water' is permanent ocean (or an island not yet unlocked, which
+    // tileAt() masks to this same value) — never buildable, purely scenery.
+    water: { id: 'water', name: 'Ocean', icon: '🌊', color: '#2F6FA8' },
+    // house2/park2/shop2 aren't placed directly — four of the same building
+    // in a 2x2 block auto-merge into these, a reward for planning a tidy
+    // layout rather than scattering buildings randomly. Values are PER CELL
+    // (each occupies all 4 grid cells of the block), tuned above 1/4 of
+    // four separate buildings so merging is a genuine upgrade, not just
+    // tidier.
+    house2: { id: 'house2', name: 'Apartment',     icon: '🏢', color: '#2E9E6B', pop: 5 },
+    park2:  { id: 'park2',  name: 'Grove',         icon: '🏞️', color: '#2C7A46', sat: 9 },
     shop2:  { id: 'shop2',  name: 'Shopping Mall', icon: '🏬', color: '#E6A93A', income: 5.5 }
   };
-  var PALETTE_ORDER = ['road', 'land', 'house', 'shop', 'park', 'school', 'landmark', 'bulldoze'];
+  var PALETTE_ORDER = [
+    'road', 'land', 'house', 'shop', 'park',
+    'school', 'landmark', 'restaurant', 'giftshop', 'highway', 'station', 'hotel', 'airport',
+    'bulldoze'
+  ];
+  var ROAD_TYPES = { road: true, highway: true };
+  var BUILDING_HEIGHTS = {
+    house: 22, shop: 30, school: 26, landmark: 38,
+    restaurant: 18, giftshop: 16, station: 24, hotel: 32, airport: 34
+  };
   var NATURE_LOW = 35, NATURE_HIGH = 65;
 
   // ---------- natural disasters ----------
@@ -623,7 +672,7 @@ canvas#c {
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
-        if (t && t !== 'forest' && t !== 'road') list.push({ gx: gx, gy: gy });
+        if (t && t !== 'forest' && t !== 'water' && !ROAD_TYPES[t]) list.push({ gx: gx, gy: gy });
       }
     }
     return list;
@@ -842,15 +891,24 @@ canvas#c {
   }
 
   // ---------- save data ----------
-  function defaultProgress() {
-    // The city starts mostly wild — Moku's town grows INTO the forest, not
-    // onto a blank lot, so every build choice is a choice to clear nature.
-    var grid = new Array(GRID_W * GRID_H).fill(null);
-    for (var i = 0; i < grid.length; i++) {
-      if (Math.random() < 0.45) grid[i] = 'forest';
+  function seedIsland(grid, x0, y0, w, h) {
+    for (var gy = y0; gy < y0 + h; gy++) {
+      for (var gx = x0; gx < x0 + w; gx++) {
+        if (Math.random() < 0.45) grid[gy * GRID_W + gx] = 'forest';
+      }
     }
+  }
+  function defaultProgress() {
+    // Ocean everywhere by default; the mainland and each island are seeded
+    // wild (forest) within their own bounds — the town grows INTO the
+    // forest, not onto a blank lot, so every build choice is a choice to
+    // clear nature. Islands stay masked as water by tileAt() until unlocked
+    // regardless of what's actually seeded underneath.
+    var grid = new Array(GRID_W * GRID_H).fill('water');
+    seedIsland(grid, MAINLAND_MIN, MAINLAND_MIN, MAINLAND_SIZE, MAINLAND_SIZE);
+    ISLANDS.forEach(function (isl) { seedIsland(grid, isl.x0, isl.y0, isl.w, isl.h); });
     return {
-      version: 3,
+      version: 4,
       gameId: GAME_ID,
       coins: 500,
       grid: grid,
@@ -859,21 +917,45 @@ canvas#c {
       flags: { shop: false },
       merges: [],
       playMinutes: 0,
+      seenIslands: [],
       updatedAt: ''
     };
+  }
+  // Saves from before the world grew to 18x18 (flat 10x10, no ocean ring)
+  // get their mainland re-centered into the new coordinate space rather
+  // than being discarded — merge anchors shift by the same offset so
+  // Apartments/Groves/Malls don't end up pointing at the wrong cells.
+  function migrateLegacyGrid(data) {
+    var OLD_SIZE = 10;
+    var grid = new Array(GRID_W * GRID_H).fill('water');
+    for (var oy = 0; oy < OLD_SIZE; oy++) {
+      for (var ox = 0; ox < OLD_SIZE; ox++) {
+        var v = data.grid[oy * OLD_SIZE + ox];
+        if (v) grid[(oy + MAINLAND_MIN) * GRID_W + (ox + MAINLAND_MIN)] = v;
+      }
+    }
+    ISLANDS.forEach(function (isl) { seedIsland(grid, isl.x0, isl.y0, isl.w, isl.h); });
+    data.grid = grid;
+    if (Array.isArray(data.merges)) {
+      data.merges.forEach(function (m) { m.gx += MAINLAND_MIN; m.gy += MAINLAND_MIN; });
+    }
+    return data;
   }
   function loadProgress() {
     try {
       var raw = localStorage.getItem(SAVE_KEY);
       if (raw) {
         var data = JSON.parse(raw);
-        if (data && data.gameId === GAME_ID && Array.isArray(data.grid) && data.grid.length === GRID_W * GRID_H) {
+        if (data && data.gameId === GAME_ID && Array.isArray(data.grid)) {
+          if (data.grid.length === 10 * 10) data = migrateLegacyGrid(data);
+          if (data.grid.length !== GRID_W * GRID_H) throw new Error('unrecognized grid size');
           // Backfill for saves written before later versions added fields.
           if (typeof data.level !== 'number') data.level = 1;
           if (typeof data.questIndex !== 'number') data.questIndex = 0;
           if (!data.flags) data.flags = { shop: false };
           if (!Array.isArray(data.merges)) data.merges = [];
           if (typeof data.playMinutes !== 'number') data.playMinutes = 0;
+          if (!Array.isArray(data.seenIslands)) data.seenIslands = [];
           return data;
         }
       }
@@ -891,8 +973,14 @@ canvas#c {
   }
 
   function idx(gx, gy) { return gy * GRID_W + gx; }
+  // A locked island reads as plain water everywhere in the game — this is
+  // the one place that masking happens, so every caller (recompute,
+  // rendering, disasters, residents, merges, handlePlace) automatically
+  // treats it as inaccessible without needing its own check.
   function tileAt(gx, gy) {
     if (gx < 0 || gy < 0 || gx >= GRID_W || gy >= GRID_H) return undefined;
+    var isl = islandAt(gx, gy);
+    if (isl && progress.level < isl.unlockLevel) return 'water';
     return progress.grid[idx(gx, gy)];
   }
 
@@ -901,8 +989,18 @@ canvas#c {
   // economy. Moku doesn't govern the city from above; Moku lives in it, so
   // the HUD mood tracks how the forest/park balance is actually doing.
   var stats = { coins: 0, population: 0, satisfaction: 0, nature: 100 };
+  // Nature is a fraction of BUILDABLE land (mainland + any unlocked
+  // islands), not the whole 18x18 world — the permanent ocean ring isn't
+  // land the player ever had a choice about, so it shouldn't dilute the
+  // percentage.
+  function buildableCellCount() {
+    var n = MAINLAND_SIZE * MAINLAND_SIZE;
+    ISLANDS.forEach(function (isl) { if (progress.level >= isl.unlockLevel) n += isl.w * isl.h; });
+    return n;
+  }
   function recompute() {
-    var pop = 0, houses = 0, parks = 0, parks2 = 0, forestTiles = 0, natureTiles = 0, schools = 0, landmarks = 0;
+    var pop = 0, houses = 0, parks = 0, parks2 = 0, forestTiles = 0, natureTiles = 0,
+      schools = 0, landmarks = 0, restaurants = 0, giftshops = 0, stations = 0, hotels = 0, airports = 0;
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
@@ -913,16 +1011,23 @@ canvas#c {
         if (t === 'forest') { forestTiles++; natureTiles++; }
         if (t === 'school') schools++;
         if (t === 'landmark') landmarks++;
+        if (t === 'restaurant') restaurants++;
+        if (t === 'giftshop') giftshops++;
+        if (t === 'station') stations++;
+        if (t === 'hotel') hotels++;
+        if (t === 'airport') airports++;
       }
     }
-    var nature = Math.round((natureTiles / (GRID_W * GRID_H)) * 100);
-    // satisfaction: baseline 50%, +community coverage (parks/school/landmark),
-    // -crowding without parks, and it suffers directly whenever nature has
-    // dropped into the red.
+    var nature = Math.round((natureTiles / buildableCellCount()) * 100);
+    // satisfaction: baseline 50%, +community coverage (parks/school/landmark/
+    // restaurant/gift shop/station/hotel/airport), -crowding without parks,
+    // and it suffers directly whenever nature has dropped into the red.
     var sat = 50;
     if (houses > 0) {
       var communityBonus = parks * BUILDINGS.park.sat + parks2 * BUILDINGS.park2.sat +
-        schools * BUILDINGS.school.sat + landmarks * BUILDINGS.landmark.sat;
+        schools * BUILDINGS.school.sat + landmarks * BUILDINGS.landmark.sat +
+        restaurants * BUILDINGS.restaurant.sat + giftshops * BUILDINGS.giftshop.sat +
+        stations * BUILDINGS.station.sat + hotels * BUILDINGS.hotel.sat + airports * BUILDINGS.airport.sat;
       sat += Math.min(50, communityBonus);
       sat -= Math.min(30, Math.max(0, houses - (parks + parks2) * 2) * 2);
     }
@@ -936,10 +1041,28 @@ canvas#c {
     stats.parks = parks + parks2;
     stats.schools = schools;
     stats.landmarks = landmarks;
+    stats.restaurants = restaurants;
+    stats.giftshops = giftshops;
+    stats.stations = stations;
+    stats.hotels = hotels;
+    stats.airports = airports;
     stats.coins = progress.coins;
     checkQuestAdvance();
     stats.coins = progress.coins; // a cleared quest may have paid out a reward
+    checkIslandUnlocks();
     updateHud();
+  }
+
+  // Announces (once) whenever a new island crosses into reach, and refits
+  // the camera to include it.
+  function checkIslandUnlocks() {
+    ISLANDS.forEach(function (isl) {
+      if (progress.level >= isl.unlockLevel && progress.seenIslands.indexOf(isl.name) === -1) {
+        progress.seenIslands.push(isl.name);
+        showToast('🏝️ ' + isl.name + ' is now open for development!');
+        resizeCanvas();
+      }
+    });
   }
 
   // Advances through as many quests as are already satisfied in one go
@@ -980,8 +1103,12 @@ canvas#c {
       }
     }
     var shopUnits = shopCount + shop2Count;
-    var landmarkCount = stats.landmarks || 0;
-    if (shopUnits === 0 && landmarkCount === 0) return;
+    // Landmark/Station/Hotel/Airport/Gift Shop are flat passive income —
+    // tourism and civic draw rather than retail throughput — on top of
+    // whatever the shops themselves bring in.
+    var passiveCount = (stats.landmarks || 0) + (stats.stations || 0) + (stats.hotels || 0) +
+      (stats.airports || 0) + (stats.giftshops || 0);
+    if (shopUnits === 0 && passiveCount === 0) return;
     var satMul = 0.6 + (stats.satisfaction / 100) * 0.8;
     // A city that paved over its forest doesn't just make Moku sad — the
     // economy itself suffers, so growth and nature can't be optimized
@@ -993,7 +1120,13 @@ canvas#c {
     var perUnit = shopUnits > 0
       ? Math.max(1, Math.round((avgBaseIncome + totalPop * 0.4) * satMul * natureMul / Math.max(1, shopUnits * 0.35)))
       : 0;
-    var earned = perUnit * shopUnits + Math.round(landmarkCount * BUILDINGS.landmark.income * satMul);
+    var passiveIncome =
+      (stats.landmarks || 0) * BUILDINGS.landmark.income +
+      (stats.stations || 0) * BUILDINGS.station.income +
+      (stats.hotels || 0) * BUILDINGS.hotel.income +
+      (stats.airports || 0) * BUILDINGS.airport.income +
+      (stats.giftshops || 0) * BUILDINGS.giftshop.income;
+    var earned = perUnit * shopUnits + Math.round(passiveIncome * satMul);
     progress.coins += earned;
     if (earned > 0) showToast('+' + earned + ' 💰 from the local economy');
     if (stats.nature < NATURE_LOW) showToast('🌲 Nature is low — Moku needs more green');
@@ -1117,6 +1250,21 @@ canvas#c {
   var originX = 0, originY = 0;
 
   var zoom = 1;
+  // The camera frames the mainland plus whatever islands are unlocked so
+  // far, not the whole 18x18 world — otherwise the mainland would render
+  // tiny from the very start to make room for ocean nobody can reach yet.
+  // As each island unlocks the frame widens to include it (see
+  // checkIslandUnlocks() -> resizeCanvas()).
+  function visibleBounds() {
+    var minX = MAINLAND_MIN, minY = MAINLAND_MIN;
+    var maxX = MAINLAND_MIN + MAINLAND_SIZE, maxY = MAINLAND_MIN + MAINLAND_SIZE;
+    ISLANDS.forEach(function (isl) {
+      if (progress.level < isl.unlockLevel) return;
+      minX = Math.min(minX, isl.x0); minY = Math.min(minY, isl.y0);
+      maxX = Math.max(maxX, isl.x0 + isl.w); maxY = Math.max(maxY, isl.y0 + isl.h);
+    });
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  }
   function resizeCanvas() {
     var area = document.getElementById('canvasArea');
     var w = area.clientWidth, h = area.clientHeight;
@@ -1124,16 +1272,17 @@ canvas#c {
     canvas.height = h * DPR;
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    var gridPxW = GRID_W * TILE_W, gridPxH = (GRID_W + GRID_H) * TILE_H / 2 + 100;
+    var bounds = visibleBounds();
+    var boundsW = bounds.maxX - bounds.minX, boundsH = bounds.maxY - bounds.minY;
+    var gridPxW = boundsW * TILE_W, gridPxH = (boundsW + boundsH) * TILE_H / 2 + 100;
     zoom = Math.min(2.2, Math.max(0.4, Math.min(w / gridPxW, h / gridPxH) * 0.94));
     ctx.setTransform(DPR * zoom, 0, 0, DPR * zoom, 0, 0);
-    originX = (w / zoom) / 2;
-    // Bias the grid's own vertical center toward the upper part of
-    // canvasArea (roughly 38% down) instead of dead-center — there's
-    // reliably more empty headroom above than clearance below before the
-    // palette bar, so use it.
-    var gridCenterY = (GRID_H * TILE_H) / 2;
-    originY = (h / zoom) * 0.38 - gridCenterY;
+    // Bias the vertical center toward the upper part of canvasArea (roughly
+    // 38% down) instead of dead-center — there's reliably more empty
+    // headroom above than clearance below before the palette bar.
+    var cxIdx = (bounds.minX + bounds.maxX) / 2, cyIdx = (bounds.minY + bounds.maxY) / 2;
+    originX = (w / zoom) / 2 - (cxIdx - cyIdx) * (TILE_W / 2);
+    originY = (h / zoom) * 0.38 - (cxIdx + cyIdx) * (TILE_H / 2);
     draw();
   }
 
@@ -1163,8 +1312,13 @@ canvas#c {
   function drawTileBase(gx, gy) {
     var p = gridToScreen(gx, gy);
     var checker = (gx + gy) % 2 === 0;
+    var isWater = tileAt(gx, gy) === 'water';
     diamondPath(p.x, p.y);
-    ctx.fillStyle = checker ? 'rgba(76,190,138,0.10)' : 'rgba(76,190,138,0.05)';
+    if (isWater) {
+      ctx.fillStyle = checker ? 'rgba(58,140,214,0.22)' : 'rgba(58,140,214,0.13)';
+    } else {
+      ctx.fillStyle = checker ? 'rgba(76,190,138,0.10)' : 'rgba(76,190,138,0.05)';
+    }
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
@@ -1176,13 +1330,13 @@ canvas#c {
     if (!b || !b.color) return;
     var p = gridToScreen(gx, gy);
     var cx = p.x, topY = p.y;
-    if (key === 'road' || key === 'land') {
+    if (key === 'road' || key === 'land' || key === 'highway') {
       diamondPath(cx, topY + TILE_H * 0.22);
       ctx.fillStyle = b.color;
       ctx.fill();
       return;
     }
-    var height = key === 'landmark' ? 38 : key === 'school' ? 26 : key === 'shop' ? 30 : key === 'house' ? 22 : 10;
+    var height = BUILDING_HEIGHTS[key] || 10;
     var baseY = topY + TILE_H * 0.72;
     // simple extruded box: front-left, front-right, top diamond
     ctx.fillStyle = shade(b.color, -30);
@@ -1212,7 +1366,9 @@ canvas#c {
     ctx.closePath();
     ctx.fill();
 
-    ctx.font = (key === 'landmark' ? 18 : key === 'shop' || key === 'school' ? 16 : 13) + 'px sans-serif';
+    var bigIcons = { landmark: 1, airport: 1, hotel: 1 };
+    var midIcons = { shop: 1, school: 1, station: 1 };
+    ctx.font = (bigIcons[key] ? 18 : midIcons[key] ? 16 : 13) + 'px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(b.icon, cx, baseY - height - TILE_H * 0.06);
   }
@@ -1296,7 +1452,7 @@ canvas#c {
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
-        if (t && t !== 'forest') list.push({ gx: gx, gy: gy });
+        if (t && t !== 'forest' && t !== 'water') list.push({ gx: gx, gy: gy });
       }
     }
     if (!list.length) return null;
@@ -1309,6 +1465,7 @@ canvas#c {
         if (dx === 0 && dy === 0) continue;
         var nx = fromGx + dx, ny = fromGy + dy;
         if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+        if (tileAt(nx, ny) === 'water') continue; // don't wander out onto the ocean
         candidates.push({ gx: nx, gy: ny });
       }
     }
@@ -1357,6 +1514,97 @@ canvas#c {
     });
   }
 
+  // ---------- vehicles ----------
+  // Same lerp-between-neighbor-tiles trick as residents, just constrained
+  // to road tiles (cars) or hovering near the airport (planes). Each one
+  // is either an eco variant (PHEV car / SAF plane) or conventional, with
+  // eco getting more common as Nature climbs — a small visual echo of the
+  // growth-vs-nature tension the rest of the game runs on, not a separate
+  // scoring mechanic.
+  var VEHICLE_CAP_CAR = 4, VEHICLE_CAP_PLANE = 2;
+  var cars = [], planes = [];
+  function ecoChance() { return Math.max(0.1, Math.min(0.9, stats.nature / 100)); }
+  function findTilesOfTypes(types) {
+    var list = [];
+    for (var gy = 0; gy < GRID_H; gy++) {
+      for (var gx = 0; gx < GRID_W; gx++) {
+        if (types[tileAt(gx, gy)]) list.push({ gx: gx, gy: gy });
+      }
+    }
+    return list;
+  }
+  function pickRoadNeighbor(fromGx, fromGy) {
+    var candidates = [];
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        var nx = fromGx + dx, ny = fromGy + dy;
+        if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
+        if (!ROAD_TYPES[tileAt(nx, ny)]) continue;
+        candidates.push({ gx: nx, gy: ny });
+      }
+    }
+    if (!candidates.length) return { gx: fromGx, gy: fromGy };
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+  function ensureCars() {
+    var roadTiles = findTilesOfTypes(ROAD_TYPES);
+    var target = roadTiles.length > 0 ? Math.min(VEHICLE_CAP_CAR, Math.ceil(roadTiles.length / 6)) : 0;
+    while (cars.length > target) cars.pop();
+    while (cars.length < target) {
+      var spot = roadTiles[Math.floor(Math.random() * roadTiles.length)];
+      cars.push({ fx: spot.gx, fy: spot.gy, tx: spot.gx, ty: spot.gy, t0: performance.now(), dur: 1, eco: Math.random() < ecoChance() });
+    }
+  }
+  function updateCars(now) {
+    cars.forEach(function (v) {
+      if (now - v.t0 >= v.dur * 1000) {
+        v.fx = v.tx; v.fy = v.ty;
+        var next = pickRoadNeighbor(v.tx, v.ty);
+        v.tx = next.gx; v.ty = next.gy;
+        v.t0 = now;
+        v.dur = 0.7 + Math.random() * 0.6;
+      }
+    });
+  }
+  function ensurePlanes() {
+    var airportTiles = findTilesOfTypes({ airport: true });
+    var target = airportTiles.length > 0 ? Math.min(VEHICLE_CAP_PLANE, airportTiles.length) : 0;
+    while (planes.length > target) planes.pop();
+    while (planes.length < target) {
+      var spot = airportTiles[Math.floor(Math.random() * airportTiles.length)];
+      planes.push({ fx: spot.gx, fy: spot.gy, tx: spot.gx, ty: spot.gy, t0: performance.now(), dur: 1, eco: Math.random() < ecoChance() });
+    }
+  }
+  function updatePlanes(now) {
+    planes.forEach(function (v) {
+      if (now - v.t0 >= v.dur * 1000) {
+        v.fx = v.tx; v.fy = v.ty;
+        var next = pickNeighborTile(v.tx, v.ty); // planes drift more freely than road-bound cars
+        v.tx = next.gx; v.ty = next.gy;
+        v.t0 = now;
+        v.dur = 1.2 + Math.random();
+      }
+    });
+  }
+  function drawVehicle(v, now, icon, ecoBadge) {
+    var t = Math.max(0, Math.min(1, (now - v.t0) / (v.dur * 1000)));
+    var gx = v.fx + (v.tx - v.fx) * t;
+    var gy = v.fy + (v.ty - v.fy) * t;
+    var p = gridToScreen(gx, gy);
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(icon, p.x, p.y + TILE_H * 0.6);
+    if (v.eco) {
+      ctx.font = '9px sans-serif';
+      ctx.fillText(ecoBadge, p.x + 9, p.y + TILE_H * 0.6 - 9);
+    }
+  }
+  function drawVehicles(now) {
+    cars.forEach(function (v) { drawVehicle(v, now, '🚗', '⚡'); });
+    planes.forEach(function (v) { drawVehicle(v, now, '✈️', '🌿'); });
+  }
+
   function draw() {
     var w = canvas.width / DPR, h = canvas.height / DPR;
     // clearRect respects the current transform (scaled by DPR*zoom), so
@@ -1381,7 +1629,7 @@ canvas#c {
     order.sort(function (a, b) { return (a.gx + a.gy) - (b.gx + b.gy); });
     order.forEach(function (t) {
       var key = tileAt(t.gx, t.gy);
-      if (!key) return;
+      if (!key || key === 'water') return; // open water/locked islands: base tile only
       if (key === 'house2' || key === 'park2' || key === 'shop2') {
         var anchor = findMergeAnchor(t.gx, t.gy);
         if (anchor) drawMergedBuilding(t.gx, t.gy, key);
@@ -1389,7 +1637,24 @@ canvas#c {
       }
       drawBuilding(t.gx, t.gy, key);
     });
+    // Hint that a locked island exists out there before it's reachable.
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ISLANDS.forEach(function (isl) {
+      if (progress.level >= isl.unlockLevel) return;
+      var p = gridToScreen(isl.x0 + isl.w / 2, isl.y0 + isl.h / 2);
+      var label = '🔒 ' + isl.name + ' · Lv' + isl.unlockLevel;
+      var textW = ctx.measureText(label).width;
+      var ly = p.y + TILE_H * 0.3;
+      ctx.fillStyle = 'rgba(10,8,18,0.55)';
+      ctx.beginPath();
+      ctx.roundRect(p.x - textW / 2 - 8, ly - 13, textW + 16, 20, 10);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(237,238,246,0.75)';
+      ctx.fillText(label, p.x, ly);
+    });
     drawResidents(performance.now());
+    drawVehicles(performance.now());
     if (hoverTile) {
       var p = gridToScreen(hoverTile.gx, hoverTile.gy);
       diamondPath(p.x, p.y);
@@ -1431,6 +1696,15 @@ canvas#c {
   function handlePlace(gx, gy) {
     if (gx < 0 || gy < 0 || gx >= GRID_W || gy >= GRID_H) return;
     var cur = tileAt(gx, gy);
+    if (cur === 'water') {
+      var isl = islandAt(gx, gy);
+      if (isl && progress.level < isl.unlockLevel) {
+        showToast('🔒 ' + isl.name + ' unlocks at Lv ' + isl.unlockLevel);
+      } else {
+        showToast('🌊 Nothing to build on open water');
+      }
+      return;
+    }
     if (selectedTool === 'bulldoze') {
       if (cur) {
         clearCell(gx, gy);
@@ -1506,10 +1780,18 @@ canvas#c {
   }
   function startCity() {
     document.body.classList.add('playing');
+    // A menu item clicked to get here keeps DOM focus, and its own
+    // keydown handler (Enter/Space -> re-trigger this menu action) would
+    // then intercept and stopPropagation() the player's very first
+    // in-game Enter/Space press before it ever reaches the gameplay
+    // keydown handler on window — silently eating a build/clear action.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     showScreen(null);
     recompute();
     resizeCanvas();
     ensureResidentCount();
+    ensureCars();
+    ensurePlanes();
     announceQuest(questForIndex(progress.questIndex));
   }
 
@@ -1610,8 +1892,13 @@ canvas#c {
 
   var residentTimer = setInterval(function () {
     if (!document.body.classList.contains('playing')) return;
+    var now = performance.now();
     ensureResidentCount();
-    updateResidents(performance.now());
+    updateResidents(now);
+    ensureCars();
+    updateCars(now);
+    ensurePlanes();
+    updatePlanes(now);
     draw();
   }, 150);
 
