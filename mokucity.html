@@ -120,6 +120,14 @@ body.playing #title-frame { display: none; }
   font-weight: 700; letter-spacing: 0.06em;
   color: rgba(237,238,246,0.6);
 }
+#titleHighScore {
+  display: none;
+  margin-top: 8px;
+  font-size: 13px; font-weight: 800;
+  color: #FFC94A;
+  letter-spacing: 0.02em;
+}
+#titleHighScore.show { display: block; }
 #titleMenu { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .menuItem {
   font-weight: 800; font-size: 19px;
@@ -506,12 +514,13 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.0.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.1.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
   <h1 id="titleLogo">MOKU<span>CITY</span></h1>
   <p id="titleSub">Grow the town, keep the forest — Moku lives here too</p>
+  <p id="titleHighScore"></p>
   <nav id="titleMenu">
     <div class="menuItem sel" data-action="continue" tabindex="0" role="button">Continue</div>
     <div class="menuItem" data-action="reset" tabindex="0" role="button">New City</div>
@@ -580,6 +589,26 @@ canvas#c {
   'use strict';
   var GAME_ID = 'mokucity';
   var SAVE_KEY = 'moku:' + GAME_ID + ':progress';
+  // Kept under its own key, separate from the save — "New City" resets
+  // progress but a personal best set on a previous city shouldn't vanish
+  // with it, same as any arcade high score.
+  var HIGHSCORE_KEY = 'moku:' + GAME_ID + ':highscore';
+  function loadHighScore() {
+    try {
+      var raw = localStorage.getItem(HIGHSCORE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && typeof data.population === 'number') return data;
+      }
+    } catch (e) {}
+    return { population: 0, level: 1 };
+  }
+  var highScore = loadHighScore();
+  function maybeUpdateHighScore(population, level) {
+    if (population <= highScore.population) return;
+    highScore = { population: population, level: level, updatedAt: new Date().toISOString() };
+    try { localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(highScore)); } catch (e) {}
+  }
 
   // ---------- grid config ----------
   // The world is bigger than the buildable mainland — a ring of ocean
@@ -655,6 +684,10 @@ canvas#c {
     'bulldoze'
   ];
   var ROAD_TYPES = { road: true, highway: true };
+  // A 2x2 merge represents real investment (four buildings' worth) and
+  // reads as a town landmark, not a random building — disasters skip them
+  // entirely rather than being able to erase one in a single hit.
+  var MERGED_TYPES = { house2: true, park2: true, shop2: true };
   var BUILDING_HEIGHTS = {
     house: 22, shop: 30, school: 26, landmark: 38,
     restaurant: 18, giftshop: 16, station: 24, hotel: 32, airport: 34
@@ -672,7 +705,7 @@ canvas#c {
     for (var gy = 0; gy < GRID_H; gy++) {
       for (var gx = 0; gx < GRID_W; gx++) {
         var t = tileAt(gx, gy);
-        if (t && t !== 'forest' && t !== 'water' && !ROAD_TYPES[t]) list.push({ gx: gx, gy: gy });
+        if (t && t !== 'forest' && t !== 'water' && !ROAD_TYPES[t] && !MERGED_TYPES[t]) list.push({ gx: gx, gy: gy });
       }
     }
     return list;
@@ -1034,6 +1067,7 @@ canvas#c {
     if (nature < NATURE_LOW) sat -= (NATURE_LOW - nature);
     else if (nature > NATURE_HIGH) sat += Math.min(10, (nature - NATURE_HIGH) / 2);
     sat = Math.max(0, Math.min(100, Math.round(sat)));
+    maybeUpdateHighScore(pop, progress.level);
     stats.population = pop;
     stats.satisfaction = sat;
     stats.nature = nature;
@@ -1773,6 +1807,16 @@ canvas#c {
     document.body.classList.remove('playing');
     cancelPendingDisaster();
     showScreen('titleScreen');
+    refreshTitleHighScore();
+  }
+  function refreshTitleHighScore() {
+    var el = document.getElementById('titleHighScore');
+    if (highScore.population > 0) {
+      el.textContent = '🏆 Best: ' + highScore.population + ' pop · Lv ' + highScore.level;
+      el.classList.add('show');
+    } else {
+      el.classList.remove('show');
+    }
   }
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
@@ -1886,7 +1930,7 @@ canvas#c {
     if (!document.body.classList.contains('playing')) return;
     if (progress.level < DISASTER_MIN_LEVEL) return;
     if (stats.population <= 0 && progress.coins <= 0) return;
-    if (Math.random() > 0.3) return;
+    if (Math.random() > 0.15) return; // halved from the original 0.3 — was firing too often
     scheduleDisasterWarning();
   }, 20000);
 
@@ -1910,6 +1954,7 @@ canvas#c {
   }, 60000);
 
   recompute();
+  refreshTitleHighScore();
 })();
 </script>
 </body>
