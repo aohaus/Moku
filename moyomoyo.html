@@ -223,12 +223,11 @@ canvas {
 }
 #board-overlay.hidden { display: none; }
 #board-overlay h1 { color: #fff; font-size: 26px; margin-bottom: 16px; text-shadow: 0 2px 12px rgba(0,0,0,0.5); }
-#board-overlay { overflow-y: auto; padding: 20px 0; }
 #board-list {
   width: min(86%, 340px);
-  max-height: 160px;
+  max-height: 55%;
   overflow-y: auto;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 .board-row {
   display: flex; align-items: center; gap: 10px;
@@ -242,51 +241,6 @@ canvas {
 .board-row .name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-row .score { font-variant-numeric: tabular-nums; color: #FFE066; font-weight: 700; }
 .board-row.empty { color: rgba(255,255,255,0.5); justify-content: center; font-size: 14px; }
-.board-row.me { border: 1.5px solid #FFE066; }
-#online-board-section {
-  width: min(86%, 340px);
-  margin-bottom: 16px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255,255,255,0.2);
-}
-#online-board-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
-}
-#online-board-header > span { color: #fff; font-weight: 700; font-size: 15px; }
-#online-mode-tabs { display: flex; gap: 6px; }
-.online-mode-tab {
-  background: rgba(255,255,255,0.12);
-  border: 1.5px solid rgba(255,255,255,0.35);
-  border-radius: 16px;
-  color: #fff;
-  font-size: 12px; font-weight: 700;
-  padding: 5px 12px;
-  cursor: pointer;
-}
-.online-mode-tab.active { background: #FF6FA8; border-color: #FF6FA8; }
-#online-name-row { display: flex; gap: 8px; margin-bottom: 10px; }
-#online-name-input {
-  flex: 1;
-  background: rgba(255,255,255,0.12);
-  border: 1.5px solid rgba(255,255,255,0.35);
-  border-radius: 20px;
-  padding: 8px 14px;
-  font-size: 13px;
-  color: #fff;
-}
-#online-name-input::placeholder { color: rgba(255,255,255,0.5); }
-#online-name-save-btn {
-  background: rgba(255,255,255,0.15);
-  border: 1.5px solid rgba(255,255,255,0.35);
-  border-radius: 20px;
-  color: #fff;
-  font-size: 13px; font-weight: 700;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-#online-status { color: rgba(255,255,255,0.7); font-size: 13px; text-align: center; margin-bottom: 8px; min-height: 18px; }
-#online-list { max-height: 160px; overflow-y: auto; }
 #board-close-btn {
   background: #FF6FA8; color: #fff;
   border: none; border-radius: 30px;
@@ -396,21 +350,6 @@ canvas {
     <div id="board-overlay" class="hidden">
       <h1>🏆 ランキング</h1>
       <div id="board-list"></div>
-      <div id="online-board-section">
-        <div id="online-board-header">
-          <span>🌐 オンライン</span>
-          <div id="online-mode-tabs">
-            <button class="online-mode-tab active" id="online-tab-marathon" data-mode="marathon">マラソン</button>
-            <button class="online-mode-tab" id="online-tab-quest" data-mode="quest">クエスト</button>
-          </div>
-        </div>
-        <div id="online-name-row">
-          <input id="online-name-input" maxlength="12" placeholder="オンライン用のなまえ">
-          <button id="online-name-save-btn">保存</button>
-        </div>
-        <div id="online-status"></div>
-        <div id="online-list"></div>
-      </div>
       <button id="board-close-btn">とじる</button>
     </div>
   </div>
@@ -420,7 +359,6 @@ canvas {
   <p>Rotate to play!</p>
 </div>
 
-<script src="shared/moku-scores.js"></script>
 <script>
 // ─── CANVAS ───────────────────────────────────────────────────
 const canvas = document.getElementById('c');
@@ -467,19 +405,6 @@ const MAGIC_CHANCE = 0.025; // ~2.5% of spawned pieces are レインボーモク
 const RAINBOW = -1; // sentinel grid value — not a STAGES index, never merges/matches on its own
 const LEADERBOARD_KEY = 'moyomoyo-leaderboard';
 const LEADERBOARD_MAX = 10;
-
-// ─── ONLINE RANKING (see SPEC.md §6, shared/moku-scores.js) ────
-// Private/public Dreamlo codes never reach the client — only gameId is sent.
-MokuScores.configure({
-  proxyBaseUrl: 'https://juqg6nv21k.execute-api.ap-southeast-5.amazonaws.com/default/moku-dreamlo-proxy',
-  gameId: 'moyomoyo'
-});
-const PLAYER_NAME_KEY = 'moyomoyo-player-name';
-// Marathon and Moyo Quest scores aren't comparable, but they share one
-// gameId leaderboard (one per title, per SPEC.md §6) — tag entries by mode
-// so the ranking screen can filter to one ladder at a time.
-const ONLINE_MODE_TAG = { marathon: '・M', quest: '・Q' };
-let onlineMode = 'marathon';
 
 // ─── CPU対戦 (VS MODE) config ────────────────────────────────
 // Same 10x9 grid shape as marathon mode. Two boards side by side don't
@@ -1557,63 +1482,8 @@ function renderBoard() {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
-// ─── ONLINE RANKING ─────────────────────────────────────────────
-function getOnlinePlayerName() {
-  return localStorage.getItem(PLAYER_NAME_KEY) || '';
-}
-// Fire-and-forget: a failed/slow submit must never affect gameplay.
-function submitOnlineScore(mode, s, lv) {
-  const base = (getOnlinePlayerName() || 'モヨラー').slice(0, 12);
-  const playerName = base + ONLINE_MODE_TAG[mode];
-  MokuScores.submit(s, { playerName, level: lv }).catch(() => {});
-}
-async function renderOnlineBoard() {
-  const listEl = document.getElementById('online-list');
-  const statusEl = document.getElementById('online-status');
-  while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
-  statusEl.textContent = '読み込み中…';
-  let ranking;
-  try {
-    ranking = await MokuScores.fetchTop(25);
-  } catch (e) {
-    statusEl.textContent = '通信に失敗しました。しばらくしてから開き直してください。';
-    return;
-  }
-  const tag = ONLINE_MODE_TAG[onlineMode];
-  const filtered = (ranking || []).filter(e => typeof e.playerName === 'string' && e.playerName.endsWith(tag));
-  if (filtered.length === 0) {
-    statusEl.textContent = 'まだ記録がありません';
-    return;
-  }
-  statusEl.textContent = '';
-  const myDeviceSuffix = MokuScores.getDeviceId().slice(0, 6);
-  filtered.slice(0, 10).forEach((entry, i) => {
-    const row = document.createElement('div');
-    row.className = 'board-row' + (entry.deviceIdSuffix === myDeviceSuffix ? ' me' : '');
-    const rank = document.createElement('span');
-    rank.className = 'rank';
-    rank.textContent = String(i + 1);
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = entry.playerName.slice(0, -tag.length);
-    const scoreEl = document.createElement('span');
-    scoreEl.className = 'score';
-    scoreEl.textContent = `${entry.score}pt`;
-    row.append(rank, name, scoreEl);
-    listEl.appendChild(row);
-  });
-}
-function setOnlineMode(m) {
-  onlineMode = m;
-  document.getElementById('online-tab-marathon').classList.toggle('active', m === 'marathon');
-  document.getElementById('online-tab-quest').classList.toggle('active', m === 'quest');
-  renderOnlineBoard();
-}
 function openBoard() {
   renderBoard();
-  document.getElementById('online-name-input').value = getOnlinePlayerName();
-  setOnlineMode(mode === 'VS' ? 'quest' : 'marathon');
   document.getElementById('board-overlay').classList.remove('hidden');
 }
 function closeBoard() {
@@ -1630,7 +1500,6 @@ function endRun(title, sfxKind) {
   if (score > bestScore) {
     bestScore = score;
     localStorage.setItem('moyomoyo-best', String(bestScore));
-    submitOnlineScore('marathon', score, level);
   }
   const secs = Math.floor(playFrames / 60);
   const mm = Math.floor(secs / 60);
@@ -2611,7 +2480,6 @@ function endRunVs() {
   if (vsP.score > questBestScore) {
     questBestScore = vsP.score;
     localStorage.setItem('moyomoyo-quest-best', String(questBestScore));
-    submitOnlineScore('quest', vsP.score, cpuLevel);
   }
   const ov = document.getElementById('overlay');
   ov.classList.remove('hidden');
@@ -2819,14 +2687,6 @@ document.getElementById('ov-board-btn').addEventListener('click', () => {
   else openBoard();
 });
 document.getElementById('board-close-btn').addEventListener('click', closeBoard);
-
-document.getElementById('online-tab-marathon').addEventListener('click', () => setOnlineMode('marathon'));
-document.getElementById('online-tab-quest').addEventListener('click', () => setOnlineMode('quest'));
-document.getElementById('online-name-save-btn').addEventListener('click', () => {
-  const name = document.getElementById('online-name-input').value.trim().slice(0, 12);
-  localStorage.setItem(PLAYER_NAME_KEY, name);
-  document.getElementById('online-name-input').value = name;
-});
 
 document.getElementById('pause-btn').addEventListener('click', () => {
   if (state === 'PLAYING') pauseGame();
