@@ -514,7 +514,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.1.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.1.1 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -1349,14 +1349,22 @@ canvas#c {
     var isWater = tileAt(gx, gy) === 'water';
     diamondPath(p.x, p.y);
     if (isWater) {
-      ctx.fillStyle = checker ? 'rgba(58,140,214,0.22)' : 'rgba(58,140,214,0.13)';
+      // Bold, unambiguous ocean blue — the previous low-opacity tint read
+      // as "just a slightly different empty tile" rather than water.
+      ctx.fillStyle = checker ? '#1C5A94' : '#164B7C';
     } else {
       ctx.fillStyle = checker ? 'rgba(76,190,138,0.10)' : 'rgba(76,190,138,0.05)';
     }
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = isWater ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
     ctx.stroke();
+    if (isWater && (gx * 7 + gy * 13) % 5 === 0) {
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText('〰️', p.x, p.y + TILE_H * 0.62);
+    }
   }
 
   function drawBuilding(gx, gy, key) {
