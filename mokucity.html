@@ -514,7 +514,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.1.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.2.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -675,7 +675,10 @@ canvas#c {
     // four separate buildings so merging is a genuine upgrade, not just
     // tidier.
     house2: { id: 'house2', name: 'Apartment',     icon: '🏢', color: '#2E9E6B', pop: 5 },
-    park2:  { id: 'park2',  name: 'Grove',         icon: '🏞️', color: '#2C7A46', sat: 9 },
+    // nature is per cell and higher than a lone Park's implicit 1 — four
+    // parks merged into one grove count for MORE than four scattered
+    // parks would, not just the same total.
+    park2:  { id: 'park2',  name: 'Grove',         icon: '🏞️', color: '#2C7A46', sat: 9, nature: 1.25 },
     shop2:  { id: 'shop2',  name: 'Shopping Mall', icon: '🏬', color: '#E6A93A', income: 5.5 }
   };
   var PALETTE_ORDER = [
@@ -718,32 +721,40 @@ canvas#c {
     return arr;
   }
 
-  // ---------- 2x2 merges ----------
-  // Four of the same building sitting in a 2x2 square auto-upgrade into one
-  // bigger object. progress.merges tracks each block's anchor (top-left
-  // cell) separately from the grid so rendering knows exactly which single
-  // cell draws the big sprite — deriving that purely from adjacent-cell
-  // checks breaks when two merged blocks sit diagonally next to each other
-  // (a corner cell can look like a false anchor of its neighbor's block).
-  function tryMerge2x2(gx, gy, baseType, mergedType) {
-    if (tileAt(gx, gy) === baseType && tileAt(gx + 1, gy) === baseType &&
-        tileAt(gx, gy + 1) === baseType && tileAt(gx + 1, gy + 1) === baseType) {
-      progress.grid[idx(gx, gy)] = mergedType;
-      progress.grid[idx(gx + 1, gy)] = mergedType;
-      progress.grid[idx(gx, gy + 1)] = mergedType;
-      progress.grid[idx(gx + 1, gy + 1)] = mergedType;
-      progress.merges.push({ type: mergedType, gx: gx, gy: gy });
-      return true;
+  // ---------- shape merges ----------
+  // Four of the same building sitting in a 2x2 square — or, for Park, also
+  // a straight run of 4 in a row/column — auto-upgrade into one bigger
+  // object. progress.merges tracks each block's anchor (top-left cell) and
+  // footprint (w,h) separately from the grid so rendering knows exactly
+  // which single cell draws the big sprite — deriving that purely from
+  // adjacent-cell checks breaks when two merged blocks sit next to each
+  // other (a shared corner/edge cell can look like a false anchor of its
+  // neighbor's block).
+  function tryMergeShape(gx, gy, w, h, baseType, mergedType) {
+    for (var dy = 0; dy < h; dy++) {
+      for (var dx = 0; dx < w; dx++) {
+        if (tileAt(gx + dx, gy + dy) !== baseType) return false;
+      }
     }
-    return false;
+    for (var dy2 = 0; dy2 < h; dy2++) {
+      for (var dx2 = 0; dx2 < w; dx2++) {
+        progress.grid[idx(gx + dx2, gy + dy2)] = mergedType;
+      }
+    }
+    progress.merges.push({ type: mergedType, gx: gx, gy: gy, w: w, h: h });
+    return true;
   }
   function checkMerges() {
     var didMerge = false;
-    for (var gy = 0; gy < GRID_H - 1; gy++) {
-      for (var gx = 0; gx < GRID_W - 1; gx++) {
-        if (tryMerge2x2(gx, gy, 'house', 'house2')) { didMerge = true; continue; }
-        if (tryMerge2x2(gx, gy, 'park', 'park2')) { didMerge = true; continue; }
-        if (tryMerge2x2(gx, gy, 'shop', 'shop2')) didMerge = true;
+    for (var gy = 0; gy < GRID_H; gy++) {
+      for (var gx = 0; gx < GRID_W; gx++) {
+        if (tryMergeShape(gx, gy, 2, 2, 'house', 'house2')) { didMerge = true; continue; }
+        if (tryMergeShape(gx, gy, 2, 2, 'park', 'park2')) { didMerge = true; continue; }
+        if (tryMergeShape(gx, gy, 2, 2, 'shop', 'shop2')) { didMerge = true; continue; }
+        // Park groves also form as a straight run of 4 — a tree-lined row
+        // is as much a grove as a square cluster.
+        if (tryMergeShape(gx, gy, 4, 1, 'park', 'park2')) { didMerge = true; continue; }
+        if (tryMergeShape(gx, gy, 1, 4, 'park', 'park2')) didMerge = true;
       }
     }
     if (didMerge) showToast('🏙️ Buildings merged into something bigger!');
@@ -757,21 +768,23 @@ canvas#c {
   function findMergeContaining(gx, gy) {
     for (var i = 0; i < progress.merges.length; i++) {
       var m = progress.merges[i];
-      if (gx >= m.gx && gx <= m.gx + 1 && gy >= m.gy && gy <= m.gy + 1) return i;
+      if (gx >= m.gx && gx < m.gx + m.w && gy >= m.gy && gy < m.gy + m.h) return i;
     }
     return -1;
   }
   // Clears a single grid cell, but breaks a whole merged block at once if
   // the cell belongs to one — a disaster or bulldoze hitting any corner of
-  // an Apartment/Grove takes out the entire 2x2, not a single stray cell.
+  // an Apartment/Grove/Mall takes out the entire block, not a single stray
+  // cell.
   function clearCell(gx, gy) {
     var mi = findMergeContaining(gx, gy);
     if (mi >= 0) {
       var m = progress.merges[mi];
-      progress.grid[idx(m.gx, m.gy)] = null;
-      progress.grid[idx(m.gx + 1, m.gy)] = null;
-      progress.grid[idx(m.gx, m.gy + 1)] = null;
-      progress.grid[idx(m.gx + 1, m.gy + 1)] = null;
+      for (var dy = 0; dy < m.h; dy++) {
+        for (var dx = 0; dx < m.w; dx++) {
+          progress.grid[idx(m.gx + dx, m.gy + dy)] = null;
+        }
+      }
       progress.merges.splice(mi, 1);
     } else {
       progress.grid[idx(gx, gy)] = null;
@@ -1040,7 +1053,7 @@ canvas#c {
         if (t === 'house') { pop += BUILDINGS.house.pop; houses++; }
         if (t === 'house2') { pop += BUILDINGS.house2.pop; houses++; }
         if (t === 'park') { parks++; natureTiles++; }
-        if (t === 'park2') { parks2++; natureTiles++; }
+        if (t === 'park2') { parks2++; natureTiles += BUILDINGS.park2.nature; }
         if (t === 'forest') { forestTiles++; natureTiles++; }
         if (t === 'school') schools++;
         if (t === 'landmark') landmarks++;
@@ -1419,11 +1432,15 @@ canvas#c {
   // at double the footprint — same extrusion shape as drawBuilding, just
   // scaled, since the anchor's own top vertex is exactly the combined
   // diamond's top vertex (gridToScreen is a linear map).
-  function drawMergedBuilding(ax, ay, key) {
+  function drawMergedBuilding(ax, ay, w, h, key) {
     var b = BUILDINGS[key];
     var top = gridToScreen(ax, ay);
     var cx = top.x, topY = top.y;
-    var W2 = TILE_W * 2, H2 = TILE_H * 2;
+    // A true isometric footprint for a non-square w x h block is a
+    // parallelogram, not a diamond — this approximates it with a diamond
+    // sized independently per axis, close enough at this sprite scale and
+    // consistent with the simplified extrusion style used everywhere else.
+    var W2 = TILE_W * w, H2 = TILE_H * h;
     // Deliberately NOT scaled up with the doubled footprint — a taller
     // block would bury anything sitting behind it on the isometric grid.
     // Height stays close to a normal single-tile building; the wider
@@ -1674,7 +1691,7 @@ canvas#c {
       if (!key || key === 'water') return; // open water/locked islands: base tile only
       if (key === 'house2' || key === 'park2' || key === 'shop2') {
         var anchor = findMergeAnchor(t.gx, t.gy);
-        if (anchor) drawMergedBuilding(t.gx, t.gy, key);
+        if (anchor) drawMergedBuilding(t.gx, t.gy, anchor.w, anchor.h, key);
         return;
       }
       drawBuilding(t.gx, t.gy, key);
