@@ -536,7 +536,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.3.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.3.1 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -1391,11 +1391,13 @@ canvas#c {
     zoom = Math.min(2.2, Math.max(0.4, Math.min(w / gridPxW, h / gridPxH) * 0.94));
     ctx.setTransform(DPR * zoom, 0, 0, DPR * zoom, 0, 0);
     // Bias the vertical center toward the upper part of canvasArea (roughly
-    // 38% down) instead of dead-center — there's reliably more empty
-    // headroom above than clearance below before the palette bar.
+    // 42% down) instead of dead-center — there's reliably more empty
+    // headroom above than clearance below before the palette bar. (Was
+    // 38% — tight enough at the wider Wide/World zoom levels to clip the
+    // very top tile while leaving visible slack at the bottom.)
     var cxIdx = (bounds.minX + bounds.maxX) / 2, cyIdx = (bounds.minY + bounds.maxY) / 2;
     originX = (w / zoom) / 2 - (cxIdx - cyIdx) * (TILE_W / 2);
-    originY = (h / zoom) * 0.38 - (cxIdx + cyIdx) * (TILE_H / 2);
+    originY = (h / zoom) * 0.42 - (cxIdx + cyIdx) * (TILE_H / 2);
     draw();
   }
 
