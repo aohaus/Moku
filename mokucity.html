@@ -514,7 +514,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.2.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.2.1 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -937,10 +937,15 @@ canvas#c {
   }
 
   // ---------- save data ----------
+  // The grid starts entirely 'water' — seeding a region has to explicitly
+  // set the non-forest cells to null (empty buildable ground), not just
+  // leave them alone, or they stay stuck as literal water: rendered blue
+  // and rejected by handlePlace(), scattered through what's supposed to be
+  // solid buildable land.
   function seedIsland(grid, x0, y0, w, h) {
     for (var gy = y0; gy < y0 + h; gy++) {
       for (var gx = x0; gx < x0 + w; gx++) {
-        if (Math.random() < 0.45) grid[gy * GRID_W + gx] = 'forest';
+        grid[gy * GRID_W + gx] = Math.random() < 0.45 ? 'forest' : null;
       }
     }
   }
@@ -987,6 +992,23 @@ canvas#c {
     }
     return data;
   }
+  // One-time self-heal for saves written while seedIsland() had the bug
+  // above: any cell that's actually inside the mainland or an island but
+  // still stored as literal 'water' (should be empty buildable ground)
+  // gets fixed in place. Runs on every load — cheap (~130 cells) and a
+  // no-op once a save is clean.
+  function repairStrandedWater(data) {
+    function fixRegion(x0, y0, w, h) {
+      for (var gy = y0; gy < y0 + h; gy++) {
+        for (var gx = x0; gx < x0 + w; gx++) {
+          var i = gy * GRID_W + gx;
+          if (data.grid[i] === 'water') data.grid[i] = null;
+        }
+      }
+    }
+    fixRegion(MAINLAND_MIN, MAINLAND_MIN, MAINLAND_SIZE, MAINLAND_SIZE);
+    ISLANDS.forEach(function (isl) { fixRegion(isl.x0, isl.y0, isl.w, isl.h); });
+  }
   function loadProgress() {
     try {
       var raw = localStorage.getItem(SAVE_KEY);
@@ -995,6 +1017,7 @@ canvas#c {
         if (data && data.gameId === GAME_ID && Array.isArray(data.grid)) {
           if (data.grid.length === 10 * 10) data = migrateLegacyGrid(data);
           if (data.grid.length !== GRID_W * GRID_H) throw new Error('unrecognized grid size');
+          repairStrandedWater(data);
           // Backfill for saves written before later versions added fields.
           if (typeof data.level !== 'number') data.level = 1;
           if (typeof data.questIndex !== 'number') data.questIndex = 0;
