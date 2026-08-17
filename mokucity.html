@@ -239,6 +239,15 @@ body.playing #wrapper { display: flex; }
   padding: 7px 14px; border-radius: 999px;
   font-size: 17px; font-weight: 800;
 }
+#refreshBtn {
+  appearance: none; border: none; cursor: pointer;
+  background: rgba(10,8,18,0.5);
+  color: #EDEEF6;
+  width: 38px; height: 38px; border-radius: 50%;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+#refreshBtn:active { transform: rotate(90deg); transition: transform 0.3s; }
 
 #canvasArea {
   position: relative;
@@ -497,6 +506,7 @@ canvas#c {
   #hud .stat { font-size: 12px; padding: 3px 7px; }
   #hud .stat.mood { font-size: 15px; padding: 3px 6px; }
   #titleBtn { font-size: 11.5px; padding: 4px 8px; }
+  #refreshBtn { width: 28px; height: 28px; font-size: 12px; }
   #questBar { margin: 0 8px 4px; padding: 4px 8px; gap: 6px; }
   #questBar .questIcon { font-size: 12px; }
   #questBar .questTitle { font-size: 10.5px; }
@@ -536,7 +546,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.4.0 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.5.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -564,6 +574,7 @@ canvas#c {
 <div id="wrapper">
   <div id="hud">
     <button id="titleBtn" type="button">◀ Title</button>
+    <button id="refreshBtn" type="button" aria-label="Refresh to latest version" title="Refresh to latest version">🔄</button>
     <div id="dashboard">
       <div class="stat lvl">⭐ Lv <span id="hudLevel">1</span></div>
       <div class="stat coins">💰 <span id="hudCoins">0</span></div>
@@ -714,10 +725,13 @@ canvas#c {
   // reads as a town landmark, not a random building — disasters skip them
   // entirely rather than being able to erase one in a single hit.
   var MERGED_TYPES = { house2: true, park2: true, shop2: true };
-  var BUILDING_HEIGHTS = {
-    house: 22, shop: 30, school: 26, landmark: 38,
-    restaurant: 18, giftshop: 16, station: 24, hotel: 32, airport: 34
-  };
+  // One uniform extrusion height for every building, single-tile and
+  // merged alike — buildings used to each have their own height (up to
+  // 38 for Landmark) and merges scaled even taller, which read as
+  // inconsistent/too-tall pedestals next to a flat Park. Everything now
+  // sits at the same height Park always used; buildings differentiate by
+  // color, icon, and footprint instead.
+  var BUILDING_HEIGHT = 10;
   var NATURE_LOW = 35, NATURE_HIGH = 65;
 
   // ---------- natural disasters ----------
@@ -1459,7 +1473,7 @@ canvas#c {
       ctx.fill();
       return;
     }
-    var height = BUILDING_HEIGHTS[key] || 10;
+    var height = BUILDING_HEIGHT;
     var baseY = topY + TILE_H * 0.72;
     // simple extruded box: front-left, front-right, top diamond
     ctx.fillStyle = shade(b.color, -30);
@@ -1513,12 +1527,11 @@ canvas#c {
     var right = { x: top.x + w * TILE_W / 2, y: top.y + w * TILE_H / 2 };
     var left = { x: top.x - h * TILE_W / 2, y: top.y + h * TILE_H / 2 };
     var bottom = { x: right.x + (left.x - top.x), y: right.y + (left.y - top.y) };
-    // Deliberately NOT scaled up with the footprint — a taller block would
-    // bury anything sitting behind it on the isometric grid. Height stays
-    // close to a normal single-tile building; the wider footprint alone
-    // reads as "bigger", and a touch of transparency on the walls (not the
-    // icon) keeps whatever's behind it visible too.
-    var height = key === 'park2' ? 13 : key === 'shop2' ? 28 : 25;
+    // Same uniform height as every other building — a taller block would
+    // bury anything sitting behind it on the isometric grid, and the wider
+    // footprint alone already reads as "bigger". A touch of transparency
+    // on the walls (not the icon) keeps whatever's behind it visible too.
+    var height = BUILDING_HEIGHT;
     ctx.save();
     ctx.globalAlpha = 0.82;
     ctx.fillStyle = shade(b.color, -30);
@@ -1976,6 +1989,13 @@ canvas#c {
     handleMenuAction(item);
   });
   document.getElementById('titleBtn').addEventListener('click', goTitle);
+  // Progress lives in localStorage, independent of the page itself, so a
+  // reload can't lose it — this just re-fetches the file with a
+  // cache-busting query string, in case the browser (or GitHub Pages'
+  // caching) is still serving an older cached copy after an update ships.
+  document.getElementById('refreshBtn').addEventListener('click', function () {
+    window.location.href = window.location.pathname + '?t=' + Date.now();
+  });
 
   function toggleHowTo() {
     document.getElementById('howToPanel').classList.toggle('show');
