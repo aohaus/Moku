@@ -467,6 +467,22 @@ canvas#c {
   -webkit-tap-highlight-color: transparent;
 }
 #placeBtn:active { background: rgba(76,190,138,0.3); }
+#zoomBtn {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(10,8,18,0.55);
+  color: rgba(237,238,246,0.85);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+#zoomBtn:active { background: rgba(255,255,255,0.15); }
 
 /* ---------- compact layout: short landscape (phones) ---------- */
 /* iPad-scale chrome (large stat pills, a 140px D-pad) eats most of a
@@ -507,6 +523,12 @@ canvas#c {
     width: 46px; height: 46px;
     font-size: 17px;
   }
+  #zoomBtn {
+    right: calc(env(safe-area-inset-right, 0px) + 6px);
+    top: calc(env(safe-area-inset-top, 0px) + 6px);
+    width: 32px; height: 32px;
+    font-size: 13px;
+  }
 }
 </style>
 </head>
@@ -514,7 +536,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.2.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.3.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -579,6 +601,7 @@ canvas#c {
         <button class="dbtn down" type="button" data-dir="down" aria-label="Move down">▼</button>
       </div>
       <button id="placeBtn" type="button" aria-label="Place or clear">✓</button>
+      <button id="zoomBtn" type="button" aria-label="Cycle zoom level">🔍</button>
     </div>
   </div>
   <div id="palette"></div>
@@ -1325,6 +1348,18 @@ canvas#c {
   // tiny from the very start to make room for ocean nobody can reach yet.
   // As each island unlocks the frame widens to include it (see
   // checkIslandUnlocks() -> resizeCanvas()).
+  // Three manual zoom levels on top of the auto-fit framing: the default
+  // "Fit" crop is snug around the mainland/unlocked islands, which is
+  // exactly what clips a bit of the ocean checker/wave texture at the
+  // edges (cosmetic — the ocean itself is still there, just partly off
+  // the visible canvas). "Wide" pads the frame out, "World" always shows
+  // the full 18x18 including locked islands.
+  var ZOOM_MODES = [
+    { label: 'Fit', icon: '🔍' },
+    { label: 'Wide', icon: '🔎' },
+    { label: 'World', icon: '🌐' }
+  ];
+  var zoomModeIndex = 0;
   function visibleBounds() {
     var minX = MAINLAND_MIN, minY = MAINLAND_MIN;
     var maxX = MAINLAND_MIN + MAINLAND_SIZE, maxY = MAINLAND_MIN + MAINLAND_SIZE;
@@ -1333,6 +1368,14 @@ canvas#c {
       minX = Math.min(minX, isl.x0); minY = Math.min(minY, isl.y0);
       maxX = Math.max(maxX, isl.x0 + isl.w); maxY = Math.max(maxY, isl.y0 + isl.h);
     });
+    var mode = ZOOM_MODES[zoomModeIndex].label;
+    if (mode === 'World') return { minX: 0, minY: 0, maxX: GRID_W, maxY: GRID_H };
+    if (mode === 'Wide') {
+      return {
+        minX: Math.max(0, minX - 3), minY: Math.max(0, minY - 3),
+        maxX: Math.min(GRID_W, maxX + 3), maxY: Math.min(GRID_H, maxY + 3)
+      };
+    }
     return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
   }
   function resizeCanvas() {
@@ -1848,6 +1891,14 @@ canvas#c {
     e.preventDefault();
     keyboardActive = true;
     handlePlace(keyCursor.gx, keyCursor.gy);
+  });
+  document.getElementById('zoomBtn').addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    zoomModeIndex = (zoomModeIndex + 1) % ZOOM_MODES.length;
+    var mode = ZOOM_MODES[zoomModeIndex];
+    document.getElementById('zoomBtn').textContent = mode.icon;
+    showToast(mode.icon + ' ' + mode.label + ' view');
+    resizeCanvas();
   });
 
   // ---------- game flow ----------
