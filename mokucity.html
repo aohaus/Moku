@@ -536,7 +536,7 @@ canvas#c {
 <div id="rotate-hint"><span>📱</span><p>MokuCity is played in landscape.<br>Please rotate your device.</p></div>
 <div id="title-frame"></div>
 <a id="hub-link" href="hub.html">🦉 Moku Series ▶</a>
-<div id="buildInfo">v2.3.1 · Updated Aug 15, 2026</div>
+<div id="buildInfo">v2.4.0 · Updated Aug 15, 2026</div>
 
 <section class="screen active" id="titleScreen">
   <img id="titleMascot" src="brand/mokumoku-hero.png" alt="Mokumoku">
@@ -1503,52 +1503,65 @@ canvas#c {
   function drawMergedBuilding(ax, ay, w, h, key) {
     var b = BUILDINGS[key];
     var top = gridToScreen(ax, ay);
-    var cx = top.x, topY = top.y;
-    // A true isometric footprint for a non-square w x h block is a
-    // parallelogram, not a diamond — this approximates it with a diamond
-    // sized independently per axis, close enough at this sprite scale and
-    // consistent with the simplified extrusion style used everywhere else.
-    var W2 = TILE_W * w, H2 = TILE_H * h;
-    // Deliberately NOT scaled up with the doubled footprint — a taller
-    // block would bury anything sitting behind it on the isometric grid.
-    // Height stays close to a normal single-tile building; the wider
-    // footprint alone reads as "bigger", and a touch of transparency on
-    // the walls (not the icon) keeps whatever's behind it visible too.
+    // The true isometric footprint of a w x h block is a parallelogram —
+    // its two edges are the same (gx-gy, gx+gy) basis vectors gridToScreen
+    // uses everywhere else, just scaled by w and h independently. Treating
+    // it as a symmetric diamond (the previous approach) was only correct
+    // for square blocks; for anything like a 1x4 Grove it put the sprite
+    // in the wrong screen position entirely — reported as a grove floating
+    // over open water despite being built on solid mainland tiles.
+    var right = { x: top.x + w * TILE_W / 2, y: top.y + w * TILE_H / 2 };
+    var left = { x: top.x - h * TILE_W / 2, y: top.y + h * TILE_H / 2 };
+    var bottom = { x: right.x + (left.x - top.x), y: right.y + (left.y - top.y) };
+    // Deliberately NOT scaled up with the footprint — a taller block would
+    // bury anything sitting behind it on the isometric grid. Height stays
+    // close to a normal single-tile building; the wider footprint alone
+    // reads as "bigger", and a touch of transparency on the walls (not the
+    // icon) keeps whatever's behind it visible too.
     var height = key === 'park2' ? 13 : key === 'shop2' ? 28 : 25;
-    var baseY = topY + H2 * 0.72;
     ctx.save();
     ctx.globalAlpha = 0.82;
     ctx.fillStyle = shade(b.color, -30);
     ctx.beginPath();
-    ctx.moveTo(cx - W2 * 0.28, baseY);
-    ctx.lineTo(cx, baseY + H2 * 0.28);
-    ctx.lineTo(cx, baseY + H2 * 0.28 - height);
-    ctx.lineTo(cx - W2 * 0.28, baseY - height);
+    ctx.moveTo(left.x, left.y);
+    ctx.lineTo(bottom.x, bottom.y);
+    ctx.lineTo(bottom.x, bottom.y - height);
+    ctx.lineTo(left.x, left.y - height);
     ctx.closePath();
     ctx.fill();
 
     ctx.fillStyle = shade(b.color, -12);
     ctx.beginPath();
-    ctx.moveTo(cx + W2 * 0.28, baseY);
-    ctx.lineTo(cx, baseY + H2 * 0.28);
-    ctx.lineTo(cx, baseY + H2 * 0.28 - height);
-    ctx.lineTo(cx + W2 * 0.28, baseY - height);
+    ctx.moveTo(right.x, right.y);
+    ctx.lineTo(bottom.x, bottom.y);
+    ctx.lineTo(bottom.x, bottom.y - height);
+    ctx.lineTo(right.x, right.y - height);
     ctx.closePath();
     ctx.fill();
 
     ctx.fillStyle = b.color;
     ctx.beginPath();
-    ctx.moveTo(cx, baseY - height - H2 * 0.28);
-    ctx.lineTo(cx + W2 * 0.28, baseY - height);
-    ctx.lineTo(cx, baseY - height + H2 * 0.28);
-    ctx.lineTo(cx - W2 * 0.28, baseY - height);
+    ctx.moveTo(top.x, top.y - height);
+    ctx.lineTo(right.x, right.y - height);
+    ctx.lineTo(bottom.x, bottom.y - height);
+    ctx.lineTo(left.x, left.y - height);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
 
-    ctx.font = '24px sans-serif';
+    // Icon anchored at the true center of the top face, with a soft dark
+    // backing disc so it reads clearly against any of the wall colors —
+    // the previous plain-text icon was hard to pick out at a glance.
+    var iconCx = (top.x + bottom.x) / 2, iconCy = (top.y + bottom.y) / 2 - height;
+    ctx.beginPath();
+    ctx.arc(iconCx, iconCy, 13, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(10,8,18,0.45)';
+    ctx.fill();
+    ctx.font = '20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(b.icon, cx, baseY - height - H2 * 0.06);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.icon, iconCx, iconCy + 1);
+    ctx.textBaseline = 'alphabetic';
   }
 
   function shade(hex, amt) {
